@@ -3,8 +3,10 @@ extern crate core_graphics;
 extern crate objc;
 
 use cocoa::appkit::{
-    NSApp, NSApplication, NSColor, NSWindow, NSWindowCollectionBehavior, NSWindowStyleMask,
+    NSApp, NSApplication, NSColor, NSPanel, NSWindowCollectionBehavior, NSWindowStyleMask,
+    NSBackingStoreType,
 };
+use cocoa::appkit::NSWindow; // IMPORTANTE: Trae a alcance los métodos definidos en el trait NSWindow.
 use cocoa::base::{id, nil, YES, NO};
 use cocoa::foundation::{NSPoint, NSRect, NSSize};
 use core_graphics::display::CGDisplay;
@@ -28,19 +30,24 @@ fn main() {
 
         // Obtenemos las pantallas activas
         let displays = CGDisplay::active_displays().unwrap();
-        let total_width: f64 = displays.iter().map(|&id| CGDisplay::new(id).bounds().size.width).sum();
+        let total_width: f64 = displays
+            .iter()
+            .map(|&id| CGDisplay::new(id).bounds().size.width)
+            .sum();
         let max_height: f64 = displays
             .iter()
             .map(|&id| CGDisplay::new(id).bounds().size.height)
             .max_by(|a, b| a.partial_cmp(b).unwrap())
             .unwrap();
 
-        // Creamos la ventana sin bordes y del tamaño de todas las pantallas
-        let window = NSWindow::alloc(nil).initWithContentRect_styleMask_backing_defer_(
+        // Creamos la ventana sin bordes y del tamaño de todas las pantallas usando NSPanel
+        // Usamos initWithContentRect_styleMask_backing_defer_screen_ (pasando nil como pantalla)
+        let window = NSPanel::alloc(nil).initWithContentRect_styleMask_backing_defer_screen_(
             NSRect::new(NSPoint::new(0.0, 0.0), NSSize::new(total_width, max_height)),
             NSWindowStyleMask::NSBorderlessWindowMask,
-            cocoa::appkit::NSBackingStoreType::NSBackingStoreBuffered,
+            NSBackingStoreType::NSBackingStoreBuffered,
             NO,
+            nil
         );
 
         // Configuración de la ventana para que se muestre en todas las pantallas
@@ -48,14 +55,16 @@ fn main() {
         window.setBackgroundColor_(NSColor::clearColor(nil));
         window.setIgnoresMouseEvents_(YES);
 
-        // Forzamos el nivel de la ventana para que se muestre sobre otras (incluido pantalla completa)
+        // Elevamos el nivel de la ventana para que se muestre sobre otras (incluido pantalla completa)
         window.setLevel_(1000.into());
 
-        // Configuramos la ventana para que esté en todos los espacios, pantallas y en pantalla completa
+        // Configuramos la ventana para que esté en todos los espacios y en pantalla completa,
+        // agregando también IgnoresCycle para evitar que se incluya en el ciclo de ventanas.
         window.setCollectionBehavior_(
             NSWindowCollectionBehavior::NSWindowCollectionBehaviorCanJoinAllSpaces
-                | NSWindowCollectionBehavior::NSWindowCollectionBehaviorFullScreenAuxiliary
-                | NSWindowCollectionBehavior::NSWindowCollectionBehaviorStationary,
+            | NSWindowCollectionBehavior::NSWindowCollectionBehaviorFullScreenAuxiliary
+            | NSWindowCollectionBehavior::NSWindowCollectionBehaviorStationary
+            | NSWindowCollectionBehavior::NSWindowCollectionBehaviorIgnoresCycle
         );
 
         // Usamos el frame completo de la ventana para la vista
@@ -88,7 +97,7 @@ unsafe fn register_custom_view_class(window: id, frame: NSRect) -> id {
         unsafe {
             let (x, y) = CURSOR_POS;
 
-            // Invertimos la coordenada Y para que el círculo se alinee correctamente
+            // Invertimos la coordenada Y para alinear correctamente el dibujo
             let screen_height = CGDisplay::main().bounds().size.height;
             let adjusted_y = screen_height - y;
 
