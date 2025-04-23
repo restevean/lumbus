@@ -85,12 +85,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "dispatch"
-version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bd0c93bb4b0c6d9b77f4435b0ae98c24d17f1c45b2ff844c6151a07256ca923b"
-
-[[package]]
 name = "foreign-types"
 version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -125,9 +119,8 @@ name = "mouse_highlighter"
 version = "0.1.0"
 dependencies = [
  "cocoa",
+ "core-foundation",
  "core-graphics",
- "dispatch",
- "libc",
  "objc",
 ]
 
