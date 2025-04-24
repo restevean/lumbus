@@ -1,3 +1,4 @@
+#![allow(unexpected_cfgs)]
 extern crate cocoa;
 extern crate core_graphics;
 extern crate objc;
@@ -45,10 +46,9 @@ fn main() {
         window.setBackgroundColor_(NSColor::clearColor(nil));
         window.setIgnoresMouseEvents_(YES);
 
-        // Forzar el nivel de la ventana por encima de los menús contextuales y el dock
-        // window.setLevel_((nspop_up_menu_window_level() + 1).into());
         // Forzar el nivel de la ventana por encima de todas las demás ventanas
-        window.setLevel_(NS_STATUS_WINDOW_LEVEL);
+        window.setLevel_(NS_STATUS_WINDOW_LEVEL + 1);
+
         // Configuramos la ventana para que esté en todos los espacios, pantallas y en pantalla completa
         window.setCollectionBehavior_(
             NSWindowCollectionBehavior::NSWindowCollectionBehaviorCanJoinAllSpaces
@@ -56,7 +56,7 @@ fn main() {
                 | NSWindowCollectionBehavior::NSWindowCollectionBehaviorStationary
         );
 
-        let view: id = register_custom_view_class(window);
+        let view: id = register_custom_view_class(window, total_width, max_height);
 
         // Usamos NSTimer para actualizar la posición del cursor cada 16 ms
         let _: id = create_timer(view, sel!(update_cursor), 0.016);
@@ -65,13 +65,8 @@ fn main() {
     }
 }
 
-/// Función para obtener el nivel de la ventana para menús contextuales
-fn nspop_up_menu_window_level() -> i64 {
-    201 // Ajustado para estar por encima de los menús contextuales
-}
-
 /// Registrar la clase personalizada de la vista
-unsafe fn register_custom_view_class(window: id) -> id {
+unsafe fn register_custom_view_class(window: id, width: f64, height: f64) -> id {
     let superclass = Class::get("NSView").unwrap();
     let mut decl = ClassDecl::new("CustomView", superclass).unwrap();
 
@@ -91,7 +86,7 @@ unsafe fn register_custom_view_class(window: id) -> id {
 
             // Invertimos la coordenada Y para que el círculo siga correctamente el puntero
             let screen_height = CGDisplay::main().bounds().size.height;
-            let adjusted_y = screen_height - y;  // Corregimos el movimiento en Y
+            let adjusted_y = screen_height - y; // Corregimos el movimiento en Y
 
             let radius = CIRCLE_DIAMETER / 2.0;
             let rect = NSRect::new(
@@ -114,9 +109,9 @@ unsafe fn register_custom_view_class(window: id) -> id {
 
     let new_class = decl.register();
 
-    // Crear la vista personalizada
+    // Crear la vista personalizada que cubre toda la ventana
     let view: id = msg_send![new_class, alloc];
-    let view: id = msg_send![view, initWithFrame: NSRect::new(NSPoint::new(0.0, 0.0), NSSize::new(800.0, 600.0))];
+    let view: id = msg_send![view, initWithFrame: NSRect::new(NSPoint::new(0.0, 0.0), NSSize::new(width, height))];
     let _: () = msg_send![window, setContentView: view];
     let _: () = msg_send![window, makeKeyAndOrderFront: nil];
 
