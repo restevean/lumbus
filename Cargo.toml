@@ -2,10 +2,9 @@
 name = "mouse_highlighter"
 version = "0.1.0"
 edition = "2021"
-authors = ["restevean <restevean@protonmail.com>"]
 
 [dependencies]
-cocoa = "0.24"
-core-graphics = "0.22"
+cocoa = "0.25"
 objc = "0.2"
-core-video-sys = "0.1"
+block = "0.1"
+core-graphics = "0.24"

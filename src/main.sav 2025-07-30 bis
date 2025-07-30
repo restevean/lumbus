@@ -2,15 +2,15 @@
 
 use block::ConcreteBlock;
 use cocoa::appkit::{
-    NSApp, NSApplication, NSApplicationActivationPolicy, NSBackingStoreType, NSColor, NSEventType,
-    NSWindow, NSWindowCollectionBehavior, NSWindowStyleMask,
+    NSApp, NSApplication, NSApplicationActivationPolicy, NSBackingStoreType, NSColor,
+    NSEventType, NSWindow, NSWindowCollectionBehavior, NSWindowStyleMask,
 };
 use cocoa::base::{id, nil, NO, YES};
 use cocoa::foundation::{NSAutoreleasePool, NSArray, NSPoint, NSRect, NSSize};
 use objc::runtime::{Class, Object, Sel};
 use objc::{class, declare::ClassDecl, msg_send, sel, sel_impl};
 
-// Apariencia del círculo
+// Dimensiones del círculo
 const CIRCLE_DIAMETER: f64 = 38.5;
 const BORDER_WIDTH: f64 = 3.0;
 
@@ -19,7 +19,7 @@ fn main() {
         let _pool = NSAutoreleasePool::new(nil);
 
         let app = NSApp();
-        // La app no toma foco (evita beep e interferencias)
+        // La app no toma foco (evita interferencias/beep)
         app.setActivationPolicy_(NSApplicationActivationPolicy::NSApplicationActivationPolicyProhibited);
 
         // --- Unión de todas las pantallas (Cocoa / NSScreen) ---
@@ -45,16 +45,16 @@ fn main() {
                 | NSWindowCollectionBehavior::NSWindowCollectionBehaviorStationary,
         );
 
-        // Vista personalizada con estado y monitor retenido
+        // Vista personalizada con estado + ivar para retener el monitor
         let view: id = register_custom_view_class_and_create_view(window, union_width, union_height);
 
-        // Timer a ~60 FPS para actualizar coordenadas y repintar (vista completa)
+        // Timer a ~60 FPS para actualizar coordenadas y repintar
         let _: id = create_timer(view, sel!(update_cursor), 0.016);
 
         // Monitor global de teclado: CTRL + A -> alterna visibilidad
         install_global_key_monitor(view);
 
-        // Mostrar sin hacerla key (no toma foco)
+        // Mostrar sin hacerla key
         let _: () = msg_send![window, orderFrontRegardless];
 
         app.run();
@@ -96,7 +96,7 @@ unsafe fn union_de_pantallas_cocoa() -> (f64, f64, f64, f64) {
     (min_x, min_y, union_width, union_height)
 }
 
-/// Posición del ratón en coordenadas **Cocoa** (pantalla)
+/// Obtiene la posición del ratón en coordenadas **Cocoa** (pantalla)
 fn get_mouse_position_cocoa() -> (f64, f64) {
     unsafe {
         let cls = class!(NSEvent);
@@ -105,7 +105,7 @@ fn get_mouse_position_cocoa() -> (f64, f64) {
     }
 }
 
-/// Registra `CustomView` y crea la instancia (estado sencillo, sin filtros)
+/// Registra `CustomView` y crea la instancia
 unsafe fn register_custom_view_class_and_create_view(window: id, width: f64, height: f64) -> id {
     let class_name = "CustomView";
     let custom_view_class = if let Some(cls) = Class::get(class_name) {
@@ -114,19 +114,19 @@ unsafe fn register_custom_view_class_and_create_view(window: id, width: f64, hei
         let superclass = Class::get("NSView").unwrap();
         let mut decl = ClassDecl::new(class_name, superclass).unwrap();
 
-        // Ivars de estado (posición pantalla) y retención de monitor de teclado
+        // Ivars para estado (posición Cocoa) y retención del monitor
         decl.add_ivar::<f64>("_cursorXScreen");
         decl.add_ivar::<f64>("_cursorYScreen");
         decl.add_ivar::<bool>("_visible");
         decl.add_ivar::<id>("_keyMonitor");
 
-        // Método: actualiza posición del cursor (Cocoa) y repinta vista completa
+        // Método: actualiza posición del cursor (Cocoa) y pide repintado
         extern "C" fn update_cursor(this: &mut Object, _cmd: Sel) {
             unsafe {
                 let (x, y) = get_mouse_position_cocoa();
                 *this.get_mut_ivar::<f64>("_cursorXScreen") = x;
                 *this.get_mut_ivar::<f64>("_cursorYScreen") = y;
-                let _: () = msg_send![this, setNeedsDisplay: YES]; // repinta todo -> sin “rastros”
+                let _: () = msg_send![this, setNeedsDisplay: YES];
             }
         }
 
@@ -135,16 +135,11 @@ unsafe fn register_custom_view_class_and_create_view(window: id, width: f64, hei
             unsafe {
                 let vis = *this.get_ivar::<bool>("_visible");
                 *this.get_mut_ivar::<bool>("_visible") = !vis;
-                // Pinta inmediatamente al mostrar (sin esperar al siguiente tick)
-                if !vis {
-                    let _: () = msg_send![this, performSelectorOnMainThread: sel!(update_cursor) withObject: nil waitUntilDone: NO];
-                } else {
-                    let _: () = msg_send![this, setNeedsDisplay: YES];
-                }
+                let _: () = msg_send![this, setNeedsDisplay: YES];
             }
         }
 
-        // Dibuja el círculo convertiendo **pantalla → ventana → vista** (Cocoa coords)
+        // Dibuja el círculo convertiendo **pantalla → ventana → vista** (todo en Cocoa)
         extern "C" fn draw_rect(this: &Object, _cmd: Sel, _rect: NSRect) {
             unsafe {
                 let sx = *this.get_ivar::<f64>("_cursorXScreen");
@@ -164,7 +159,7 @@ unsafe fn register_custom_view_class_and_create_view(window: id, width: f64, hei
                     // 3) ventana -> vista
                     let view_pt: NSPoint = msg_send![this, convertPoint: win_pt fromView: nil];
 
-                    // Dibujo centrado en view_pt (solo borde blanco, sin relleno)
+                    // Dibujo centrado en view_pt (sin relleno, solo borde blanco)
                     let radius = CIRCLE_DIAMETER / 2.0;
                     let rect = NSRect::new(
                         NSPoint::new(view_pt.x - radius, view_pt.y - radius),
@@ -212,7 +207,7 @@ unsafe fn register_custom_view_class_and_create_view(window: id, width: f64, hei
     view
 }
 
-/// Crea un NSTimer que llama `selector` en `target` cada `interval` segundos (~60 FPS)
+/// Crea un NSTimer que llama `selector` en `target` cada `interval` segundos
 unsafe fn create_timer(target: id, selector: Sel, interval: f64) -> id {
     let timer_class = Class::get("NSTimer").unwrap();
     let timer: id = msg_send![
@@ -226,14 +221,16 @@ unsafe fn create_timer(target: id, selector: Sel, interval: f64) -> id {
     timer
 }
 
-/// Instala un monitor global para **teclado**; CTRL + A alterna visibilidad
+/// Instala un monitor global para KeyDown; CTRL + A alterna la visibilidad
 unsafe fn install_global_key_monitor(view: id) {
     let mask: u64 = mask_from_event_type(NSEventType::NSKeyDown);
 
+    // Handler ejecuta en hilo auxiliar → reenviamos a main thread para tocar UI
     let handler = ConcreteBlock::new(move |event: id| {
         unsafe {
             let key_code: u16 = msg_send![event, keyCode]; // 0 == 'A'
             let flags: u64 = msg_send![event, modifierFlags];
+
             // Control es el bit 1 << 18
             let ctrl_pressed = (flags & (1u64 << 18)) != 0;
 
@@ -249,12 +246,13 @@ unsafe fn install_global_key_monitor(view: id) {
     })
         .copy();
 
+    // Llamada al método de clase y retener el monitor
     let cls = class!(NSEvent);
     let monitor: id = msg_send![cls, addGlobalMonitorForEventsMatchingMask: mask handler: &*handler];
-    if monitor != nil {
-        // Retenemos el monitor en la vista para que no se libere
-        (*view).set_ivar::<id>("_keyMonitor", monitor);
+
+    if monitor == nil {
+        eprintln!("❌ Falta permiso de 'Monitorización de entradas'.");
     } else {
-        eprintln!("❌ Falta permiso de 'Monitorización de entradas' para el monitor de teclado.");
+        (*view).set_ivar::<id>("_keyMonitor", monitor);
     }
 }
