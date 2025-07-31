@@ -6,8 +6,7 @@ use cocoa::appkit::{
     NSWindow, NSWindowCollectionBehavior, NSWindowStyleMask,
 };
 use cocoa::base::{id, nil, NO, YES};
-use cocoa::foundation::{NSAutoreleasePool, NSPoint, NSRect, NSSize};
-
+use cocoa::foundation::{NSAutoreleasePool, NSArray, NSPoint, NSRect, NSSize};
 use objc::runtime::{Class, Object, Sel};
 use objc::{class, declare::ClassDecl, msg_send, sel, sel_impl};
 
