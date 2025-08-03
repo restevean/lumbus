@@ -101,6 +101,46 @@ const HKID_SETTINGS_COMMA: u32 = 2;
 const HKID_SETTINGS_SEMI: u32 = 3;
 
 //
+// ======= CoreText / CoreGraphics / CoreFoundation (para glifos y paths) =======
+//
+
+// Opaque refs como punteros a c_void (suficiente para FFI)
+type CTFontRef = *const std::ffi::c_void;
+type CGPathRef = *const std::ffi::c_void;
+
+#[link(name = "CoreText", kind = "framework")]
+extern "C" {
+
+    // CFStringRef es toll-free con NSString*, así que pasaremos NSString* casteado.
+    fn CTFontCreateWithName(
+        name: *const std::ffi::c_void,
+        size: f64,
+        matrix: *const std::ffi::c_void,
+    ) -> CTFontRef;
+    fn CTFontGetGlyphsForCharacters(
+        font: CTFontRef,
+        chars: *const u16,
+        glyphs: *mut u16,
+        count: isize,
+    ) -> bool;
+    fn CTFontCreatePathForGlyph(
+        font: CTFontRef,
+        glyph: u16,
+        transform: *const std::ffi::c_void,
+    ) -> CGPathRef;
+}
+
+#[link(name = "CoreGraphics", kind = "framework")]
+extern "C" {
+    fn CGPathRelease(path: CGPathRef);
+}
+
+#[link(name = "CoreFoundation", kind = "framework")]
+extern "C" {
+    fn CFRelease(obj: *const std::ffi::c_void);
+}
+
+//
 // ===================== Apariencia por defecto =====================
 //
 
@@ -164,6 +204,9 @@ fn main() {
 
         // Hotkeys globales (sin beep)
         install_hotkeys(view);
+
+        // Monitores globales de ratón (L/R down/up)
+        install_mouse_monitors(view);
 
         // Observar terminación para desregistrar hotkeys/handler
         install_termination_observer(view);
@@ -261,7 +304,7 @@ unsafe fn load_preferences_into_view(view: id) {
 }
 
 //
-// ===================== Utilidades Color / Texto =====================
+// ===================== Utilidades =====================
 //
 
 fn clamp(v: f64, lo: f64, hi: f64) -> f64 {
@@ -354,7 +397,7 @@ fn open_settings_window(view: id) {
         let a: f64 = *(*view).get_ivar::<f64>("_strokeA");
         let fill_t: f64 = *(*view).get_ivar::<f64>("_fillTransparencyPct");
 
-        // Labels
+        // Labels helper
         let mk_label = |x, y, text: &str| -> id {
             let lbl: id = msg_send![class!(NSTextField), alloc];
             let lbl: id = msg_send![
@@ -372,11 +415,11 @@ fn open_settings_window(view: id) {
         let label_radius = mk_label(20.0, h - 60.0, "Radio (px)");
         let label_border = mk_label(20.0, h - 110.0, "Grosor (px)");
         let label_color = mk_label(20.0, h - 160.0, "Color");
-        let label_hex = mk_label(190.0, h - 160.0, "Hex");
+        let label_hex = mk_label(220.0, h - 160.0, "Hex");
+        let _: () = msg_send![label_hex, sizeToFit];
         let label_fill_t = mk_label(20.0, h - 210.0, "Transparencia (%)");
 
-        // ===== Campos numéricos y sliders sincronizados =====
-        // Radio
+        // Radio: campo + slider
         let field_radius: id = msg_send![class!(NSTextField), alloc];
         let field_radius: id = msg_send![
             field_radius,
@@ -399,7 +442,7 @@ fn open_settings_window(view: id) {
         let _: () = msg_send![slider_radius, setTarget: view];
         let _: () = msg_send![slider_radius, setAction: sel!(setRadius:)];
 
-        // Grosor
+        // Grosor: campo + slider
         let field_border: id = msg_send![class!(NSTextField), alloc];
         let field_border: id = msg_send![
             field_border,
@@ -422,7 +465,7 @@ fn open_settings_window(view: id) {
         let _: () = msg_send![slider_border, setTarget: view];
         let _: () = msg_send![slider_border, setAction: sel!(setBorderWidth:)];
 
-        // ColorWell
+        // ColorWell + Hex
         let color_well: id = msg_send![class!(NSColorWell), alloc];
         let color_well: id = msg_send![
             color_well,
@@ -435,12 +478,19 @@ fn open_settings_window(view: id) {
         let _: () = msg_send![color_well, setTarget: view];
         let _: () = msg_send![color_well, setAction: sel!(colorChanged:)];
 
-        // Hex field
         let hex_str = color_to_hex(r, g, b, a);
+
+        // Campo Hex: alineado justo después de la etiqueta "Hex"
+        let label_hex_frame: NSRect = msg_send![label_hex, frame];
+        let padding: f64 = 8.0;                 // separación entre "Hex" y el campo
+        let right_margin: f64 = 175.0;           // margen derecho de la ventana
+        let field_x = label_hex_frame.origin.x + label_hex_frame.size.width + padding;
+        let field_w = (w - right_margin) - field_x; // ocupa hasta el margen derecho
+
         let field_hex: id = msg_send![class!(NSTextField), alloc];
         let field_hex: id = msg_send![
             field_hex,
-            initWithFrame: NSRect::new(NSPoint::new(230.0, h - 169.0), NSSize::new(260.0, 24.0))
+            initWithFrame: NSRect::new(NSPoint::new(field_x, h - 165.0), NSSize::new(field_w, 24.0))
         ];
         let _: () = msg_send![field_hex, setStringValue: nsstring(&hex_str)];
         let _: () = msg_send![field_hex, setBezeled: YES];
@@ -448,7 +498,7 @@ fn open_settings_window(view: id) {
         let _: () = msg_send![field_hex, setTarget: view];
         let _: () = msg_send![field_hex, setAction: sel!(hexChanged:)];
 
-        // Transparencia (relleno)
+        // Transparencia relleno (%)
         let field_fill_t: id = msg_send![class!(NSTextField), alloc];
         let field_fill_t: id = msg_send![
             field_fill_t,
@@ -501,7 +551,7 @@ fn open_settings_window(view: id) {
 
         let _: () = msg_send![content, addSubview: btn_close];
 
-        // Guardar punteros para sincronizar UI desde acciones
+        // Guardar punteros para sincronización
         (*view).set_ivar::<id>("_settingsWindow", settings);
         (*view).set_ivar::<id>("_fieldRadius", field_radius);
         (*view).set_ivar::<id>("_sliderRadius", slider_radius);
@@ -540,7 +590,7 @@ fn close_settings_window(view: id) {
 }
 
 //
-// ===================== Vista personalizada =====================
+// ===================== Vista personalizada (incluye modo letra) =====================
 //
 
 unsafe fn register_custom_view_class_and_create_view(window: id, width: f64, height: f64) -> id {
@@ -555,7 +605,9 @@ unsafe fn register_custom_view_class_and_create_view(window: id, width: f64, hei
         decl.add_ivar::<f64>("_cursorXScreen");
         decl.add_ivar::<f64>("_cursorYScreen");
         decl.add_ivar::<bool>("_visible");
-        // Parámetros
+        decl.add_ivar::<i32>("_displayMode"); // 0=circle, 1=L, 2=R
+
+        // Parámetros visuales
         decl.add_ivar::<f64>("_radius");
         decl.add_ivar::<f64>("_borderWidth");
         decl.add_ivar::<f64>("_strokeR");
@@ -563,11 +615,19 @@ unsafe fn register_custom_view_class_and_create_view(window: id, width: f64, hei
         decl.add_ivar::<f64>("_strokeB");
         decl.add_ivar::<f64>("_strokeA");
         decl.add_ivar::<f64>("_fillTransparencyPct"); // 0..100
+
         // Hotkeys/handler (refs Carbon)
         decl.add_ivar::<*mut std::ffi::c_void>("_hkHandler");
         decl.add_ivar::<*mut std::ffi::c_void>("_hkToggle");
         decl.add_ivar::<*mut std::ffi::c_void>("_hkComma");
         decl.add_ivar::<*mut std::ffi::c_void>("_hkSemi");
+
+        // Monitores de ratón (retenidos)
+        decl.add_ivar::<id>("_monLeftDown");
+        decl.add_ivar::<id>("_monLeftUp");
+        decl.add_ivar::<id>("_monRightDown");
+        decl.add_ivar::<id>("_monRightUp");
+
         // Ventana settings + controles
         decl.add_ivar::<id>("_settingsWindow");
         decl.add_ivar::<id>("_fieldRadius");
@@ -605,8 +665,7 @@ unsafe fn register_custom_view_class_and_create_view(window: id, width: f64, hei
             }
         }
 
-        // ===== Acciones de configuración (con guardado y sincronización UI) =====
-
+        // ===== Acciones de configuración (igual que antes) =====
         extern "C" fn set_radius(this: &mut Object, _cmd: Sel, sender: id) {
             unsafe {
                 let mut v: f64 = msg_send![sender, doubleValue];
@@ -620,7 +679,6 @@ unsafe fn register_custom_view_class_and_create_view(window: id, width: f64, hei
                 let _: () = msg_send![this, setNeedsDisplay: YES];
             }
         }
-
         extern "C" fn set_radius_from_field(this: &mut Object, _cmd: Sel, sender: id) {
             unsafe {
                 let s: id = msg_send![sender, stringValue];
@@ -641,7 +699,6 @@ unsafe fn register_custom_view_class_and_create_view(window: id, width: f64, hei
                 }
             }
         }
-
         extern "C" fn set_border_width(this: &mut Object, _cmd: Sel, sender: id) {
             unsafe {
                 let mut v: f64 = msg_send![sender, doubleValue];
@@ -655,7 +712,6 @@ unsafe fn register_custom_view_class_and_create_view(window: id, width: f64, hei
                 let _: () = msg_send![this, setNeedsDisplay: YES];
             }
         }
-
         extern "C" fn set_border_from_field(this: &mut Object, _cmd: Sel, sender: id) {
             unsafe {
                 let s: id = msg_send![sender, stringValue];
@@ -676,14 +732,12 @@ unsafe fn register_custom_view_class_and_create_view(window: id, width: f64, hei
                 }
             }
         }
-
         extern "C" fn set_fill_transparency(this: &mut Object, _cmd: Sel, sender: id) {
             unsafe {
-                let mut v: f64 = msg_send![sender, doubleValue]; // 0..100
+                let mut v: f64 = msg_send![sender, doubleValue];
                 v = clamp(v, 0.0, 100.0);
                 *this.get_mut_ivar::<f64>("_fillTransparencyPct") = v;
                 prefs_set_double(PREF_FILL_T, v);
-                // sync campo
                 let field: id = *this.get_ivar("_fieldFillT");
                 if field != nil {
                     let _: () = msg_send![field, setStringValue: nsstring(&format!("{:.0}", v))];
@@ -691,7 +745,6 @@ unsafe fn register_custom_view_class_and_create_view(window: id, width: f64, hei
                 let _: () = msg_send![this, setNeedsDisplay: YES];
             }
         }
-
         extern "C" fn set_fill_transparency_from_field(this: &mut Object, _cmd: Sel, sender: id) {
             unsafe {
                 let s: id = msg_send![sender, stringValue];
@@ -702,19 +755,16 @@ unsafe fn register_custom_view_class_and_create_view(window: id, width: f64, hei
                         v = clamp(v, 0.0, 100.0);
                         *this.get_mut_ivar::<f64>("_fillTransparencyPct") = v;
                         prefs_set_double(PREF_FILL_T, v);
-                        // sync slider
                         let slider: id = *this.get_ivar("_sliderFillT");
                         if slider != nil {
                             let _: () = msg_send![slider, setDoubleValue: v];
                         }
-                        // normaliza texto
                         let _: () = msg_send![sender, setStringValue: nsstring(&format!("{:.0}", v))];
                         let _: () = msg_send![this, setNeedsDisplay: YES];
                     }
                 }
             }
         }
-
         extern "C" fn color_changed(this: &mut Object, _cmd: Sel, sender: id) {
             unsafe {
                 let color: id = msg_send![sender, color];
@@ -726,12 +776,10 @@ unsafe fn register_custom_view_class_and_create_view(window: id, width: f64, hei
                 *this.get_mut_ivar::<f64>("_strokeG") = g;
                 *this.get_mut_ivar::<f64>("_strokeB") = b;
                 *this.get_mut_ivar::<f64>("_strokeA") = a;
-                // Guardar
                 prefs_set_double(PREF_R, r);
                 prefs_set_double(PREF_G, g);
                 prefs_set_double(PREF_B, b);
                 prefs_set_double(PREF_A, a);
-                // sync campo hex
                 let hex_field: id = *this.get_ivar("_fieldHex");
                 if hex_field != nil {
                     let s = color_to_hex(r, g, b, a);
@@ -740,7 +788,6 @@ unsafe fn register_custom_view_class_and_create_view(window: id, width: f64, hei
                 let _: () = msg_send![this, setNeedsDisplay: YES];
             }
         }
-
         extern "C" fn hex_changed(this: &mut Object, _cmd: Sel, sender: id) {
             unsafe {
                 let s: id = msg_send![sender, stringValue];
@@ -752,12 +799,10 @@ unsafe fn register_custom_view_class_and_create_view(window: id, width: f64, hei
                         *this.get_mut_ivar::<f64>("_strokeG") = g;
                         *this.get_mut_ivar::<f64>("_strokeB") = b;
                         *this.get_mut_ivar::<f64>("_strokeA") = a;
-                        // Guardar
                         prefs_set_double(PREF_R, r);
                         prefs_set_double(PREF_G, g);
                         prefs_set_double(PREF_B, b);
                         prefs_set_double(PREF_A, a);
-                        // sync colorWell
                         let ns_color = Class::get("NSColor").unwrap();
                         let col: id =
                             msg_send![ns_color, colorWithCalibratedRed: r green: g blue: b alpha: a];
@@ -765,12 +810,10 @@ unsafe fn register_custom_view_class_and_create_view(window: id, width: f64, hei
                         if well != nil {
                             let _: () = msg_send![well, setColor: col];
                         }
-                        // normaliza texto
                         let norm = color_to_hex(r, g, b, a);
                         let _: () = msg_send![sender, setStringValue: nsstring(&norm)];
                         let _: () = msg_send![this, setNeedsDisplay: YES];
                     } else {
-                        // entrada inválida: reponer valor actual
                         let r = *this.get_ivar::<f64>("_strokeR");
                         let g = *this.get_ivar::<f64>("_strokeG");
                         let b = *this.get_ivar::<f64>("_strokeB");
@@ -781,50 +824,57 @@ unsafe fn register_custom_view_class_and_create_view(window: id, width: f64, hei
                 }
             }
         }
-
         extern "C" fn close_settings(this: &mut Object, _cmd: Sel, _sender: id) {
             let view: id = this as *mut _ as id;
             close_settings_window(view);
         }
 
+        // ===== Dibujo (círculo o letra L/R) =====
         extern "C" fn draw_rect(this: &Object, _cmd: Sel, _rect: NSRect) {
             unsafe {
                 let sx = *this.get_ivar::<f64>("_cursorXScreen");
                 let sy = *this.get_ivar::<f64>("_cursorYScreen");
                 let visible = *this.get_ivar::<bool>("_visible");
+                if !visible {
+                    return;
+                }
 
-                if visible {
-                    let screen_pt = NSPoint::new(sx, sy);
-                    let screen_rect = NSRect::new(screen_pt, NSSize::new(0.0, 0.0));
+                // Convertir pantalla→ventana→vista
+                let screen_pt = NSPoint::new(sx, sy);
+                let screen_rect = NSRect::new(screen_pt, NSSize::new(0.0, 0.0));
+                let win: id = msg_send![this, window];
+                let win_rect: NSRect = msg_send![win, convertRectFromScreen: screen_rect];
+                let win_pt = win_rect.origin;
+                let view_pt: NSPoint = msg_send![this, convertPoint: win_pt fromView: nil];
 
-                    let win: id = msg_send![this, window];
-                    let win_rect: NSRect = msg_send![win, convertRectFromScreen: screen_rect];
-                    let win_pt = win_rect.origin;
+                // Parámetros comunes
+                let radius = *this.get_ivar::<f64>("_radius");
+                let border_width = *this.get_ivar::<f64>("_borderWidth");
+                let r = *this.get_ivar::<f64>("_strokeR");
+                let g = *this.get_ivar::<f64>("_strokeG");
+                let b = *this.get_ivar::<f64>("_strokeB");
+                let a = *this.get_ivar::<f64>("_strokeA");
+                let fill_t = *this.get_ivar::<f64>("_fillTransparencyPct");
 
-                    let view_pt: NSPoint = msg_send![this, convertPoint: win_pt fromView: nil];
+                let target_letter_height = 3.0 * radius; // 1.5x diámetro = 3×radio
+                let mode = *this.get_ivar::<i32>("_displayMode");
 
-                    let radius = *this.get_ivar::<f64>("_radius");
-                    let border_width = *this.get_ivar::<f64>("_borderWidth");
-                    let r = *this.get_ivar::<f64>("_strokeR");
-                    let g = *this.get_ivar::<f64>("_strokeG");
-                    let b = *this.get_ivar::<f64>("_strokeB");
-                    let a = *this.get_ivar::<f64>("_strokeA");
-                    let fill_t = *this.get_ivar::<f64>("_fillTransparencyPct"); // 0..100
+                let ns_color = Class::get("NSColor").unwrap();
 
+                if mode == 0 {
+                    // ---- Círculo ----
                     let rect = NSRect::new(
                         NSPoint::new(view_pt.x - radius, view_pt.y - radius),
                         NSSize::new(radius * 2.0, radius * 2.0),
                     );
-
                     let ns_bezier = Class::get("NSBezierPath").unwrap();
                     let circle: id = msg_send![ns_bezier, bezierPathWithOvalInRect: rect];
 
-                    let ns_color = Class::get("NSColor").unwrap();
-
-                    // Relleno (mismo color que borde, pero alpha ajustada por transparencia)
+                    // Relleno (alpha según transparencia)
                     let fill_alpha = a * (1.0 - clamp(fill_t, 0.0, 100.0) / 100.0);
                     if fill_alpha > 0.0 {
-                        let fill: id = msg_send![ns_color, colorWithCalibratedRed: r green: g blue: b alpha: fill_alpha];
+                        let fill: id =
+                            msg_send![ns_color, colorWithCalibratedRed: r green: g blue: b alpha: fill_alpha];
                         let _: () = msg_send![fill, set];
                         let _: () = msg_send![circle, fill];
                     }
@@ -835,37 +885,115 @@ unsafe fn register_custom_view_class_and_create_view(window: id, width: f64, hei
                     let _: () = msg_send![stroke, set];
                     let _: () = msg_send![circle, setLineWidth: border_width];
                     let _: () = msg_send![circle, stroke];
+                    return;
                 }
+
+                // ---- Letra L/R con CoreText → CGPath → NSBezierPath ----
+                let font_class = Class::get("NSFont").unwrap();
+                let font: id = msg_send![font_class, boldSystemFontOfSize: target_letter_height];
+
+                // CTFont a partir de nombre de NSFont
+                let font_name: id = msg_send![font, fontName];
+                let ct_font: CTFontRef = CTFontCreateWithName(font_name as *const _, target_letter_height, std::ptr::null());
+
+                // Carácter -> glifo
+                let ch_u16: u16 = if mode == 1 { 'L' as u16 } else { 'R' as u16 };
+                let mut glyph: u16 = 0;
+                let mapped = CTFontGetGlyphsForCharacters(ct_font, &ch_u16 as *const u16, &mut glyph as *mut u16, 1);
+                if !mapped || glyph == 0 {
+                    // Fallback seguro: círculo
+                    let rect = NSRect::new(
+                        NSPoint::new(view_pt.x - radius, view_pt.y - radius),
+                        NSSize::new(radius * 2.0, radius * 2.0),
+                    );
+                    let ns_bezier = Class::get("NSBezierPath").unwrap();
+                    let circle: id = msg_send![ns_bezier, bezierPathWithOvalInRect: rect];
+                    let fill_alpha = a * (1.0 - clamp(fill_t, 0.0, 100.0) / 100.0);
+                    if fill_alpha > 0.0 {
+                        let fill: id = msg_send![ns_color, colorWithCalibratedRed: r green: g blue: b alpha: fill_alpha];
+                        let _: () = msg_send![fill, set];
+                        let _: () = msg_send![circle, fill];
+                    }
+                    let stroke: id = msg_send![ns_color, colorWithCalibratedRed: r green: g blue: b alpha: a];
+                    let _: () = msg_send![stroke, set];
+                    let _: () = msg_send![circle, setLineWidth: border_width];
+                    let _: () = msg_send![circle, stroke];
+                    CFRelease(ct_font as *const _);
+                    return;
+                }
+
+                // Glifo -> CGPath
+                let cg_path: CGPathRef = CTFontCreatePathForGlyph(ct_font, glyph, std::ptr::null());
+                if cg_path.is_null() {
+                    // Fallback seguro: círculo
+                    let rect = NSRect::new(
+                        NSPoint::new(view_pt.x - radius, view_pt.y - radius),
+                        NSSize::new(radius * 2.0, radius * 2.0),
+                    );
+                    let ns_bezier = Class::get("NSBezierPath").unwrap();
+                    let circle: id = msg_send![ns_bezier, bezierPathWithOvalInRect: rect];
+                    let fill_alpha = a * (1.0 - clamp(fill_t, 0.0, 100.0) / 100.0);
+                    if fill_alpha > 0.0 {
+                        let fill: id = msg_send![ns_color, colorWithCalibratedRed: r green: g blue: b alpha: fill_alpha];
+                        let _: () = msg_send![fill, set];
+                        let _: () = msg_send![circle, fill];
+                    }
+                    let stroke: id = msg_send![ns_color, colorWithCalibratedRed: r green: g blue: b alpha: a];
+                    let _: () = msg_send![stroke, set];
+                    let _: () = msg_send![circle, setLineWidth: border_width];
+                    let _: () = msg_send![circle, stroke];
+                    CFRelease(ct_font as *const _);
+                    return;
+                }
+
+                // CGPath -> NSBezierPath (10.13+)
+                let ns_bezier = Class::get("NSBezierPath").unwrap();
+                let path: id = msg_send![ns_bezier, bezierPathWithCGPath: cg_path];
+
+                // Centrado en el cursor usando el bounds del path
+                let pbounds: NSRect = msg_send![path, bounds];
+                let mid_x = pbounds.origin.x + pbounds.size.width / 2.0;
+                let mid_y = pbounds.origin.y + pbounds.size.height / 2.0;
+
+                let ns_affine = Class::get("NSAffineTransform").unwrap();
+                let transform: id = msg_send![ns_affine, transform];
+                let dx = view_pt.x - mid_x;
+                let dy = view_pt.y - mid_y;
+                let _: () = msg_send![transform, translateXBy: dx yBy: dy];
+                let _: () = msg_send![path, transformUsingAffineTransform: transform];
+
+                // Uniones redondeadas
+                let _: () = msg_send![path, setLineJoinStyle: 1u64 /* NSLineJoinStyleRound */];
+
+                // === Relleno y trazo EXACTAMENTE como el círculo ===
+                let fill_alpha = a * (1.0 - clamp(fill_t, 0.0, 100.0) / 100.0);
+                if fill_alpha > 0.0 {
+                    let fill: id = msg_send![ns_color, colorWithCalibratedRed: r green: g blue: b alpha: fill_alpha];
+                    let _: () = msg_send![fill, set];
+                    let _: () = msg_send![path, fill];
+                }
+                let stroke: id = msg_send![ns_color, colorWithCalibratedRed: r green: g blue: b alpha: a];
+                let _: () = msg_send![stroke, set];
+                let _: () = msg_send![path, setLineWidth: border_width];
+                let _: () = msg_send![path, stroke];
+
+                // Liberar recursos CoreFoundation/CoreGraphics
+                CGPathRelease(cg_path);
+                CFRelease(ct_font as *const _);
             }
         }
 
         // Registro de métodos
         decl.add_method(sel!(update_cursor), update_cursor as extern "C" fn(&mut Object, Sel));
-        decl.add_method(
-            sel!(toggleVisibility),
-            toggle_visibility as extern "C" fn(&mut Object, Sel),
-        );
+        decl.add_method(sel!(toggleVisibility), toggle_visibility as extern "C" fn(&mut Object, Sel));
+
+        // Config (igual que antes)
         decl.add_method(sel!(setRadius:), set_radius as extern "C" fn(&mut Object, Sel, id));
-        decl.add_method(
-            sel!(setRadiusFromField:),
-            set_radius_from_field as extern "C" fn(&mut Object, Sel, id),
-        );
-        decl.add_method(
-            sel!(setBorderWidth:),
-            set_border_width as extern "C" fn(&mut Object, Sel, id),
-        );
-        decl.add_method(
-            sel!(setBorderFromField:),
-            set_border_from_field as extern "C" fn(&mut Object, Sel, id),
-        );
-        decl.add_method(
-            sel!(setFillTransparency:),
-            set_fill_transparency as extern "C" fn(&mut Object, Sel, id),
-        );
-        decl.add_method(
-            sel!(setFillTransparencyFromField:),
-            set_fill_transparency_from_field as extern "C" fn(&mut Object, Sel, id),
-        );
+        decl.add_method(sel!(setRadiusFromField:), set_radius_from_field as extern "C" fn(&mut Object, Sel, id));
+        decl.add_method(sel!(setBorderWidth:), set_border_width as extern "C" fn(&mut Object, Sel, id));
+        decl.add_method(sel!(setBorderFromField:), set_border_from_field as extern "C" fn(&mut Object, Sel, id));
+        decl.add_method(sel!(setFillTransparency:), set_fill_transparency as extern "C" fn(&mut Object, Sel, id));
+        decl.add_method(sel!(setFillTransparencyFromField:), set_fill_transparency_from_field as extern "C" fn(&mut Object, Sel, id));
         decl.add_method(sel!(colorChanged:), color_changed as extern "C" fn(&mut Object, Sel, id));
         decl.add_method(sel!(hexChanged:), hex_changed as extern "C" fn(&mut Object, Sel, id));
         decl.add_method(sel!(closeSettings:), close_settings as extern "C" fn(&mut Object, Sel, id));
@@ -878,11 +1006,13 @@ unsafe fn register_custom_view_class_and_create_view(window: id, width: f64, hei
     let frame = NSRect::new(NSPoint::new(0.0, 0.0), NSSize::new(width, height));
     let view: id = msg_send![view, initWithFrame: frame];
 
+    // Estado inicial
     (*view).set_ivar::<f64>("_cursorXScreen", 0.0);
     (*view).set_ivar::<f64>("_cursorYScreen", 0.0);
     (*view).set_ivar::<bool>("_visible", false);
+    (*view).set_ivar::<i32>("_displayMode", 0);
 
-    // Parámetros iniciales (serán sobrescritos por load_preferences_into_view)
+    // Parámetros iniciales (sobrescritos por preferencias)
     (*view).set_ivar::<f64>("_radius", DEFAULT_DIAMETER / 2.0);
     (*view).set_ivar::<f64>("_borderWidth", DEFAULT_BORDER_WIDTH);
     (*view).set_ivar::<f64>("_strokeR", DEFAULT_COLOR.0);
@@ -897,7 +1027,13 @@ unsafe fn register_custom_view_class_and_create_view(window: id, width: f64, hei
     (*view).set_ivar::<*mut std::ffi::c_void>("_hkComma", std::ptr::null_mut());
     (*view).set_ivar::<*mut std::ffi::c_void>("_hkSemi", std::ptr::null_mut());
 
-    // Punteros a controles (inicialmente nil)
+    // Monitores mouse
+    (*view).set_ivar::<id>("_monLeftDown", nil);
+    (*view).set_ivar::<id>("_monLeftUp", nil);
+    (*view).set_ivar::<id>("_monRightDown", nil);
+    (*view).set_ivar::<id>("_monRightUp", nil);
+
+    // UI settings refs
     (*view).set_ivar::<id>("_settingsWindow", nil);
     (*view).set_ivar::<id>("_fieldRadius", nil);
     (*view).set_ivar::<id>("_sliderRadius", nil);
@@ -960,11 +1096,10 @@ extern "C" fn hotkey_event_handler(
                         ];
                     }
                     HKID_SETTINGS_COMMA | HKID_SETTINGS_SEMI => {
-                        let block =
-                            ConcreteBlock::new(move || {
-                                open_settings_window(view);
-                            })
-                                .copy();
+                        let block = ConcreteBlock::new(move || {
+                            open_settings_window(view);
+                        })
+                            .copy();
                         let main_queue: id = msg_send![class!(NSOperationQueue), mainQueue];
                         let _: () = msg_send![main_queue, addOperationWithBlock: &*block];
                     }
@@ -988,7 +1123,7 @@ unsafe fn install_hotkeys(view: id) {
         hotkey_event_handler,
         types.len() as u32,
         types.as_ptr(),
-        view as *mut std::ffi::c_void, // user_data -> view
+        view as *mut std::ffi::c_void,
         &mut handler_ref,
     );
     if status != NO_ERR {
@@ -999,18 +1134,10 @@ unsafe fn install_hotkeys(view: id) {
 
     macro_rules! register_hotkey {
         ($keycode:expr, $mods:expr, $idconst:expr, $slot:literal) => {{
-            let hk_id = EventHotKeyID {
-                signature: SIG_MHLT,
-                id: $idconst,
-            };
+            let hk_id = EventHotKeyID { signature: SIG_MHLT, id: $idconst };
             let mut out_ref: EventHotKeyRef = std::ptr::null_mut();
             let st = RegisterEventHotKey(
-                $keycode as u32,
-                $mods as u32,
-                hk_id,
-                GetApplicationEventTarget(),
-                0,
-                &mut out_ref,
+                $keycode as u32, $mods as u32, hk_id, GetApplicationEventTarget(), 0, &mut out_ref,
             );
             if st != NO_ERR || out_ref.is_null() {
                 eprintln!(
@@ -1025,7 +1152,7 @@ unsafe fn install_hotkeys(view: id) {
 
     // Ctrl + A (toggle)
     register_hotkey!(KC_A, CONTROL_KEY, HKID_TOGGLE, "_hkToggle");
-    // ⌘ + ,  y ⌘ + ; (compat ISO/ANSI) → Configuración
+    // ⌘ + ,  y ⌘ + ; → Configuración
     register_hotkey!(KC_COMMA, CMD_KEY, HKID_SETTINGS_COMMA, "_hkComma");
     register_hotkey!(KC_SEMICOLON, CMD_KEY, HKID_SETTINGS_SEMI, "_hkSemi");
 }
@@ -1071,4 +1198,67 @@ unsafe fn install_termination_observer(view: id) {
     ];
     let _: id =
         msg_send![center, addObserverForName: name object: nil queue: queue usingBlock: &*block];
+}
+
+//
+// ===================== Monitores de ratón (globales) =====================
+//
+
+unsafe fn install_mouse_monitors(view: id) {
+    // Máscaras NSEvent (bitmask)
+    // leftDown=1<<1, leftUp=1<<2, rightDown=1<<3, rightUp=1<<4
+    const LEFT_DOWN_MASK: u64 = 1 << 1;
+    const LEFT_UP_MASK: u64 = 1 << 2;
+    const RIGHT_DOWN_MASK: u64 = 1 << 3;
+    const RIGHT_UP_MASK: u64 = 1 << 4;
+
+    let cls = class!(NSEvent);
+
+    // LEFT DOWN -> modo L
+    let v1 = view;
+    let h1 = ConcreteBlock::new(move |_e: id| {
+        unsafe {
+            (*v1).set_ivar::<i32>("_displayMode", 1);
+            let _: () = msg_send![v1, setNeedsDisplay: YES];
+        }
+    })
+        .copy();
+    let mon_ld: id = msg_send![cls, addGlobalMonitorForEventsMatchingMask: LEFT_DOWN_MASK handler: &*h1];
+    (*view).set_ivar::<id>("_monLeftDown", mon_ld);
+
+    // LEFT UP -> modo círculo
+    let v2 = view;
+    let h2 = ConcreteBlock::new(move |_e: id| {
+        unsafe {
+            (*v2).set_ivar::<i32>("_displayMode", 0);
+            let _: () = msg_send![v2, setNeedsDisplay: YES];
+        }
+    })
+        .copy();
+    let mon_lu: id = msg_send![cls, addGlobalMonitorForEventsMatchingMask: LEFT_UP_MASK handler: &*h2];
+    (*view).set_ivar::<id>("_monLeftUp", mon_lu);
+
+    // RIGHT DOWN -> modo R
+    let v3 = view;
+    let h3 = ConcreteBlock::new(move |_e: id| {
+        unsafe {
+            (*v3).set_ivar::<i32>("_displayMode", 2);
+            let _: () = msg_send![v3, setNeedsDisplay: YES];
+        }
+    })
+        .copy();
+    let mon_rd: id = msg_send![cls, addGlobalMonitorForEventsMatchingMask: RIGHT_DOWN_MASK handler: &*h3];
+    (*view).set_ivar::<id>("_monRightDown", mon_rd);
+
+    // RIGHT UP -> modo círculo
+    let v4 = view;
+    let h4 = ConcreteBlock::new(move |_e: id| {
+        unsafe {
+            (*v4).set_ivar::<i32>("_displayMode", 0);
+            let _: () = msg_send![v4, setNeedsDisplay: YES];
+        }
+    })
+        .copy();
+    let mon_ru: id = msg_send![cls, addGlobalMonitorForEventsMatchingMask: RIGHT_UP_MASK handler: &*h4];
+    (*view).set_ivar::<id>("_monRightUp", mon_ru);
 }
