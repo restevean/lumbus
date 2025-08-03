@@ -107,6 +107,7 @@ const HKID_SETTINGS_SEMI: u32 = 3;
 const DEFAULT_DIAMETER: f64 = 38.5;
 const DEFAULT_BORDER_WIDTH: f64 = 3.0;
 const DEFAULT_COLOR: (f64, f64, f64, f64) = (1.0, 1.0, 1.0, 1.0); // blanco
+const DEFAULT_FILL_TRANSPARENCY_PCT: f64 = 100.0; // 100% transparente (como antes: sin relleno)
 
 //
 // ===================== Claves de preferencias (NSUserDefaults) =====================
@@ -118,6 +119,7 @@ const PREF_R: &str = "strokeR";
 const PREF_G: &str = "strokeG";
 const PREF_B: &str = "strokeB";
 const PREF_A: &str = "strokeA";
+const PREF_FILL_T: &str = "fillTransparencyPct";
 
 //
 // ===================== App =====================
@@ -247,6 +249,7 @@ unsafe fn load_preferences_into_view(view: id) {
     let g = prefs_get_double(PREF_G, DEFAULT_COLOR.1);
     let b = prefs_get_double(PREF_B, DEFAULT_COLOR.2);
     let a = prefs_get_double(PREF_A, DEFAULT_COLOR.3);
+    let fill_t = prefs_get_double(PREF_FILL_T, DEFAULT_FILL_TRANSPARENCY_PCT);
 
     (*view).set_ivar::<f64>("_radius", radius);
     (*view).set_ivar::<f64>("_borderWidth", border);
@@ -254,6 +257,7 @@ unsafe fn load_preferences_into_view(view: id) {
     (*view).set_ivar::<f64>("_strokeG", g);
     (*view).set_ivar::<f64>("_strokeB", b);
     (*view).set_ivar::<f64>("_strokeA", a);
+    (*view).set_ivar::<f64>("_fillTransparencyPct", clamp(fill_t, 0.0, 100.0));
 }
 
 //
@@ -329,8 +333,8 @@ fn open_settings_window(view: id) {
         let style = NSWindowStyleMask::NSTitledWindowMask
             | NSWindowStyleMask::NSClosableWindowMask
             | NSWindowStyleMask::NSMiniaturizableWindowMask;
-        let w = 460.0;
-        let h = 240.0;
+        let w = 520.0;
+        let h = 300.0;
         let settings = NSWindow::alloc(nil).initWithContentRect_styleMask_backing_defer_(
             NSRect::new(NSPoint::new(0.0, 0.0), NSSize::new(w, h)),
             style,
@@ -348,47 +352,35 @@ fn open_settings_window(view: id) {
         let g: f64 = *(*view).get_ivar::<f64>("_strokeG");
         let b: f64 = *(*view).get_ivar::<f64>("_strokeB");
         let a: f64 = *(*view).get_ivar::<f64>("_strokeA");
+        let fill_t: f64 = *(*view).get_ivar::<f64>("_fillTransparencyPct");
 
         // Labels
-        let label_radius: id = msg_send![class!(NSTextField), alloc];
-        let label_radius: id = msg_send![
-            label_radius,
-            initWithFrame: NSRect::new(NSPoint::new(20.0, h - 50.0), NSSize::new(90.0, 20.0))
-        ];
-        let _: () = msg_send![label_radius, setBezeled: NO];
-        let _: () = msg_send![label_radius, setDrawsBackground: NO];
-        let _: () = msg_send![label_radius, setEditable: NO];
-        let _: () = msg_send![label_radius, setSelectable: NO];
-        let _: () = msg_send![label_radius, setStringValue: nsstring("Radio (px)")];
+        let mk_label = |x, y, text: &str| -> id {
+            let lbl: id = msg_send![class!(NSTextField), alloc];
+            let lbl: id = msg_send![
+                lbl,
+                initWithFrame: NSRect::new(NSPoint::new(x, y), NSSize::new(140.0, 20.0))
+            ];
+            let _: () = msg_send![lbl, setBezeled: NO];
+            let _: () = msg_send![lbl, setDrawsBackground: NO];
+            let _: () = msg_send![lbl, setEditable: NO];
+            let _: () = msg_send![lbl, setSelectable: NO];
+            let _: () = msg_send![lbl, setStringValue: nsstring(text)];
+            lbl
+        };
 
-        let label_border: id = msg_send![class!(NSTextField), alloc];
-        let label_border: id = msg_send![
-            label_border,
-            initWithFrame: NSRect::new(NSPoint::new(20.0, h - 100.0), NSSize::new(90.0, 20.0))
-        ];
-        let _: () = msg_send![label_border, setBezeled: NO];
-        let _: () = msg_send![label_border, setDrawsBackground: NO];
-        let _: () = msg_send![label_border, setEditable: NO];
-        let _: () = msg_send![label_border, setSelectable: NO];
-        let _: () = msg_send![label_border, setStringValue: nsstring("Grosor (px)")];
-
-        let label_color: id = msg_send![class!(NSTextField), alloc];
-        let label_color: id = msg_send![
-            label_color,
-            initWithFrame: NSRect::new(NSPoint::new(20.0, h - 150.0), NSSize::new(90.0, 20.0))
-        ];
-        let _: () = msg_send![label_color, setBezeled: NO];
-        let _: () = msg_send![label_color, setDrawsBackground: NO];
-        let _: () = msg_send![label_color, setEditable: NO];
-        let _: () = msg_send![label_color, setSelectable: NO];
-        let _: () = msg_send![label_color, setStringValue: nsstring("Color")];
+        let label_radius = mk_label(20.0, h - 60.0, "Radio (px)");
+        let label_border = mk_label(20.0, h - 110.0, "Grosor (px)");
+        let label_color = mk_label(20.0, h - 160.0, "Color");
+        let label_hex = mk_label(190.0, h - 160.0, "Hex");
+        let label_fill_t = mk_label(20.0, h - 210.0, "Transparencia (%)");
 
         // ===== Campos numéricos y sliders sincronizados =====
-        // Radio: campo + slider
+        // Radio
         let field_radius: id = msg_send![class!(NSTextField), alloc];
         let field_radius: id = msg_send![
             field_radius,
-            initWithFrame: NSRect::new(NSPoint::new(120.0, h - 54.0), NSSize::new(60.0, 24.0))
+            initWithFrame: NSRect::new(NSPoint::new(160.0, h - 64.0), NSSize::new(60.0, 24.0))
         ];
         let _: () = msg_send![field_radius, setStringValue: nsstring(&format!("{:.0}", radius))];
         let _: () = msg_send![field_radius, setBezeled: YES];
@@ -399,7 +391,7 @@ fn open_settings_window(view: id) {
         let slider_radius: id = msg_send![class!(NSSlider), alloc];
         let slider_radius: id = msg_send![
             slider_radius,
-            initWithFrame: NSRect::new(NSPoint::new(190.0, h - 55.0), NSSize::new(240.0, 24.0))
+            initWithFrame: NSRect::new(NSPoint::new(230.0, h - 65.0), NSSize::new(260.0, 24.0))
         ];
         let _: () = msg_send![slider_radius, setMinValue: 5.0f64];
         let _: () = msg_send![slider_radius, setMaxValue: 200.0f64];
@@ -407,11 +399,11 @@ fn open_settings_window(view: id) {
         let _: () = msg_send![slider_radius, setTarget: view];
         let _: () = msg_send![slider_radius, setAction: sel!(setRadius:)];
 
-        // Grosor: campo + slider
+        // Grosor
         let field_border: id = msg_send![class!(NSTextField), alloc];
         let field_border: id = msg_send![
             field_border,
-            initWithFrame: NSRect::new(NSPoint::new(120.0, h - 104.0), NSSize::new(60.0, 24.0))
+            initWithFrame: NSRect::new(NSPoint::new(160.0, h - 114.0), NSSize::new(60.0, 24.0))
         ];
         let _: () = msg_send![field_border, setStringValue: nsstring(&format!("{:.0}", border))];
         let _: () = msg_send![field_border, setBezeled: YES];
@@ -422,7 +414,7 @@ fn open_settings_window(view: id) {
         let slider_border: id = msg_send![class!(NSSlider), alloc];
         let slider_border: id = msg_send![
             slider_border,
-            initWithFrame: NSRect::new(NSPoint::new(190.0, h - 105.0), NSSize::new(240.0, 24.0))
+            initWithFrame: NSRect::new(NSPoint::new(230.0, h - 115.0), NSSize::new(260.0, 24.0))
         ];
         let _: () = msg_send![slider_border, setMinValue: 1.0f64];
         let _: () = msg_send![slider_border, setMaxValue: 20.0f64];
@@ -434,7 +426,7 @@ fn open_settings_window(view: id) {
         let color_well: id = msg_send![class!(NSColorWell), alloc];
         let color_well: id = msg_send![
             color_well,
-            initWithFrame: NSRect::new(NSPoint::new(120.0, h - 155.0), NSSize::new(50.0, 25.0))
+            initWithFrame: NSRect::new(NSPoint::new(160.0, h - 165.0), NSSize::new(50.0, 25.0))
         ];
         let ns_color = Class::get("NSColor").unwrap();
         let current_color: id =
@@ -443,29 +435,41 @@ fn open_settings_window(view: id) {
         let _: () = msg_send![color_well, setTarget: view];
         let _: () = msg_send![color_well, setAction: sel!(colorChanged:)];
 
-        // Hex label + field
-        let label_hex: id = msg_send![class!(NSTextField), alloc];
-        let label_hex: id = msg_send![
-            label_hex,
-            initWithFrame: NSRect::new(NSPoint::new(190.0, h - 150.0), NSSize::new(40.0, 20.0))
-        ];
-        let _: () = msg_send![label_hex, setBezeled: NO];
-        let _: () = msg_send![label_hex, setDrawsBackground: NO];
-        let _: () = msg_send![label_hex, setEditable: NO];
-        let _: () = msg_send![label_hex, setSelectable: NO];
-        let _: () = msg_send![label_hex, setStringValue: nsstring("Hex")];
-
+        // Hex field
         let hex_str = color_to_hex(r, g, b, a);
         let field_hex: id = msg_send![class!(NSTextField), alloc];
         let field_hex: id = msg_send![
             field_hex,
-            initWithFrame: NSRect::new(NSPoint::new(230.0, h - 154.0), NSSize::new(200.0, 24.0))
+            initWithFrame: NSRect::new(NSPoint::new(230.0, h - 169.0), NSSize::new(260.0, 24.0))
         ];
         let _: () = msg_send![field_hex, setStringValue: nsstring(&hex_str)];
         let _: () = msg_send![field_hex, setBezeled: YES];
         let _: () = msg_send![field_hex, setEditable: YES];
         let _: () = msg_send![field_hex, setTarget: view];
         let _: () = msg_send![field_hex, setAction: sel!(hexChanged:)];
+
+        // Transparencia (relleno)
+        let field_fill_t: id = msg_send![class!(NSTextField), alloc];
+        let field_fill_t: id = msg_send![
+            field_fill_t,
+            initWithFrame: NSRect::new(NSPoint::new(160.0, h - 214.0), NSSize::new(60.0, 24.0))
+        ];
+        let _: () = msg_send![field_fill_t, setStringValue: nsstring(&format!("{:.0}", fill_t))];
+        let _: () = msg_send![field_fill_t, setBezeled: YES];
+        let _: () = msg_send![field_fill_t, setEditable: YES];
+        let _: () = msg_send![field_fill_t, setTarget: view];
+        let _: () = msg_send![field_fill_t, setAction: sel!(setFillTransparencyFromField:)];
+
+        let slider_fill_t: id = msg_send![class!(NSSlider), alloc];
+        let slider_fill_t: id = msg_send![
+            slider_fill_t,
+            initWithFrame: NSRect::new(NSPoint::new(230.0, h - 215.0), NSSize::new(260.0, 24.0))
+        ];
+        let _: () = msg_send![slider_fill_t, setMinValue: 0.0f64];
+        let _: () = msg_send![slider_fill_t, setMaxValue: 100.0f64];
+        let _: () = msg_send![slider_fill_t, setDoubleValue: fill_t];
+        let _: () = msg_send![slider_fill_t, setTarget: view];
+        let _: () = msg_send![slider_fill_t, setAction: sel!(setFillTransparency:)];
 
         // Botón cerrar
         let btn_close: id = msg_send![class!(NSButton), alloc];
@@ -491,9 +495,13 @@ fn open_settings_window(view: id) {
         let _: () = msg_send![content, addSubview: label_hex];
         let _: () = msg_send![content, addSubview: field_hex];
 
+        let _: () = msg_send![content, addSubview: label_fill_t];
+        let _: () = msg_send![content, addSubview: field_fill_t];
+        let _: () = msg_send![content, addSubview: slider_fill_t];
+
         let _: () = msg_send![content, addSubview: btn_close];
 
-        // Guardar punteros de controles para sincronización desde acciones
+        // Guardar punteros para sincronizar UI desde acciones
         (*view).set_ivar::<id>("_settingsWindow", settings);
         (*view).set_ivar::<id>("_fieldRadius", field_radius);
         (*view).set_ivar::<id>("_sliderRadius", slider_radius);
@@ -501,6 +509,8 @@ fn open_settings_window(view: id) {
         (*view).set_ivar::<id>("_sliderBorder", slider_border);
         (*view).set_ivar::<id>("_colorWell", color_well);
         (*view).set_ivar::<id>("_fieldHex", field_hex);
+        (*view).set_ivar::<id>("_fieldFillT", field_fill_t);
+        (*view).set_ivar::<id>("_sliderFillT", slider_fill_t);
 
         let _: () = msg_send![settings, makeKeyAndOrderFront: nil];
     }
@@ -552,6 +562,7 @@ unsafe fn register_custom_view_class_and_create_view(window: id, width: f64, hei
         decl.add_ivar::<f64>("_strokeG");
         decl.add_ivar::<f64>("_strokeB");
         decl.add_ivar::<f64>("_strokeA");
+        decl.add_ivar::<f64>("_fillTransparencyPct"); // 0..100
         // Hotkeys/handler (refs Carbon)
         decl.add_ivar::<*mut std::ffi::c_void>("_hkHandler");
         decl.add_ivar::<*mut std::ffi::c_void>("_hkToggle");
@@ -565,6 +576,8 @@ unsafe fn register_custom_view_class_and_create_view(window: id, width: f64, hei
         decl.add_ivar::<id>("_sliderBorder");
         decl.add_ivar::<id>("_colorWell");
         decl.add_ivar::<id>("_fieldHex");
+        decl.add_ivar::<id>("_fieldFillT");
+        decl.add_ivar::<id>("_sliderFillT");
 
         extern "C" fn update_cursor(this: &mut Object, _cmd: Sel) {
             unsafe {
@@ -600,7 +613,6 @@ unsafe fn register_custom_view_class_and_create_view(window: id, width: f64, hei
                 v = clamp(v, 5.0, 200.0);
                 *this.get_mut_ivar::<f64>("_radius") = v;
                 prefs_set_double(PREF_RADIUS, v);
-                // sync campo
                 let field: id = *this.get_ivar("_fieldRadius");
                 if field != nil {
                     let _: () = msg_send![field, setStringValue: nsstring(&format!("{:.0}", v))];
@@ -619,12 +631,10 @@ unsafe fn register_custom_view_class_and_create_view(window: id, width: f64, hei
                         v = clamp(v, 5.0, 200.0);
                         *this.get_mut_ivar::<f64>("_radius") = v;
                         prefs_set_double(PREF_RADIUS, v);
-                        // sync slider
                         let slider: id = *this.get_ivar("_sliderRadius");
                         if slider != nil {
                             let _: () = msg_send![slider, setDoubleValue: v];
                         }
-                        // normaliza texto
                         let _: () = msg_send![sender, setStringValue: nsstring(&format!("{:.0}", v))];
                         let _: () = msg_send![this, setNeedsDisplay: YES];
                     }
@@ -638,7 +648,6 @@ unsafe fn register_custom_view_class_and_create_view(window: id, width: f64, hei
                 v = clamp(v, 1.0, 20.0);
                 *this.get_mut_ivar::<f64>("_borderWidth") = v;
                 prefs_set_double(PREF_BORDER, v);
-                // sync campo
                 let field: id = *this.get_ivar("_fieldBorder");
                 if field != nil {
                     let _: () = msg_send![field, setStringValue: nsstring(&format!("{:.0}", v))];
@@ -657,8 +666,44 @@ unsafe fn register_custom_view_class_and_create_view(window: id, width: f64, hei
                         v = clamp(v, 1.0, 20.0);
                         *this.get_mut_ivar::<f64>("_borderWidth") = v;
                         prefs_set_double(PREF_BORDER, v);
-                        // sync slider
                         let slider: id = *this.get_ivar("_sliderBorder");
+                        if slider != nil {
+                            let _: () = msg_send![slider, setDoubleValue: v];
+                        }
+                        let _: () = msg_send![sender, setStringValue: nsstring(&format!("{:.0}", v))];
+                        let _: () = msg_send![this, setNeedsDisplay: YES];
+                    }
+                }
+            }
+        }
+
+        extern "C" fn set_fill_transparency(this: &mut Object, _cmd: Sel, sender: id) {
+            unsafe {
+                let mut v: f64 = msg_send![sender, doubleValue]; // 0..100
+                v = clamp(v, 0.0, 100.0);
+                *this.get_mut_ivar::<f64>("_fillTransparencyPct") = v;
+                prefs_set_double(PREF_FILL_T, v);
+                // sync campo
+                let field: id = *this.get_ivar("_fieldFillT");
+                if field != nil {
+                    let _: () = msg_send![field, setStringValue: nsstring(&format!("{:.0}", v))];
+                }
+                let _: () = msg_send![this, setNeedsDisplay: YES];
+            }
+        }
+
+        extern "C" fn set_fill_transparency_from_field(this: &mut Object, _cmd: Sel, sender: id) {
+            unsafe {
+                let s: id = msg_send![sender, stringValue];
+                let cstr_ptr: *const std::os::raw::c_char = msg_send![s, UTF8String];
+                if !cstr_ptr.is_null() {
+                    let txt = CStr::from_ptr(cstr_ptr).to_string_lossy();
+                    if let Ok(mut v) = txt.trim().parse::<f64>() {
+                        v = clamp(v, 0.0, 100.0);
+                        *this.get_mut_ivar::<f64>("_fillTransparencyPct") = v;
+                        prefs_set_double(PREF_FILL_T, v);
+                        // sync slider
+                        let slider: id = *this.get_ivar("_sliderFillT");
                         if slider != nil {
                             let _: () = msg_send![slider, setDoubleValue: v];
                         }
@@ -764,6 +809,7 @@ unsafe fn register_custom_view_class_and_create_view(window: id, width: f64, hei
                     let g = *this.get_ivar::<f64>("_strokeG");
                     let b = *this.get_ivar::<f64>("_strokeB");
                     let a = *this.get_ivar::<f64>("_strokeA");
+                    let fill_t = *this.get_ivar::<f64>("_fillTransparencyPct"); // 0..100
 
                     let rect = NSRect::new(
                         NSPoint::new(view_pt.x - radius, view_pt.y - radius),
@@ -774,6 +820,16 @@ unsafe fn register_custom_view_class_and_create_view(window: id, width: f64, hei
                     let circle: id = msg_send![ns_bezier, bezierPathWithOvalInRect: rect];
 
                     let ns_color = Class::get("NSColor").unwrap();
+
+                    // Relleno (mismo color que borde, pero alpha ajustada por transparencia)
+                    let fill_alpha = a * (1.0 - clamp(fill_t, 0.0, 100.0) / 100.0);
+                    if fill_alpha > 0.0 {
+                        let fill: id = msg_send![ns_color, colorWithCalibratedRed: r green: g blue: b alpha: fill_alpha];
+                        let _: () = msg_send![fill, set];
+                        let _: () = msg_send![circle, fill];
+                    }
+
+                    // Trazo
                     let stroke: id =
                         msg_send![ns_color, colorWithCalibratedRed: r green: g blue: b alpha: a];
                     let _: () = msg_send![stroke, set];
@@ -802,6 +858,14 @@ unsafe fn register_custom_view_class_and_create_view(window: id, width: f64, hei
             sel!(setBorderFromField:),
             set_border_from_field as extern "C" fn(&mut Object, Sel, id),
         );
+        decl.add_method(
+            sel!(setFillTransparency:),
+            set_fill_transparency as extern "C" fn(&mut Object, Sel, id),
+        );
+        decl.add_method(
+            sel!(setFillTransparencyFromField:),
+            set_fill_transparency_from_field as extern "C" fn(&mut Object, Sel, id),
+        );
         decl.add_method(sel!(colorChanged:), color_changed as extern "C" fn(&mut Object, Sel, id));
         decl.add_method(sel!(hexChanged:), hex_changed as extern "C" fn(&mut Object, Sel, id));
         decl.add_method(sel!(closeSettings:), close_settings as extern "C" fn(&mut Object, Sel, id));
@@ -825,6 +889,7 @@ unsafe fn register_custom_view_class_and_create_view(window: id, width: f64, hei
     (*view).set_ivar::<f64>("_strokeG", DEFAULT_COLOR.1);
     (*view).set_ivar::<f64>("_strokeB", DEFAULT_COLOR.2);
     (*view).set_ivar::<f64>("_strokeA", DEFAULT_COLOR.3);
+    (*view).set_ivar::<f64>("_fillTransparencyPct", DEFAULT_FILL_TRANSPARENCY_PCT);
 
     // Hotkeys/handler (refs Carbon)
     (*view).set_ivar::<*mut std::ffi::c_void>("_hkHandler", std::ptr::null_mut());
@@ -832,6 +897,7 @@ unsafe fn register_custom_view_class_and_create_view(window: id, width: f64, hei
     (*view).set_ivar::<*mut std::ffi::c_void>("_hkComma", std::ptr::null_mut());
     (*view).set_ivar::<*mut std::ffi::c_void>("_hkSemi", std::ptr::null_mut());
 
+    // Punteros a controles (inicialmente nil)
     (*view).set_ivar::<id>("_settingsWindow", nil);
     (*view).set_ivar::<id>("_fieldRadius", nil);
     (*view).set_ivar::<id>("_sliderRadius", nil);
@@ -839,6 +905,8 @@ unsafe fn register_custom_view_class_and_create_view(window: id, width: f64, hei
     (*view).set_ivar::<id>("_sliderBorder", nil);
     (*view).set_ivar::<id>("_colorWell", nil);
     (*view).set_ivar::<id>("_fieldHex", nil);
+    (*view).set_ivar::<id>("_fieldFillT", nil);
+    (*view).set_ivar::<id>("_sliderFillT", nil);
 
     let _: () = msg_send![window, setContentView: view];
     view
