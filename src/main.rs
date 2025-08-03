@@ -11,6 +11,109 @@ use objc::runtime::{Class, Object, Sel};
 use objc::{class, declare::ClassDecl, msg_send, sel, sel_impl};
 use std::ffi::{CStr, CString};
 
+// ===================== Carbon HotKeys (FFI) =====================
+
+// Link a framework Carbon
+#[link(name = "Carbon", kind = "framework")]
+extern "C" {
+    // Registro / baja de hotkeys
+    fn RegisterEventHotKey(
+        inHotKeyCode: u32,
+        inHotKeyModifiers: u32,
+        inHotKeyID: EventHotKeyID,
+        inTarget: EventTargetRef,
+        inOptions: u32,
+        outRef: *mut EventHotKeyRef,
+    ) -> i32;
+
+    fn UnregisterEventHotKey(inHotKeyRef: EventHotKeyRef) -> i32;
+
+    // Event handler
+    fn InstallEventHandler(
+        inTarget: EventTargetRef,
+        inHandler: EventHandlerUPP,
+        inNumTypes: u32,
+        inList: *const EventTypeSpec,
+        inUserData: *mut std::ffi::c_void,
+        outRef: *mut EventHandlerRef,
+    ) -> i32;
+
+    fn RemoveEventHandler(inHandlerRef: EventHandlerRef) -> i32;
+
+    fn GetApplicationEventTarget() -> EventTargetRef;
+
+    fn GetEventClass(inEvent: EventRef) -> u32;
+    fn GetEventKind(inEvent: EventRef) -> u32;
+
+    fn GetEventParameter(
+        inEvent: EventRef,
+        inName: u32,
+        inDesiredType: u32,
+        outActualType: *mut u32,
+        inBufferSize: u32,
+        outActualSize: *mut u32,
+        outData: *mut std::ffi::c_void,
+    ) -> i32;
+}
+
+// Tipos Carbon (punteros opacos)
+type EventTargetRef = *mut std::ffi::c_void;
+type EventHandlerRef = *mut std::ffi::c_void;
+type EventRef = *mut std::ffi::c_void;
+type EventHandlerUPP = extern "C" fn(EventHandlerCallRef, EventRef, *mut std::ffi::c_void) -> i32;
+type EventHandlerCallRef = *mut std::ffi::c_void;
+type EventHotKeyRef = *mut std::ffi::c_void;
+
+// Estructuras Carbon
+#[repr(C)]
+#[derive(Copy, Clone)]
+struct EventTypeSpec {
+    eventClass: u32,
+    eventKind: u32,
+}
+
+#[repr(C)]
+#[derive(Copy, Clone)]
+struct EventHotKeyID {
+    signature: u32, // FourCC
+    id: u32,        // identificador del hotkey
+}
+
+// Constantes Carbon
+const NO_ERR: i32 = 0;
+
+// 'keyb'
+const K_EVENT_CLASS_KEYBOARD: u32 = 0x6B65_7962;
+// kinds
+const K_EVENT_HOTKEY_PRESSED: u32 = 6;
+const K_EVENT_HOTKEY_RELEASED: u32 = 7;
+
+// Parámetros para GetEventParameter (FourCC)
+const K_EVENT_PARAM_DIRECT_OBJECT: u32 = 0x2D2D_2D2D; // '----'
+const TYPE_EVENT_HOTKEY_ID: u32 = 0x686B_6964; // 'hkid'
+
+// Modificadores (Carbon) — ojo, son distintos a NSEvent:
+const CMD_KEY: u32 = 1 << 8;     // 256
+const SHIFT_KEY: u32 = 1 << 9;   // 512
+const OPTION_KEY: u32 = 1 << 11; // 2048
+const CONTROL_KEY: u32 = 1 << 12;// 4096
+
+// Keycodes (ANSI habituales). ISO suele coincidir para 'A'; ',' y ';' pueden variar.
+// A = 0, ; = 41, , = 43
+const KC_A: u32 = 0;
+const KC_SEMICOLON: u32 = 41;
+const KC_COMMA: u32 = 43;
+
+// Firma para nuestros hotkeys: 'mhlt' (mouse highlighter)
+const SIG_MHLT: u32 = 0x6D68_6C74;
+
+// IDs de hotkey internos
+const HKID_TOGGLE: u32 = 1;
+const HKID_SETTINGS_COMMA: u32 = 2;
+const HKID_SETTINGS_SEMI: u32 = 3;
+
+// ===============================================================
+
 // Apariencia del círculo (valores por defecto)
 const DEFAULT_DIAMETER: f64 = 38.5;
 const DEFAULT_BORDER_WIDTH: f64 = 3.0;
@@ -21,13 +124,13 @@ fn main() {
         let _pool = NSAutoreleasePool::new(nil);
 
         let app = NSApp();
-        // Arrancamos en modo "Accessory": sin icono en Dock, pero con capacidad de UI cuando la pidamos
+        // Modo "Accessory": sin icono en Dock pero con UI cuando la pidamos
         app.setActivationPolicy_(NSApplicationActivationPolicy::NSApplicationActivationPolicyAccessory);
 
         // --- Unión de todas las pantallas (Cocoa / NSScreen) ---
         let (min_x, min_y, union_width, union_height) = union_de_pantallas_cocoa();
 
-        // Ventana transparente, sin bordes, que cubre la unión de pantallas (Cocoa coords)
+        // Ventana overlay
         let window = NSWindow::alloc(nil).initWithContentRect_styleMask_backing_defer_(
             NSRect::new(
                 NSPoint::new(min_x, min_y),
@@ -47,13 +150,14 @@ fn main() {
                 | NSWindowCollectionBehavior::NSWindowCollectionBehaviorStationary,
         );
 
+        // Vista personalizada
         let view: id = register_custom_view_class_and_create_view(window, union_width, union_height);
 
         // Timer ~60 FPS
         let _: id = create_timer(view, sel!(update_cursor), 0.016);
 
-        // Hotkeys: Ctrl+A (toggle) y ⌘, / ⌘; (config), layout-independientes
-        install_global_key_monitor(view);
+        // 🔑 Hotkeys globales (sin beep, sin permisos)
+        install_hotkeys(view);
 
         // Mostrar overlay
         let _: () = msg_send![window, orderFrontRegardless];
@@ -67,11 +171,13 @@ fn nspop_up_menu_window_level() -> i64 {
     201
 }
 
+/// Construye una máscara de evento a partir de un NSEventType (equivalente a NSEventMaskFromType)
 #[inline]
 fn mask_from_event_type(ty: NSEventType) -> u64 {
     1u64 << (ty as u64)
 }
 
+/// Unión de pantallas (Cocoa)
 unsafe fn union_de_pantallas_cocoa() -> (f64, f64, f64, f64) {
     let screens: id = msg_send![class!(NSScreen), screens];
     let count: usize = msg_send![screens, count];
@@ -95,6 +201,7 @@ unsafe fn union_de_pantallas_cocoa() -> (f64, f64, f64, f64) {
     (min_x, min_y, union_width, union_height)
 }
 
+/// Posición del ratón en coordenadas Cocoa
 fn get_mouse_position_cocoa() -> (f64, f64) {
     unsafe {
         let cls = class!(NSEvent);
@@ -103,6 +210,7 @@ fn get_mouse_position_cocoa() -> (f64, f64) {
     }
 }
 
+/// Helper: NSString* desde &str
 unsafe fn nsstring(s: &str) -> id {
     let cstr = CString::new(s).unwrap();
     let ns: id = msg_send![class!(NSString), stringWithUTF8String: cstr.as_ptr()];
@@ -229,7 +337,7 @@ fn open_settings_window(view: id) {
     }
 }
 
-/// Cierra Configuración y restablece overlay **sin romper hotkeys**
+/// Cierra Configuración y restablece overlay
 fn close_settings_window(view: id) {
     unsafe {
         let settings: id = *(*view).get_ivar::<id>("_settingsWindow");
@@ -237,17 +345,26 @@ fn close_settings_window(view: id) {
             let _: () = msg_send![settings, orderOut: nil];
             (*view).set_ivar::<id>("_settingsWindow", nil);
         }
+        // Volver a Accessory
         let app = NSApp();
         app.setActivationPolicy_(NSApplicationActivationPolicy::NSApplicationActivationPolicyAccessory);
 
+        // Reordenar overlay arriba y restablecer nivel
         let overlay_win: id = msg_send![view, window];
         let _: () = msg_send![overlay_win, setLevel: (nspop_up_menu_window_level() + 1)];
         let _: () = msg_send![overlay_win, orderFrontRegardless];
-        let _: () = msg_send![view, setNeedsDisplay: YES];
+
+        // Forzar actualización inmediata
+        let _: () = msg_send![
+            view,
+            performSelectorOnMainThread: sel!(update_cursor)
+            withObject: nil
+            waitUntilDone: NO
+        ];
     }
 }
 
-
+/// Registra `CustomView` y crea la instancia (estado con parámetros configurables)
 unsafe fn register_custom_view_class_and_create_view(window: id, width: f64, height: f64) -> id {
     let class_name = "CustomView";
     let custom_view_class = if let Some(cls) = Class::get(class_name) {
@@ -267,8 +384,12 @@ unsafe fn register_custom_view_class_and_create_view(window: id, width: f64, hei
         decl.add_ivar::<f64>("_strokeG");
         decl.add_ivar::<f64>("_strokeB");
         decl.add_ivar::<f64>("_strokeA");
-        // Retenidos
-        decl.add_ivar::<id>("_keyMonitor");
+        // Retenidos (Carbon hotkeys y handler)
+        decl.add_ivar::<*mut std::ffi::c_void>("_hkHandler");
+        decl.add_ivar::<*mut std::ffi::c_void>("_hkToggle");
+        decl.add_ivar::<*mut std::ffi::c_void>("_hkComma");
+        decl.add_ivar::<*mut std::ffi::c_void>("_hkSemi");
+        // Ventana de settings
         decl.add_ivar::<id>("_settingsWindow");
 
         extern "C" fn update_cursor(this: &mut Object, _cmd: Sel) {
@@ -396,13 +517,19 @@ unsafe fn register_custom_view_class_and_create_view(window: id, width: f64, hei
     (*view).set_ivar::<f64>("_strokeB", DEFAULT_COLOR.2);
     (*view).set_ivar::<f64>("_strokeA", DEFAULT_COLOR.3);
 
-    (*view).set_ivar::<id>("_keyMonitor", nil);
+    // Hotkeys/handler aún no registrados
+    (*view).set_ivar::<*mut std::ffi::c_void>("_hkHandler", std::ptr::null_mut());
+    (*view).set_ivar::<*mut std::ffi::c_void>("_hkToggle", std::ptr::null_mut());
+    (*view).set_ivar::<*mut std::ffi::c_void>("_hkComma", std::ptr::null_mut());
+    (*view).set_ivar::<*mut std::ffi::c_void>("_hkSemi", std::ptr::null_mut());
+
     (*view).set_ivar::<id>("_settingsWindow", nil);
 
     let _: () = msg_send![window, setContentView: view];
     view
 }
 
+/// NSTimer ~60 FPS
 unsafe fn create_timer(target: id, selector: Sel, interval: f64) -> id {
     let timer_class = Class::get("NSTimer").unwrap();
     let timer: id = msg_send![
@@ -416,56 +543,90 @@ unsafe fn create_timer(target: id, selector: Sel, interval: f64) -> id {
     timer
 }
 
-/// Hotkeys: Ctrl+A (toggle) y ⌘, / ⌘; (config). Soportan ISO/ANSI y fallback por keyCode.
-unsafe fn install_global_key_monitor(view: id) {
-    let mask: u64 = mask_from_event_type(NSEventType::NSKeyDown);
+// ===================== Registro de Hotkeys (Carbon) =====================
 
-    let handler = ConcreteBlock::new(move |event: id| {
-        unsafe {
-            let flags: u64 = msg_send![event, modifierFlags];
-            let ctrl_pressed = (flags & (1u64 << 18)) != 0; // Control
-            let cmd_pressed  = (flags & (1u64 << 20)) != 0; // Command
-
-            // Por carácter (layout-independiente)
-            let mut handled = false;
-            let chars: id = msg_send![event, charactersIgnoringModifiers];
-            if chars != nil {
-                let utf8_ptr: *const std::os::raw::c_char = msg_send![chars, UTF8String];
-                if !utf8_ptr.is_null() {
-                    let s = CStr::from_ptr(utf8_ptr).to_string_lossy();
-
-                    if ctrl_pressed && s.eq_ignore_ascii_case("a") {
-                        let _: () = msg_send![view, performSelectorOnMainThread: sel!(toggleVisibility) withObject: nil waitUntilDone: NO];
-                        handled = true;
-                    } else if cmd_pressed && (s == "," || s == ";") {
-                        let block = ConcreteBlock::new(move || { open_settings_window(view); }).copy();
+/// Handler común de hotkeys (Carbon)
+extern "C" fn hotkey_event_handler(
+    _call_ref: EventHandlerCallRef,
+    event: EventRef,
+    user_data: *mut std::ffi::c_void,
+) -> i32 {
+    unsafe {
+        if GetEventClass(event) == K_EVENT_CLASS_KEYBOARD && GetEventKind(event) == K_EVENT_HOTKEY_PRESSED {
+            let mut hot_id = EventHotKeyID { signature: 0, id: 0 };
+            let status = GetEventParameter(
+                event,
+                K_EVENT_PARAM_DIRECT_OBJECT,
+                TYPE_EVENT_HOTKEY_ID,
+                std::ptr::null_mut(),
+                std::mem::size_of::<EventHotKeyID>() as u32,
+                std::ptr::null_mut(),
+                &mut hot_id as *mut _ as *mut std::ffi::c_void,
+            );
+            if status == NO_ERR && hot_id.signature == SIG_MHLT {
+                let view = user_data as id;
+                match hot_id.id {
+                    HKID_TOGGLE => {
+                        let _: () = msg_send![
+                            view,
+                            performSelectorOnMainThread: sel!(toggleVisibility)
+                            withObject: nil
+                            waitUntilDone: NO
+                        ];
+                    }
+                    HKID_SETTINGS_COMMA | HKID_SETTINGS_SEMI => {
+                        // Asegurar ejecutar en main thread
+                        let block = ConcreteBlock::new(move || {
+                            open_settings_window(view);
+                        }).copy();
                         let main_queue: id = msg_send![class!(NSOperationQueue), mainQueue];
                         let _: () = msg_send![main_queue, addOperationWithBlock: &*block];
-                        handled = true;
                     }
-                }
-            }
-
-            // Fallback por keyCode (por si alguna app altera charactersIgnoringModifiers)
-            if !handled {
-                let key_code: u16 = msg_send![event, keyCode];
-                // 'A' ANSI == 0; ',' ANSI == 43; ';' ANSI == 41 (ISO puede variar, pero al menos cubrimos casos)
-                if ctrl_pressed && key_code == 0 {
-                    let _: () = msg_send![view, performSelectorOnMainThread: sel!(toggleVisibility) withObject: nil waitUntilDone: NO];
-                } else if cmd_pressed && (key_code == 43 || key_code == 41) {
-                    let block = ConcreteBlock::new(move || { open_settings_window(view); }).copy();
-                    let main_queue: id = msg_send![class!(NSOperationQueue), mainQueue];
-                    let _: () = msg_send![main_queue, addOperationWithBlock: &*block];
+                    _ => {}
                 }
             }
         }
-    }).copy();
-
-    let cls = class!(NSEvent);
-    let monitor: id = msg_send![cls, addGlobalMonitorForEventsMatchingMask: mask handler: &*handler];
-    if monitor != nil {
-        (*view).set_ivar::<id>("_keyMonitor", monitor);
-    } else {
-        eprintln!("❌ Falta permiso de 'Monitorización de entradas' para el monitor de teclado.");
+        NO_ERR
     }
+}
+
+/// Registrar hotkeys globales y guardar refs en la vista
+unsafe fn install_hotkeys(view: id) {
+    // Instalar handler de eventos
+    let types = [EventTypeSpec { eventClass: K_EVENT_CLASS_KEYBOARD, eventKind: K_EVENT_HOTKEY_PRESSED }];
+    let mut handler_ref: EventHandlerRef = std::ptr::null_mut();
+    let status = InstallEventHandler(
+        GetApplicationEventTarget(),
+        hotkey_event_handler,
+        types.len() as u32,
+        types.as_ptr(),
+        view as *mut std::ffi::c_void, // user_data -> view
+        &mut handler_ref,
+    );
+    if status != NO_ERR {
+        eprintln!("❌ InstallEventHandler falló: {}", status);
+        return;
+    }
+    (*view).set_ivar::<*mut std::ffi::c_void>("_hkHandler", handler_ref);
+
+    // Macro helper para registrar un hotkey y guardarlo
+    macro_rules! register_hotkey {
+        ($keycode:expr, $mods:expr, $idconst:expr, $slot:literal) => {{
+            let hk_id = EventHotKeyID { signature: SIG_MHLT, id: $idconst };
+            let mut out_ref: EventHotKeyRef = std::ptr::null_mut();
+            let st = RegisterEventHotKey($keycode as u32, $mods as u32, hk_id, GetApplicationEventTarget(), 0, &mut out_ref);
+            if st != NO_ERR || out_ref.is_null() {
+                eprintln!("❌ RegisterEventHotKey fallo (code={}, mods={}, id={}): {}", $keycode, $mods, $idconst, st);
+            } else {
+                (*view).set_ivar::<*mut std::ffi::c_void>($slot, out_ref);
+            }
+        }};
+    }
+
+    // Ctrl + A
+    register_hotkey!(KC_A, CONTROL_KEY, HKID_TOGGLE, "_hkToggle");
+    // ⌘ + ,  (ANSI)
+    register_hotkey!(KC_COMMA, CMD_KEY, HKID_SETTINGS_COMMA, "_hkComma");
+    // ⌘ + ;  (ANSI; compat ISO en muchos teclados)
+    register_hotkey!(KC_SEMICOLON, CMD_KEY, HKID_SETTINGS_SEMI, "_hkSemi");
 }
