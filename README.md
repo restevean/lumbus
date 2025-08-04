@@ -45,8 +45,6 @@ Highlight the mouse pointer across **all** macOS displays with a configurable ci
 ```
 toml
 
-
-Copiar
 [dependencies]
 cocoa = "0.25"
 objc = "0.2"

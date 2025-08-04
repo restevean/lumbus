@@ -9,6 +9,7 @@ use cocoa::base::{id, nil, NO, YES};
 use cocoa::foundation::{NSAutoreleasePool, NSPoint, NSRect, NSSize};
 use objc::runtime::{Class, Object, Sel};
 use objc::{class, declare::ClassDecl, msg_send, sel, sel_impl};
+use std::borrow::Cow;
 use std::ffi::{CStr, CString};
 
 //
@@ -103,7 +104,6 @@ const HKID_SETTINGS_SEMI: u32 = 3;
 // ======= CoreText / CoreGraphics / CoreFoundation (para glifos y paths) =======
 //
 
-// Opaque refs
 type CTFontRef = *const std::ffi::c_void;
 type CGPathRef = *const std::ffi::c_void;
 
@@ -157,6 +157,7 @@ const PREF_G: &str = "strokeG";
 const PREF_B: &str = "strokeB";
 const PREF_A: &str = "strokeA";
 const PREF_FILL_T: &str = "fillTransparencyPct";
+const PREF_LANG: &str = "lang"; // 0 = en, 1 = es
 
 //
 // ===================== App =====================
@@ -174,7 +175,7 @@ fn main() {
         let count: usize = msg_send![screens, count];
 
         if count == 0 {
-            eprintln!("No hay pantallas activas.");
+            eprintln!("No screens available.");
             return;
         }
 
@@ -248,6 +249,24 @@ unsafe fn prefs_set_double(key: &str, val: f64) {
     let _: () = msg_send![ud, setDouble: val forKey: k];
 }
 
+unsafe fn prefs_get_int(key: &str, default: i32) -> i32 {
+    let ud: id = msg_send![class!(NSUserDefaults), standardUserDefaults];
+    let k = nsstring(key);
+    let obj: id = msg_send![ud, objectForKey: k];
+    if obj == nil {
+        default
+    } else {
+        let v: i32 = msg_send![ud, integerForKey: k];
+        v
+    }
+}
+
+unsafe fn prefs_set_int(key: &str, val: i32) {
+    let ud: id = msg_send![class!(NSUserDefaults), standardUserDefaults];
+    let k = nsstring(key);
+    let _: () = msg_send![ud, setInteger: val forKey: k];
+}
+
 /// Cargar preferencias al arrancar
 unsafe fn load_preferences_into_view(view: id) {
     let radius = prefs_get_double(PREF_RADIUS, DEFAULT_DIAMETER / 2.0);
@@ -257,6 +276,7 @@ unsafe fn load_preferences_into_view(view: id) {
     let b = prefs_get_double(PREF_B, DEFAULT_COLOR.2);
     let a = prefs_get_double(PREF_A, DEFAULT_COLOR.3);
     let fill_t = prefs_get_double(PREF_FILL_T, DEFAULT_FILL_TRANSPARENCY_PCT);
+    let lang = prefs_get_int(PREF_LANG, 0); // 0 en, 1 es
 
     (*view).set_ivar::<f64>("_radius", radius);
     (*view).set_ivar::<f64>("_borderWidth", border);
@@ -265,10 +285,11 @@ unsafe fn load_preferences_into_view(view: id) {
     (*view).set_ivar::<f64>("_strokeB", b);
     (*view).set_ivar::<f64>("_strokeA", a);
     (*view).set_ivar::<f64>("_fillTransparencyPct", clamp(fill_t, 0.0, 100.0));
+    (*view).set_ivar::<i32>("_lang", if lang == 1 { 1 } else { 0 });
 }
 
 //
-// ===================== Utilidades =====================
+// ===================== Utilidades / Localización =====================
 //
 
 fn clamp(v: f64, lo: f64, hi: f64) -> f64 {
@@ -321,6 +342,54 @@ fn parse_hex_color(s: &str) -> Option<(f64, f64, f64, f64)> {
     ))
 }
 
+// Localización con Cow: evita el error de lifetime
+fn tr_key(key: &str, es: bool) -> Cow<'static, str> {
+    match (key, es) {
+        ("Settings", true) => Cow::Borrowed("Configuración"),
+        ("Settings", false) => Cow::Borrowed("Settings"),
+
+        ("Language", true) => Cow::Borrowed("Idioma"),
+        ("Language", false) => Cow::Borrowed("Language"),
+
+        ("English", true) => Cow::Borrowed("Inglés"),
+        ("English", false) => Cow::Borrowed("English"),
+
+        ("Spanish", true) => Cow::Borrowed("Español"),
+        ("Spanish", false) => Cow::Borrowed("Spanish"),
+
+        ("Radius (px)", true) => Cow::Borrowed("Radio (px)"),
+        ("Radius (px)", false) => Cow::Borrowed("Radius (px)"),
+
+        ("Border (px)", true) => Cow::Borrowed("Grosor (px)"),
+        ("Border (px)", false) => Cow::Borrowed("Border (px)"),
+
+        ("Color", true) => Cow::Borrowed("Color"),
+        ("Color", false) => Cow::Borrowed("Color"),
+
+        ("Hex", true) => Cow::Borrowed("Hex"),
+        ("Hex", false) => Cow::Borrowed("Hex"),
+
+        ("Fill Transparency (%)", true) => Cow::Borrowed("Transparencia (%)"),
+        ("Fill Transparency (%)", false) => Cow::Borrowed("Fill Transparency (%)"),
+
+        ("Close", true) => Cow::Borrowed("Cerrar"),
+        ("Close", false) => Cow::Borrowed("Close"),
+
+        _ => Cow::Owned(key.to_string()),
+    }
+}
+
+fn lang_is_es(view: id) -> bool {
+    unsafe {
+        let l = *(*view).get_ivar::<i32>("_lang");
+        l == 1
+    }
+}
+
+//
+// ===================== Funciones multi-monitor / apply =====================
+//
+
 /// Aplica `f` únicamente a vistas de la clase `CustomViewMulti`.
 unsafe fn apply_to_all_views<F: Fn(id)>(f: F) {
     let app: id = NSApp();
@@ -350,6 +419,7 @@ unsafe fn sync_visual_prefs_to_all_views(src: id) {
     let b = *(*src).get_ivar::<f64>("_strokeB");
     let a = *(*src).get_ivar::<f64>("_strokeA");
     let fill_t = *(*src).get_ivar::<f64>("_fillTransparencyPct");
+    let lang = *(*src).get_ivar::<i32>("_lang");
 
     apply_to_all_views(|v| {
         unsafe {
@@ -360,6 +430,7 @@ unsafe fn sync_visual_prefs_to_all_views(src: id) {
             (*v).set_ivar::<f64>("_strokeB", b);
             (*v).set_ivar::<f64>("_strokeA", a);
             (*v).set_ivar::<f64>("_fillTransparencyPct", fill_t);
+            (*v).set_ivar::<i32>("_lang", lang);
         }
     });
 }
@@ -380,18 +451,20 @@ fn open_settings_window(view: id) {
         app.setActivationPolicy_(NSApplicationActivationPolicy::NSApplicationActivationPolicyRegular);
         let _: () = msg_send![app, activateIgnoringOtherApps: YES];
 
+        let es = lang_is_es(view);
+
         let style = NSWindowStyleMask::NSTitledWindowMask
             | NSWindowStyleMask::NSClosableWindowMask
             | NSWindowStyleMask::NSMiniaturizableWindowMask;
         let w = 520.0;
-        let h = 300.0;
+        let h = 330.0; // + espacio para selector de idioma
         let settings = NSWindow::alloc(nil).initWithContentRect_styleMask_backing_defer_(
             NSRect::new(NSPoint::new(0.0, 0.0), NSSize::new(w, h)),
             style,
             NSBackingStoreType::NSBackingStoreBuffered,
             NO,
         );
-        let _: () = msg_send![settings, setTitle: nsstring("Settings")];
+        let _: () = msg_send![settings, setTitle: nsstring(tr_key("Settings", es).as_ref())];
         let _: () = msg_send![settings, center];
 
         let content: id = msg_send![settings, contentView];
@@ -403,13 +476,14 @@ fn open_settings_window(view: id) {
         let b: f64 = *(*view).get_ivar::<f64>("_strokeB");
         let a: f64 = *(*view).get_ivar::<f64>("_strokeA");
         let fill_t: f64 = *(*view).get_ivar::<f64>("_fillTransparencyPct");
+        let cur_lang: i32 = *(*view).get_ivar::<i32>("_lang");
 
         // Labels helper
         let mk_label = |x, y, text: &str| -> id {
             let lbl: id = msg_send![class!(NSTextField), alloc];
             let lbl: id = msg_send![
                 lbl,
-                initWithFrame: NSRect::new(NSPoint::new(x, y), NSSize::new(140.0, 20.0))
+                initWithFrame: NSRect::new(NSPoint::new(x, y), NSSize::new(180.0, 20.0))
             ];
             let _: () = msg_send![lbl, setBezeled: NO];
             let _: () = msg_send![lbl, setDrawsBackground: NO];
@@ -419,18 +493,32 @@ fn open_settings_window(view: id) {
             lbl
         };
 
-        let label_radius = mk_label(20.0, h - 60.0, "Radius (px)");
-        let label_border = mk_label(20.0, h - 110.0, "Border (px)");
-        let label_color = mk_label(20.0, h - 160.0, "Color");
-        let label_hex = mk_label(220.0, h - 160.0, "Hex");
-        let _: () = msg_send![label_hex, sizeToFit];
-        let label_fill_t = mk_label(20.0, h - 210.0, "Fill Transparency (%)");
+        // --- Selector de idioma ---
+        let label_lang = mk_label(20.0, h - 40.0, tr_key("Language", es).as_ref());
+        let popup_lang: id = msg_send![class!(NSPopUpButton), alloc];
+        let popup_lang: id = msg_send![
+            popup_lang,
+            initWithFrame: NSRect::new(NSPoint::new(160.0, h - 44.0), NSSize::new(160.0, 24.0))
+        ];
+        let _: () = msg_send![popup_lang, addItemWithTitle: nsstring(tr_key("English", es).as_ref())];
+        let _: () = msg_send![popup_lang, addItemWithTitle: nsstring(tr_key("Spanish", es).as_ref())];
+        let _: () = msg_send![popup_lang, selectItemAtIndex: (if cur_lang == 1 { 1 } else { 0 })];
+        let _: () = msg_send![popup_lang, setTarget: view];
+        let _: () = msg_send![popup_lang, setAction: sel!(langChanged:)];
 
-        // Radius: field + slider
+        // --- Resto de controles ---
+        let label_radius = mk_label(20.0, h - 80.0, tr_key("Radius (px)", es).as_ref());
+        let label_border = mk_label(20.0, h - 130.0, tr_key("Border (px)", es).as_ref());
+        let label_color  = mk_label(20.0, h - 180.0, tr_key("Color", es).as_ref());
+        let label_hex    = mk_label(220.0, h - 180.0, tr_key("Hex", es).as_ref());
+        let _: () = msg_send![label_hex, sizeToFit];
+        let label_fill_t = mk_label(20.0, h - 230.0, tr_key("Fill Transparency (%)", es).as_ref());
+
+        // Radio: campo + slider
         let field_radius: id = msg_send![class!(NSTextField), alloc];
         let field_radius: id = msg_send![
             field_radius,
-            initWithFrame: NSRect::new(NSPoint::new(160.0, h - 64.0), NSSize::new(60.0, 24.0))
+            initWithFrame: NSRect::new(NSPoint::new(160.0, h - 84.0), NSSize::new(60.0, 24.0))
         ];
         let _: () = msg_send![field_radius, setStringValue: nsstring(&format!("{:.0}", radius))];
         let _: () = msg_send![field_radius, setBezeled: YES];
@@ -441,7 +529,7 @@ fn open_settings_window(view: id) {
         let slider_radius: id = msg_send![class!(NSSlider), alloc];
         let slider_radius: id = msg_send![
             slider_radius,
-            initWithFrame: NSRect::new(NSPoint::new(230.0, h - 65.0), NSSize::new(260.0, 24.0))
+            initWithFrame: NSRect::new(NSPoint::new(230.0, h - 85.0), NSSize::new(260.0, 24.0))
         ];
         let _: () = msg_send![slider_radius, setMinValue: 5.0f64];
         let _: () = msg_send![slider_radius, setMaxValue: 200.0f64];
@@ -449,11 +537,11 @@ fn open_settings_window(view: id) {
         let _: () = msg_send![slider_radius, setTarget: view];
         let _: () = msg_send![slider_radius, setAction: sel!(setRadius:)];
 
-        // Border: field + slider
+        // Grosor: campo + slider
         let field_border: id = msg_send![class!(NSTextField), alloc];
         let field_border: id = msg_send![
             field_border,
-            initWithFrame: NSRect::new(NSPoint::new(160.0, h - 114.0), NSSize::new(60.0, 24.0))
+            initWithFrame: NSRect::new(NSPoint::new(160.0, h - 134.0), NSSize::new(60.0, 24.0))
         ];
         let _: () = msg_send![field_border, setStringValue: nsstring(&format!("{:.0}", border))];
         let _: () = msg_send![field_border, setBezeled: YES];
@@ -464,7 +552,7 @@ fn open_settings_window(view: id) {
         let slider_border: id = msg_send![class!(NSSlider), alloc];
         let slider_border: id = msg_send![
             slider_border,
-            initWithFrame: NSRect::new(NSPoint::new(230.0, h - 115.0), NSSize::new(260.0, 24.0))
+            initWithFrame: NSRect::new(NSPoint::new(230.0, h - 135.0), NSSize::new(260.0, 24.0))
         ];
         let _: () = msg_send![slider_border, setMinValue: 1.0f64];
         let _: () = msg_send![slider_border, setMaxValue: 20.0f64];
@@ -476,7 +564,7 @@ fn open_settings_window(view: id) {
         let color_well: id = msg_send![class!(NSColorWell), alloc];
         let color_well: id = msg_send![
             color_well,
-            initWithFrame: NSRect::new(NSPoint::new(160.0, h - 165.0), NSSize::new(50.0, 25.0))
+            initWithFrame: NSRect::new(NSPoint::new(160.0, h - 185.0), NSSize::new(50.0, 25.0))
         ];
         let ns_color = Class::get("NSColor").unwrap();
         let current_color: id =
@@ -485,8 +573,8 @@ fn open_settings_window(view: id) {
         let _: () = msg_send![color_well, setTarget: view];
         let _: () = msg_send![color_well, setAction: sel!(colorChanged:)];
 
-        // Hex field (a continuación de "Hex")
         let hex_str = color_to_hex(r, g, b, a);
+        // Campo Hex a continuación de la etiqueta "Hex"
         let label_hex_frame: NSRect = msg_send![label_hex, frame];
         let padding: f64 = 8.0;
         let right_margin: f64 = 175.0;
@@ -496,7 +584,7 @@ fn open_settings_window(view: id) {
         let field_hex: id = msg_send![class!(NSTextField), alloc];
         let field_hex: id = msg_send![
             field_hex,
-            initWithFrame: NSRect::new(NSPoint::new(field_x, h - 165.0), NSSize::new(field_w, 24.0))
+            initWithFrame: NSRect::new(NSPoint::new(field_x, h - 185.0), NSSize::new(field_w, 24.0))
         ];
         let _: () = msg_send![field_hex, setStringValue: nsstring(&hex_str)];
         let _: () = msg_send![field_hex, setBezeled: YES];
@@ -504,11 +592,11 @@ fn open_settings_window(view: id) {
         let _: () = msg_send![field_hex, setTarget: view];
         let _: () = msg_send![field_hex, setAction: sel!(hexChanged:)];
 
-        // Fill transparency (%)
+        // Transparencia relleno (%)
         let field_fill_t: id = msg_send![class!(NSTextField), alloc];
         let field_fill_t: id = msg_send![
             field_fill_t,
-            initWithFrame: NSRect::new(NSPoint::new(160.0, h - 214.0), NSSize::new(60.0, 24.0))
+            initWithFrame: NSRect::new(NSPoint::new(160.0, h - 234.0), NSSize::new(60.0, 24.0))
         ];
         let _: () = msg_send![field_fill_t, setStringValue: nsstring(&format!("{:.0}", fill_t))];
         let _: () = msg_send![field_fill_t, setBezeled: YES];
@@ -519,7 +607,7 @@ fn open_settings_window(view: id) {
         let slider_fill_t: id = msg_send![class!(NSSlider), alloc];
         let slider_fill_t: id = msg_send![
             slider_fill_t,
-            initWithFrame: NSRect::new(NSPoint::new(230.0, h - 215.0), NSSize::new(260.0, 24.0))
+            initWithFrame: NSRect::new(NSPoint::new(230.0, h - 235.0), NSSize::new(260.0, 24.0))
         ];
         let _: () = msg_send![slider_fill_t, setMinValue: 0.0f64];
         let _: () = msg_send![slider_fill_t, setMaxValue: 100.0f64];
@@ -527,17 +615,20 @@ fn open_settings_window(view: id) {
         let _: () = msg_send![slider_fill_t, setTarget: view];
         let _: () = msg_send![slider_fill_t, setAction: sel!(setFillTransparency:)];
 
-        // Close
+        // Botón cerrar
         let btn_close: id = msg_send![class!(NSButton), alloc];
         let btn_close: id = msg_send![
             btn_close,
             initWithFrame: NSRect::new(NSPoint::new(w - 100.0, 15.0), NSSize::new(80.0, 28.0))
         ];
-        let _: () = msg_send![btn_close, setTitle: nsstring("Close")];
+        let _: () = msg_send![btn_close, setTitle: nsstring(tr_key("Close", es).as_ref())];
         let _: () = msg_send![btn_close, setTarget: view];
         let _: () = msg_send![btn_close, setAction: sel!(closeSettings:)];
 
         // Añadir subviews
+        let _: () = msg_send![content, addSubview: label_lang];
+        let _: () = msg_send![content, addSubview: popup_lang];
+
         let _: () = msg_send![content, addSubview: label_radius];
         let _: () = msg_send![content, addSubview: field_radius];
         let _: () = msg_send![content, addSubview: slider_radius];
@@ -557,16 +648,30 @@ fn open_settings_window(view: id) {
 
         let _: () = msg_send![content, addSubview: btn_close];
 
-        // Guardar punteros
+        // Guardar punteros para sincronización y localización dinámica
         (*view).set_ivar::<id>("_settingsWindow", settings);
+        (*view).set_ivar::<id>("_labelLang", label_lang);
+        (*view).set_ivar::<id>("_popupLang", popup_lang);
+
+        (*view).set_ivar::<id>("_labelRadius", label_radius);
         (*view).set_ivar::<id>("_fieldRadius", field_radius);
         (*view).set_ivar::<id>("_sliderRadius", slider_radius);
+
+        (*view).set_ivar::<id>("_labelBorder", label_border);
         (*view).set_ivar::<id>("_fieldBorder", field_border);
         (*view).set_ivar::<id>("_sliderBorder", slider_border);
+
+        (*view).set_ivar::<id>("_labelColor", label_color);
         (*view).set_ivar::<id>("_colorWell", color_well);
+
+        (*view).set_ivar::<id>("_labelHex", label_hex);
         (*view).set_ivar::<id>("_fieldHex", field_hex);
+
+        (*view).set_ivar::<id>("_labelFillT", label_fill_t);
         (*view).set_ivar::<id>("_fieldFillT", field_fill_t);
         (*view).set_ivar::<id>("_sliderFillT", slider_fill_t);
+
+        (*view).set_ivar::<id>("_btnClose", btn_close);
 
         let _: () = msg_send![settings, makeKeyAndOrderFront: nil];
     }
@@ -643,6 +748,7 @@ unsafe fn register_custom_view_class_and_create_view(window: id, width: f64, hei
         decl.add_ivar::<bool>("_overlayEnabled");  // toggle global mostrar/ocultar
         decl.add_ivar::<i32>("_displayMode");      // 0=circle, 1=L, 2=R
         decl.add_ivar::<id>("_ownScreen");         // NSScreen propietario
+        decl.add_ivar::<i32>("_lang");             // 0=en, 1=es
 
         // Parámetros visuales
         decl.add_ivar::<f64>("_radius");
@@ -665,16 +771,30 @@ unsafe fn register_custom_view_class_and_create_view(window: id, width: f64, hei
         decl.add_ivar::<id>("_monRightDown");
         decl.add_ivar::<id>("_monRightUp");
 
-        // Settings UI refs
+        // Settings UI refs (para relocalizar textos y actualizar UI)
         decl.add_ivar::<id>("_settingsWindow");
+        decl.add_ivar::<id>("_labelLang");
+        decl.add_ivar::<id>("_popupLang");
+
+        decl.add_ivar::<id>("_labelRadius");
         decl.add_ivar::<id>("_fieldRadius");
         decl.add_ivar::<id>("_sliderRadius");
+
+        decl.add_ivar::<id>("_labelBorder");
         decl.add_ivar::<id>("_fieldBorder");
         decl.add_ivar::<id>("_sliderBorder");
+
+        decl.add_ivar::<id>("_labelColor");
         decl.add_ivar::<id>("_colorWell");
+
+        decl.add_ivar::<id>("_labelHex");
         decl.add_ivar::<id>("_fieldHex");
+
+        decl.add_ivar::<id>("_labelFillT");
         decl.add_ivar::<id>("_fieldFillT");
         decl.add_ivar::<id>("_sliderFillT");
+
+        decl.add_ivar::<id>("_btnClose");
 
         // ====== Métodos ======
 
@@ -717,15 +837,11 @@ unsafe fn register_custom_view_class_and_create_view(window: id, width: f64, hei
                 let enabled = *this.get_ivar::<bool>("_overlayEnabled");
                 let new_enabled = !enabled;
 
-                // Escribir en TODAS las vistas de nuestra clase
                 apply_to_all_views(|v| {
-                    unsafe {
-                        *(*v).get_mut_ivar::<bool>("_overlayEnabled") = new_enabled;
-                    }
+                    unsafe { *(*v).get_mut_ivar::<bool>("_overlayEnabled") = new_enabled; }
                 });
 
                 if new_enabled {
-                    // Recalcular de inmediato pantalla activa
                     let _: () = msg_send![
                         this,
                         performSelectorOnMainThread: sel!(update_cursor_multi)
@@ -733,7 +849,6 @@ unsafe fn register_custom_view_class_and_create_view(window: id, width: f64, hei
                         waitUntilDone: NO
                     ];
                 } else {
-                    // Ocultar todas
                     apply_to_all_views(|v| {
                         unsafe {
                             *(*v).get_mut_ivar::<bool>("_visible") = false;
@@ -745,22 +860,13 @@ unsafe fn register_custom_view_class_and_create_view(window: id, width: f64, hei
         }
 
         // ===== Acciones de configuración (aplican a TODAS las vistas) =====
-        extern "C" fn set_radius(this: &mut Object, _cmd: Sel, sender: id) {
+        extern "C" fn set_radius(_this: &mut Object, _cmd: Sel, sender: id) {
             unsafe {
                 let mut v: f64 = msg_send![sender, doubleValue];
                 v = clamp(v, 5.0, 200.0);
                 prefs_set_double(PREF_RADIUS, v);
-                apply_to_all_views(|vv| {
-                    unsafe { (*vv).set_ivar::<f64>("_radius", v); }
-                });
-                // sync field
-                let field: id = *this.get_ivar("_fieldRadius");
-                if field != nil {
-                    let _: () = msg_send![field, setStringValue: nsstring(&format!("{:.0}", v))];
-                }
-                apply_to_all_views(|vv| {
-                    unsafe { let _: () = msg_send![vv, setNeedsDisplay: YES]; }
-                });
+                apply_to_all_views(|vv| { unsafe { (*vv).set_ivar::<f64>("_radius", v); } });
+                apply_to_all_views(|vv| { unsafe { let _: () = msg_send![vv, setNeedsDisplay: YES]; } });
             }
         }
         extern "C" fn set_radius_from_field(this: &mut Object, _cmd: Sel, sender: id) {
@@ -772,36 +878,24 @@ unsafe fn register_custom_view_class_and_create_view(window: id, width: f64, hei
                     if let Ok(mut v) = txt.trim().parse::<f64>() {
                         v = clamp(v, 5.0, 200.0);
                         prefs_set_double(PREF_RADIUS, v);
-                        apply_to_all_views(|vv| {
-                            unsafe { (*vv).set_ivar::<f64>("_radius", v); }
-                        });
+                        apply_to_all_views(|vv| { unsafe { (*vv).set_ivar::<f64>("_radius", v); } });
                         let slider: id = *this.get_ivar("_sliderRadius");
                         if slider != nil {
                             let _: () = msg_send![slider, setDoubleValue: v];
                         }
                         let _: () = msg_send![sender, setStringValue: nsstring(&format!("{:.0}", v))];
-                        apply_to_all_views(|vv| {
-                            unsafe { let _: () = msg_send![vv, setNeedsDisplay: YES]; }
-                        });
+                        apply_to_all_views(|vv| { unsafe { let _: () = msg_send![vv, setNeedsDisplay: YES]; } });
                     }
                 }
             }
         }
-        extern "C" fn set_border_width(this: &mut Object, _cmd: Sel, sender: id) {
+        extern "C" fn set_border_width(_this: &mut Object, _cmd: Sel, sender: id) {
             unsafe {
                 let mut v: f64 = msg_send![sender, doubleValue];
                 v = clamp(v, 1.0, 20.0);
                 prefs_set_double(PREF_BORDER, v);
-                apply_to_all_views(|vv| {
-                    unsafe { (*vv).set_ivar::<f64>("_borderWidth", v); }
-                });
-                let field: id = *this.get_ivar("_fieldBorder");
-                if field != nil {
-                    let _: () = msg_send![field, setStringValue: nsstring(&format!("{:.0}", v))];
-                }
-                apply_to_all_views(|vv| {
-                    unsafe { let _: () = msg_send![vv, setNeedsDisplay: YES]; }
-                });
+                apply_to_all_views(|vv| { unsafe { (*vv).set_ivar::<f64>("_borderWidth", v); } });
+                apply_to_all_views(|vv| { unsafe { let _: () = msg_send![vv, setNeedsDisplay: YES]; } });
             }
         }
         extern "C" fn set_border_from_field(this: &mut Object, _cmd: Sel, sender: id) {
@@ -813,36 +907,24 @@ unsafe fn register_custom_view_class_and_create_view(window: id, width: f64, hei
                     if let Ok(mut v) = txt.trim().parse::<f64>() {
                         v = clamp(v, 1.0, 20.0);
                         prefs_set_double(PREF_BORDER, v);
-                        apply_to_all_views(|vv| {
-                            unsafe { (*vv).set_ivar::<f64>("_borderWidth", v); }
-                        });
+                        apply_to_all_views(|vv| { unsafe { (*vv).set_ivar::<f64>("_borderWidth", v); } });
                         let slider: id = *this.get_ivar("_sliderBorder");
                         if slider != nil {
                             let _: () = msg_send![slider, setDoubleValue: v];
                         }
                         let _: () = msg_send![sender, setStringValue: nsstring(&format!("{:.0}", v))];
-                        apply_to_all_views(|vv| {
-                            unsafe { let _: () = msg_send![vv, setNeedsDisplay: YES]; }
-                        });
+                        apply_to_all_views(|vv| { unsafe { let _: () = msg_send![vv, setNeedsDisplay: YES]; } });
                     }
                 }
             }
         }
-        extern "C" fn set_fill_transparency(this: &mut Object, _cmd: Sel, sender: id) {
+        extern "C" fn set_fill_transparency(_this: &mut Object, _cmd: Sel, sender: id) {
             unsafe {
                 let mut v: f64 = msg_send![sender, doubleValue];
                 v = clamp(v, 0.0, 100.0);
                 prefs_set_double(PREF_FILL_T, v);
-                apply_to_all_views(|vv| {
-                    unsafe { (*vv).set_ivar::<f64>("_fillTransparencyPct", v); }
-                });
-                let field: id = *this.get_ivar("_fieldFillT");
-                if field != nil {
-                    let _: () = msg_send![field, setStringValue: nsstring(&format!("{:.0}", v))];
-                }
-                apply_to_all_views(|vv| {
-                    unsafe { let _: () = msg_send![vv, setNeedsDisplay: YES]; }
-                });
+                apply_to_all_views(|vv| { unsafe { (*vv).set_ivar::<f64>("_fillTransparencyPct", v); } });
+                apply_to_all_views(|vv| { unsafe { let _: () = msg_send![vv, setNeedsDisplay: YES]; } });
             }
         }
         extern "C" fn set_fill_transparency_from_field(this: &mut Object, _cmd: Sel, sender: id) {
@@ -854,17 +936,13 @@ unsafe fn register_custom_view_class_and_create_view(window: id, width: f64, hei
                     if let Ok(mut v) = txt.trim().parse::<f64>() {
                         v = clamp(v, 0.0, 100.0);
                         prefs_set_double(PREF_FILL_T, v);
-                        apply_to_all_views(|vv| {
-                            unsafe { (*vv).set_ivar::<f64>("_fillTransparencyPct", v); }
-                        });
+                        apply_to_all_views(|vv| { unsafe { (*vv).set_ivar::<f64>("_fillTransparencyPct", v); } });
                         let slider: id = *this.get_ivar("_sliderFillT");
                         if slider != nil {
                             let _: () = msg_send![slider, setDoubleValue: v];
                         }
                         let _: () = msg_send![sender, setStringValue: nsstring(&format!("{:.0}", v))];
-                        apply_to_all_views(|vv| {
-                            unsafe { let _: () = msg_send![vv, setNeedsDisplay: YES]; }
-                        });
+                        apply_to_all_views(|vv| { unsafe { let _: () = msg_send![vv, setNeedsDisplay: YES]; } });
                     }
                 }
             }
@@ -896,9 +974,7 @@ unsafe fn register_custom_view_class_and_create_view(window: id, width: f64, hei
                     let s = color_to_hex(r, g, b, a);
                     let _: () = msg_send![hex_field, setStringValue: nsstring(&s)];
                 }
-                apply_to_all_views(|vv| {
-                    unsafe { let _: () = msg_send![vv, setNeedsDisplay: YES]; }
-                });
+                apply_to_all_views(|vv| { unsafe { let _: () = msg_send![vv, setNeedsDisplay: YES]; } });
             }
         }
         extern "C" fn hex_changed(this: &mut Object, _cmd: Sel, sender: id) {
@@ -931,9 +1007,7 @@ unsafe fn register_custom_view_class_and_create_view(window: id, width: f64, hei
                         }
                         let norm = color_to_hex(r, g, b, a);
                         let _: () = msg_send![sender, setStringValue: nsstring(&norm)];
-                        apply_to_all_views(|vv| {
-                            unsafe { let _: () = msg_send![vv, setNeedsDisplay: YES]; }
-                        });
+                        apply_to_all_views(|vv| { unsafe { let _: () = msg_send![vv, setNeedsDisplay: YES]; } });
                     } else {
                         let r = *this.get_ivar::<f64>("_strokeR");
                         let g = *this.get_ivar::<f64>("_strokeG");
@@ -948,6 +1022,87 @@ unsafe fn register_custom_view_class_and_create_view(window: id, width: f64, hei
         extern "C" fn close_settings(this: &mut Object, _cmd: Sel, _sender: id) {
             let view: id = this as *mut _ as id;
             close_settings_window(view);
+        }
+
+        // Cambia idioma (0=en, 1=es) y actualiza textos y layout Hex
+        extern "C" fn lang_changed(this: &mut Object, _cmd: Sel, sender: id) {
+            unsafe {
+                let idx: i32 = msg_send![sender, indexOfSelectedItem];
+                let new_lang = if idx == 1 { 1 } else { 0 };
+
+                // Guardar en prefs y propagar a TODAS las vistas
+                prefs_set_int(PREF_LANG, new_lang);
+                apply_to_all_views(|v| { unsafe { (*v).set_ivar::<i32>("_lang", new_lang); } });
+
+                let es = new_lang == 1;
+
+                // Actualizar textos en la ventana de settings
+                let settings: id = *this.get_ivar("_settingsWindow");
+                if settings != nil {
+                    let _: () = msg_send![settings, setTitle: nsstring(tr_key("Settings", es).as_ref())];
+                }
+
+                let label_lang: id = *this.get_ivar("_labelLang");
+                if label_lang != nil {
+                    let _: () = msg_send![label_lang, setStringValue: nsstring(tr_key("Language", es).as_ref())];
+                }
+
+                // Actualizar títulos del popup (reconstruimos items para que se traduzcan)
+                let popup: id = *this.get_ivar("_popupLang");
+                if popup != nil {
+                    let _: () = msg_send![popup, removeAllItems];
+                    let _: () = msg_send![popup, addItemWithTitle: nsstring(tr_key("English", es).as_ref())];
+                    let _: () = msg_send![popup, addItemWithTitle: nsstring(tr_key("Spanish", es).as_ref())];
+                    let _: () = msg_send![popup, selectItemAtIndex: (if es { 1 } else { 0 })];
+                }
+
+                // Labels
+                let lr: id = *this.get_ivar("_labelRadius");
+                if lr != nil {
+                    let _: () = msg_send![lr, setStringValue: nsstring(tr_key("Radius (px)", es).as_ref())];
+                }
+                let lb: id = *this.get_ivar("_labelBorder");
+                if lb != nil {
+                    let _: () = msg_send![lb, setStringValue: nsstring(tr_key("Border (px)", es).as_ref())];
+                }
+                let lc: id = *this.get_ivar("_labelColor");
+                if lc != nil {
+                    let _: () = msg_send![lc, setStringValue: nsstring(tr_key("Color", es).as_ref())];
+                }
+                let lhex: id = *this.get_ivar("_labelHex");
+                if lhex != nil {
+                    let _: () = msg_send![lhex, setStringValue: nsstring(tr_key("Hex", es).as_ref())];
+                    let _: () = msg_send![lhex, sizeToFit];
+
+                    // Reposicionar campo Hex justo después del label "Hex"
+                    let field_hex: id = *this.get_ivar("_fieldHex");
+                    if field_hex != nil && settings != nil {
+                        let wframe: NSRect = msg_send![settings, frame];
+                        let w = wframe.size.width;
+
+                        let label_hex_frame: NSRect = msg_send![lhex, frame];
+                        let padding: f64 = 8.0;
+                        let right_margin: f64 = 175.0;
+                        let field_x = label_hex_frame.origin.x + label_hex_frame.size.width + padding;
+                        let field_w = (w - right_margin) - field_x;
+
+                        let mut fh_frame: NSRect = msg_send![field_hex, frame];
+                        fh_frame.origin.x = field_x;
+                        fh_frame.size.width = field_w;
+                        let _: () = msg_send![field_hex, setFrame: fh_frame];
+                    }
+                }
+                let lfill: id = *this.get_ivar("_labelFillT");
+                if lfill != nil {
+                    let _: () = msg_send![lfill, setStringValue: nsstring(tr_key("Fill Transparency (%)", es).as_ref())];
+                }
+
+                // Botón Cerrar
+                let btn: id = *this.get_ivar("_btnClose");
+                if btn != nil {
+                    let _: () = msg_send![btn, setTitle: nsstring(tr_key("Close", es).as_ref())];
+                }
+            }
         }
 
         // ===== Dibujo =====
@@ -1071,6 +1226,7 @@ unsafe fn register_custom_view_class_and_create_view(window: id, width: f64, hei
         decl.add_method(sel!(colorChanged:), color_changed as extern "C" fn(&mut Object, Sel, id));
         decl.add_method(sel!(hexChanged:), hex_changed as extern "C" fn(&mut Object, Sel, id));
         decl.add_method(sel!(closeSettings:), close_settings as extern "C" fn(&mut Object, Sel, id));
+        decl.add_method(sel!(langChanged:), lang_changed as extern "C" fn(&mut Object, Sel, id));
         decl.add_method(sel!(drawRect:), draw_rect as extern "C" fn(&Object, Sel, NSRect));
 
         decl.register()
@@ -1086,6 +1242,7 @@ unsafe fn register_custom_view_class_and_create_view(window: id, width: f64, hei
     (*view).set_ivar::<bool>("_visible", false);
     (*view).set_ivar::<bool>("_overlayEnabled", false);
     (*view).set_ivar::<i32>("_displayMode", 0);
+    (*view).set_ivar::<i32>("_lang", 0);
 
     // Parámetros iniciales (se sobreescriben al cargar prefs y sincronizar)
     (*view).set_ivar::<f64>("_radius", DEFAULT_DIAMETER / 2.0);
@@ -1110,14 +1267,28 @@ unsafe fn register_custom_view_class_and_create_view(window: id, width: f64, hei
 
     // UI settings refs
     (*view).set_ivar::<id>("_settingsWindow", nil);
+    (*view).set_ivar::<id>("_labelLang", nil);
+    (*view).set_ivar::<id>("_popupLang", nil);
+
+    (*view).set_ivar::<id>("_labelRadius", nil);
     (*view).set_ivar::<id>("_fieldRadius", nil);
     (*view).set_ivar::<id>("_sliderRadius", nil);
+
+    (*view).set_ivar::<id>("_labelBorder", nil);
     (*view).set_ivar::<id>("_fieldBorder", nil);
     (*view).set_ivar::<id>("_sliderBorder", nil);
+
+    (*view).set_ivar::<id>("_labelColor", nil);
     (*view).set_ivar::<id>("_colorWell", nil);
+
+    (*view).set_ivar::<id>("_labelHex", nil);
     (*view).set_ivar::<id>("_fieldHex", nil);
+
+    (*view).set_ivar::<id>("_labelFillT", nil);
     (*view).set_ivar::<id>("_fieldFillT", nil);
     (*view).set_ivar::<id>("_sliderFillT", nil);
+
+    (*view).set_ivar::<id>("_btnClose", nil);
 
     let _: () = msg_send![window, setContentView: view];
     view
@@ -1207,7 +1378,7 @@ unsafe fn install_hotkeys(view: id) {
         &mut handler_ref,
     );
     if status != NO_ERR {
-        eprintln!("❌ InstallEventHandler falló: {}", status);
+        eprintln!("❌ InstallEventHandler failed: {}", status);
         return;
     }
     (*view).set_ivar::<*mut std::ffi::c_void>("_hkHandler", handler_ref);
@@ -1221,7 +1392,7 @@ unsafe fn install_hotkeys(view: id) {
             );
             if st != NO_ERR || out_ref.is_null() {
                 eprintln!(
-                    "❌ RegisterEventHotKey fallo (code={}, mods={}, id={}): {}",
+                    "❌ RegisterEventHotKey failed (code={}, mods={}, id={}): {}",
                     $keycode, $mods, $idconst, st
                 );
             } else {
@@ -1283,7 +1454,6 @@ unsafe fn install_termination_observer(view: id) {
 //
 
 unsafe fn install_mouse_monitors(view: id) {
-    // Máscaras NSEvent
     const LEFT_DOWN_MASK: u64 = 1 << 1;
     const LEFT_UP_MASK: u64 = 1 << 2;
     const RIGHT_DOWN_MASK: u64 = 1 << 3;
@@ -1291,15 +1461,11 @@ unsafe fn install_mouse_monitors(view: id) {
 
     let cls = class!(NSEvent);
 
-    // LEFT DOWN -> modo L en todas las vistas
+    // LEFT DOWN -> modo L
     let h1 = ConcreteBlock::new(move |_e: id| {
         unsafe {
-            apply_to_all_views(|v| {
-                unsafe { *(*v).get_mut_ivar::<i32>("_displayMode") = 1; }
-            });
-            apply_to_all_views(|v| {
-                unsafe { let _: () = msg_send![v, setNeedsDisplay: YES]; }
-            });
+            apply_to_all_views(|v| { unsafe { *(*v).get_mut_ivar::<i32>("_displayMode") = 1; } });
+            apply_to_all_views(|v| { unsafe { let _: () = msg_send![v, setNeedsDisplay: YES]; } });
         }
     })
         .copy();
@@ -1309,12 +1475,8 @@ unsafe fn install_mouse_monitors(view: id) {
     // LEFT UP -> círculo
     let h2 = ConcreteBlock::new(move |_e: id| {
         unsafe {
-            apply_to_all_views(|v| {
-                unsafe { *(*v).get_mut_ivar::<i32>("_displayMode") = 0; }
-            });
-            apply_to_all_views(|v| {
-                unsafe { let _: () = msg_send![v, setNeedsDisplay: YES]; }
-            });
+            apply_to_all_views(|v| { unsafe { *(*v).get_mut_ivar::<i32>("_displayMode") = 0; } });
+            apply_to_all_views(|v| { unsafe { let _: () = msg_send![v, setNeedsDisplay: YES]; } });
         }
     })
         .copy();
@@ -1324,12 +1486,8 @@ unsafe fn install_mouse_monitors(view: id) {
     // RIGHT DOWN -> modo R
     let h3 = ConcreteBlock::new(move |_e: id| {
         unsafe {
-            apply_to_all_views(|v| {
-                unsafe { *(*v).get_mut_ivar::<i32>("_displayMode") = 2; }
-            });
-            apply_to_all_views(|v| {
-                unsafe { let _: () = msg_send![v, setNeedsDisplay: YES]; }
-            });
+            apply_to_all_views(|v| { unsafe { *(*v).get_mut_ivar::<i32>("_displayMode") = 2; } });
+            apply_to_all_views(|v| { unsafe { let _: () = msg_send![v, setNeedsDisplay: YES]; } });
         }
     })
         .copy();
@@ -1339,12 +1497,8 @@ unsafe fn install_mouse_monitors(view: id) {
     // RIGHT UP -> círculo
     let h4 = ConcreteBlock::new(move |_e: id| {
         unsafe {
-            apply_to_all_views(|v| {
-                unsafe { *(*v).get_mut_ivar::<i32>("_displayMode") = 0; }
-            });
-            apply_to_all_views(|v| {
-                unsafe { let _: () = msg_send![v, setNeedsDisplay: YES]; }
-            });
+            apply_to_all_views(|v| { unsafe { *(*v).get_mut_ivar::<i32>("_displayMode") = 0; } });
+            apply_to_all_views(|v| { unsafe { let _: () = msg_send![v, setNeedsDisplay: YES]; } });
         }
     })
         .copy();
