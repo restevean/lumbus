@@ -1,5 +1,7 @@
 #![allow(unexpected_cfgs)] // Silencia warnings de cfg dentro de macros de objc/cocoa
 
+// TODO: Lenguajes, Compilar y empaquetar como app
+
 use block::ConcreteBlock;
 use cocoa::appkit::{
     NSApp, NSApplication, NSApplicationActivationPolicy, NSBackingStoreType, NSColor, NSWindow,
