@@ -4,7 +4,6 @@ version = "0.1.0"
 authors = ["restevean <restevean@prtonmail.com>"]
 edition = "2021"
 license = "MIT"
-license-file = "LICENSE"
 
 [dependencies]
 cocoa = "0.25"
