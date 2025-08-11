@@ -87,10 +87,12 @@ const TYPE_EVENT_HOTKEY_ID: u32 = 0x686B_6964; // 'hkid'
 
 // Modifiers
 const CMD_KEY: u32 = 1 << 8;
+const SHIFT_KEY: u32 = 1 << 9;      // ← nuevo
 const CONTROL_KEY: u32 = 1 << 12;
 
 // ANSI keycodes
 const KC_A: u32 = 0;
+const KC_Q: u32 = 12;               // ← nuevo
 const KC_SEMICOLON: u32 = 41;
 const KC_COMMA: u32 = 43;
 
@@ -100,6 +102,7 @@ const SIG_MHLT: u32 = 0x6D68_6C74;
 const HKID_TOGGLE: u32 = 1;
 const HKID_SETTINGS_COMMA: u32 = 2;
 const HKID_SETTINGS_SEMI: u32 = 3;
+const HKID_QUIT: u32 = 4;           // ← nuevo
 
 //
 // ======= CoreText / CoreGraphics / CoreFoundation (glyphs & paths) =======
@@ -408,6 +411,12 @@ fn tr_key(key: &str, es: bool) -> Cow<'static, str> {
         ("Close", true) => Cow::Borrowed("Cerrar"),
         ("Close", false) => Cow::Borrowed("Close"),
 
+        // ← nuevos
+        ("Quit", true) => Cow::Borrowed("Salir"),
+        ("Quit", false) => Cow::Borrowed("Quit"),
+        ("Cancel", true) => Cow::Borrowed("Cancelar"),
+        ("Cancel", false) => Cow::Borrowed("Cancel"),
+
         _ => Cow::Owned(key.to_string()),
     }
 }
@@ -627,7 +636,6 @@ fn open_settings_window(view: id) {
         let _: () = msg_send![slider_radius, setTarget: view];
         let _: () = msg_send![slider_radius, setAction: sel!(setRadius:)];
         let _: () = msg_send![slider_radius, setContinuous: YES];
-        // (sin tick marks)
 
         // Border (valor como etiqueta)
         let field_border = mk_value_label(160.0, h - 134.0, 60.0, 24.0, &format!("{:.0}", border));
@@ -642,7 +650,6 @@ fn open_settings_window(view: id) {
         let _: () = msg_send![slider_border, setTarget: view];
         let _: () = msg_send![slider_border, setAction: sel!(setBorderWidth:)];
         let _: () = msg_send![slider_border, setContinuous: YES];
-        // (sin tick marks)
 
         // Color + Hex (Hex se mantiene editable)
         let color_well: id = msg_send![class!(NSColorWell), alloc];
@@ -686,7 +693,6 @@ fn open_settings_window(view: id) {
         let _: () = msg_send![slider_fill_t, setTarget: view];
         let _: () = msg_send![slider_fill_t, setAction: sel!(setFillTransparency:)];
         let _: () = msg_send![slider_fill_t, setContinuous: YES];
-        // (sin tick marks)
 
         // Close
         let btn_close: id = msg_send![class!(NSButton), alloc];
@@ -845,6 +851,106 @@ fn close_settings_window(view: id) {
 }
 
 //
+// ===================== Confirmación de salida (Ctrl+Shift+Q) =====================
+//
+
+fn confirm_and_maybe_quit(view: id) {
+    unsafe {
+        // Subimos a Regular para mostrar el diálogo
+        let app = NSApp();
+        app.setActivationPolicy_(NSApplicationActivationPolicy::NSApplicationActivationPolicyRegular);
+        let _: () = msg_send![app, activateIgnoringOtherApps: YES];
+
+        // Mantener overlays al frente
+        apply_to_all_views(|v| {
+            unsafe {
+                let overlay_win: id = msg_send![v, window];
+                let _: () = msg_send![overlay_win, setLevel: overlay_window_level()];
+                let _: () = msg_send![overlay_win, orderFrontRegardless];
+            }
+        });
+
+        let es = lang_is_es(view);
+
+        // NSAlert
+        let alert: id = msg_send![class!(NSAlert), new];
+        // 2 = Warning
+        let _: () = msg_send![alert, setAlertStyle: 2u64];
+        let title = if es { "¿Salir de la aplicación?" } else { "Quit the app?" };
+        let msg = if es {
+            "Se cerrará la app y desaparecerá el overlay."
+        } else {
+            "The app will close and the overlay will disappear."
+        };
+        let _: () = msg_send![alert, setMessageText: nsstring(title)];
+        let _: () = msg_send![alert, setInformativeText: nsstring(msg)];
+
+        // Botones: Cancelar (primero, default) y Salir (segundo)
+        let _: () = msg_send![alert, addButtonWithTitle: nsstring(tr_key("Cancel", es).as_ref())];
+        let _: () = msg_send![alert, addButtonWithTitle: nsstring(tr_key("Quit", es).as_ref())];
+
+        // Asegurar que el primero es default (Enter)
+        let buttons: id = msg_send![alert, buttons];
+        let cancel_btn: id = msg_send![buttons, objectAtIndex: 0usize];
+        let _: () = msg_send![cancel_btn, setKeyEquivalent: nsstring("\r")];
+
+        // Monitor local para ESC = cancelar
+        const KEY_DOWN_MASK: u64 = 1 << 10;
+        let alert_window: id = msg_send![alert, window];
+        let esc_block = ConcreteBlock::new(move |event: id| -> id {
+            unsafe {
+                let keycode: u16 = msg_send![event, keyCode];
+                if keycode == 53 {
+                    let app = NSApp();
+                    // 0 = cancel
+                    let _: () = msg_send![app, stopModalWithCode: 0i64];
+                    return nil;
+                }
+            }
+            event
+        })
+            .copy();
+        let esc_mon: id = msg_send![
+            class!(NSEvent),
+            addLocalMonitorForEventsMatchingMask: KEY_DOWN_MASK
+            handler: &*esc_block
+        ];
+
+        // Mostrar modal
+        let response: i64 = msg_send![alert, runModal];
+
+        // Limpiar monitor ESC
+        let _: () = msg_send![class!(NSEvent), removeMonitor: esc_mon];
+        let _ = alert_window; // silenciar warning si no se usa en debug
+
+        // NSAlert runModal: 1000 = first, 1001 = second
+        if response == 1001 {
+            // “Salir”
+            let app = NSApp();
+            let _: () = msg_send![app, terminate: nil];
+            return;
+        }
+
+        // “Cancelar”: volver a Accessory si no hay settings abiertos
+        let settings: id = *(*view).get_ivar::<id>("_settingsWindow");
+        if settings == nil {
+            let app = NSApp();
+            app.setActivationPolicy_(
+                NSApplicationActivationPolicy::NSApplicationActivationPolicyAccessory,
+            );
+        }
+
+        // Re-ordenar overlays y re-instalar hotkeys por si acaso
+        apply_to_all_views(|v| unsafe {
+            let overlay_win: id = msg_send![v, window];
+            let _: () = msg_send![overlay_win, setLevel: overlay_window_level()];
+            let _: () = msg_send![overlay_win, orderFrontRegardless];
+        });
+        reinstall_hotkeys(view);
+    }
+}
+
+//
 // ===================== Multi-monitor view =====================
 //
 
@@ -910,6 +1016,7 @@ unsafe fn register_custom_view_class_and_create_view(window: id, width: f64, hei
         decl.add_ivar::<*mut std::ffi::c_void>("_hkToggle");
         decl.add_ivar::<*mut std::ffi::c_void>("_hkComma");
         decl.add_ivar::<*mut std::ffi::c_void>("_hkSemi");
+        decl.add_ivar::<*mut std::ffi::c_void>("_hkQuit"); // ← nuevo
 
         // Keep-alive timer para hotkeys
         decl.add_ivar::<id>("_hkKeepAliveTimer");
@@ -994,7 +1101,6 @@ unsafe fn register_custom_view_class_and_create_view(window: id, width: f64, hei
                         let vis = enabled && own_id == target_id && target_id != 0;
                         *(*v).get_mut_ivar::<bool>("_visible") = vis;
                         let _: () = msg_send![v, setNeedsDisplay: YES];
-                        // Fuerza la ventana a repintar si es necesario (importante tras abrir config)
                         let win: id = msg_send![v, window];
                         let _: () = msg_send![win, displayIfNeeded];
                     }
@@ -1498,6 +1604,7 @@ unsafe fn register_custom_view_class_and_create_view(window: id, width: f64, hei
     (*view).set_ivar::<*mut std::ffi::c_void>("_hkToggle", std::ptr::null_mut());
     (*view).set_ivar::<*mut std::ffi::c_void>("_hkComma", std::ptr::null_mut());
     (*view).set_ivar::<*mut std::ffi::c_void>("_hkSemi", std::ptr::null_mut());
+    (*view).set_ivar::<*mut std::ffi::c_void>("_hkQuit", std::ptr::null_mut()); // nuevo
 
     // Keep-alive timer ref
     (*view).set_ivar::<id>("_hkKeepAliveTimer", nil);
@@ -1611,6 +1718,14 @@ extern "C" fn hotkey_event_handler(
                         let main_queue: id = msg_send![class!(NSOperationQueue), mainQueue];
                         let _: () = msg_send![main_queue, addOperationWithBlock: &*block];
                     }
+                    HKID_QUIT => {
+                        let block = ConcreteBlock::new(move || {
+                            confirm_and_maybe_quit(view);
+                        })
+                            .copy();
+                        let main_queue: id = msg_send![class!(NSOperationQueue), mainQueue];
+                        let _: () = msg_send![main_queue, addOperationWithBlock: &*block];
+                    }
                     _ => {}
                 }
             }
@@ -1671,12 +1786,15 @@ unsafe fn install_hotkeys(view: id) {
     // ⌘ + ,  y ⌘ + ; → Settings
     register_hotkey!(KC_COMMA, CMD_KEY, HKID_SETTINGS_COMMA, "_hkComma");
     register_hotkey!(KC_SEMICOLON, CMD_KEY, HKID_SETTINGS_SEMI, "_hkSemi");
+    // Ctrl + Shift + Q → Confirmar salir
+    register_hotkey!(KC_Q, CONTROL_KEY | SHIFT_KEY, HKID_QUIT, "_hkQuit");
 }
 
 unsafe fn uninstall_hotkeys(view: id) {
     let hk_toggle: *mut std::ffi::c_void = *(*view).get_ivar("_hkToggle");
     let hk_comma: *mut std::ffi::c_void = *(*view).get_ivar("_hkComma");
     let hk_semi: *mut std::ffi::c_void = *(*view).get_ivar("_hkSemi");
+    let hk_quit: *mut std::ffi::c_void = *(*view).get_ivar("_hkQuit");
     let hk_handler: *mut std::ffi::c_void = *(*view).get_ivar("_hkHandler");
 
     if !hk_toggle.is_null() {
@@ -1690,6 +1808,10 @@ unsafe fn uninstall_hotkeys(view: id) {
     if !hk_semi.is_null() {
         let _ = UnregisterEventHotKey(hk_semi);
         (*view).set_ivar::<*mut std::ffi::c_void>("_hkSemi", std::ptr::null_mut());
+    }
+    if !hk_quit.is_null() {
+        let _ = UnregisterEventHotKey(hk_quit);
+        (*view).set_ivar::<*mut std::ffi::c_void>("_hkQuit", std::ptr::null_mut());
     }
     if !hk_handler.is_null() {
         let _ = RemoveEventHandler(hk_handler);
