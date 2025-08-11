@@ -373,16 +373,14 @@ unsafe fn sync_visual_prefs_to_all_views(src: id) {
     let lang = *(*src).get_ivar::<i32>("_lang");
 
     apply_to_all_views(|v| {
-        unsafe {
-            (*v).set_ivar::<f64>("_radius", radius);
-            (*v).set_ivar::<f64>("_borderWidth", border);
-            (*v).set_ivar::<f64>("_strokeR", r);
-            (*v).set_ivar::<f64>("_strokeG", g);
-            (*v).set_ivar::<f64>("_strokeB", b);
-            (*v).set_ivar::<f64>("_strokeA", a);
-            (*v).set_ivar::<f64>("_fillTransparencyPct", fill_t);
-            (*v).set_ivar::<i32>("_lang", lang);
-        }
+        (*v).set_ivar::<f64>("_radius", radius);
+        (*v).set_ivar::<f64>("_borderWidth", border);
+        (*v).set_ivar::<f64>("_strokeR", r);
+        (*v).set_ivar::<f64>("_strokeG", g);
+        (*v).set_ivar::<f64>("_strokeB", b);
+        (*v).set_ivar::<f64>("_strokeA", a);
+        (*v).set_ivar::<f64>("_fillTransparencyPct", fill_t);
+        (*v).set_ivar::<i32>("_lang", lang);
     });
 }
 
@@ -443,17 +441,15 @@ fn open_settings_window(view: id) {
 
         // Keep overlays on top and refresh them
         apply_to_all_views(|v| {
-            unsafe {
-                let overlay_win: id = msg_send![v, window];
-                let _: () = msg_send![overlay_win, setLevel: overlay_window_level()];
-                let _: () = msg_send![overlay_win, orderFrontRegardless];
-                let _: () = msg_send![
-                    v,
-                    performSelectorOnMainThread: sel!(update_cursor_multi)
-                    withObject: nil
-                    waitUntilDone: NO
-                ];
-            }
+            let overlay_win: id = msg_send![v, window];
+            let _: () = msg_send![overlay_win, setLevel: overlay_window_level()];
+            let _: () = msg_send![overlay_win, orderFrontRegardless];
+            let _: () = msg_send![
+                v,
+                performSelectorOnMainThread: sel!(update_cursor_multi)
+                withObject: nil
+                waitUntilDone: NO
+            ];
         });
 
         let es = lang_is_es(view);
@@ -737,17 +733,15 @@ fn close_settings_window(view: id) {
 
         // Ensure overlays are in front and refreshed
         apply_to_all_views(|v| {
-            unsafe {
-                let overlay_win: id = msg_send![v, window];
-                let _: () = msg_send![overlay_win, setLevel: overlay_window_level()];
-                let _: () = msg_send![overlay_win, orderFrontRegardless];
-                let _: () = msg_send![
-                    v,
-                    performSelectorOnMainThread: sel!(update_cursor_multi)
-                    withObject: nil
-                    waitUntilDone: NO
-                ];
-            }
+            let overlay_win: id = msg_send![v, window];
+            let _: () = msg_send![overlay_win, setLevel: overlay_window_level()];
+            let _: () = msg_send![overlay_win, orderFrontRegardless];
+            let _: () = msg_send![
+                v,
+                performSelectorOnMainThread: sel!(update_cursor_multi)
+                withObject: nil
+                waitUntilDone: NO
+            ];
         });
 
         // Re-install hotkeys so Ctrl+A never dies after switching activation policy
@@ -768,11 +762,9 @@ fn confirm_and_maybe_quit(view: id) {
 
         // Keep overlays on top whilst the alert is up
         apply_to_all_views(|v| {
-            unsafe {
-                let overlay_win: id = msg_send![v, window];
-                let _: () = msg_send![overlay_win, setLevel: overlay_window_level()];
-                let _: () = msg_send![overlay_win, orderFrontRegardless];
-            }
+            let overlay_win: id = msg_send![v, window];
+            let _: () = msg_send![overlay_win, setLevel: overlay_window_level()];
+            let _: () = msg_send![overlay_win, orderFrontRegardless];
         });
 
         let es = lang_is_es(view);
@@ -846,7 +838,7 @@ fn confirm_and_maybe_quit(view: id) {
         }
 
         // Ensure overlays are back on top and hotkeys are solid
-        apply_to_all_views(|v| unsafe {
+        apply_to_all_views(|v| {
             let overlay_win: id = msg_send![v, window];
             let _: () = msg_send![overlay_win, setLevel: overlay_window_level()];
             let _: () = msg_send![overlay_win, orderFrontRegardless];
@@ -999,16 +991,14 @@ unsafe fn register_custom_view_class_and_create_view(window: id, width: f64, hei
                 let enabled = *this.get_ivar::<bool>("_overlayEnabled");
 
                 apply_to_all_views(|v| {
-                    unsafe {
-                        *(*v).get_mut_ivar::<f64>("_cursorXScreen") = x;
-                        *(*v).get_mut_ivar::<f64>("_cursorYScreen") = y;
-                        let own_id = *(*v).get_ivar::<u32>("_ownDisplayID");
-                        let vis = enabled && own_id == target_id && target_id != 0;
-                        *(*v).get_mut_ivar::<bool>("_visible") = vis;
-                        let _: () = msg_send![v, setNeedsDisplay: YES];
-                        let win: id = msg_send![v, window];
-                        let _: () = msg_send![win, displayIfNeeded];
-                    }
+                    *(*v).get_mut_ivar::<f64>("_cursorXScreen") = x;
+                    *(*v).get_mut_ivar::<f64>("_cursorYScreen") = y;
+                    let own_id = *(*v).get_ivar::<u32>("_ownDisplayID");
+                    let vis = enabled && own_id == target_id && target_id != 0;
+                    *(*v).get_mut_ivar::<bool>("_visible") = vis;
+                    let _: () = msg_send![v, setNeedsDisplay: YES];
+                    let win: id = msg_send![v, window];
+                    let _: () = msg_send![win, displayIfNeeded];
                 });
             }
         }
@@ -1019,9 +1009,7 @@ unsafe fn register_custom_view_class_and_create_view(window: id, width: f64, hei
                 let new_enabled = !enabled;
 
                 apply_to_all_views(|v| {
-                    unsafe {
-                        *(*v).get_mut_ivar::<bool>("_overlayEnabled") = new_enabled;
-                    }
+                    *(*v).get_mut_ivar::<bool>("_overlayEnabled") = new_enabled;
                 });
 
                 if new_enabled {
@@ -1033,12 +1021,10 @@ unsafe fn register_custom_view_class_and_create_view(window: id, width: f64, hei
                     ];
                 } else {
                     apply_to_all_views(|v| {
-                        unsafe {
-                            *(*v).get_mut_ivar::<bool>("_visible") = false;
-                            let _: () = msg_send![v, setNeedsDisplay: YES];
-                            let win: id = msg_send![v, window];
-                            let _: () = msg_send![win, displayIfNeeded];
-                        }
+                        *(*v).get_mut_ivar::<bool>("_visible") = false;
+                        let _: () = msg_send![v, setNeedsDisplay: YES];
+                        let win: id = msg_send![v, window];
+                        let _: () = msg_send![win, displayIfNeeded];
                     });
                 }
             }
@@ -1052,7 +1038,7 @@ unsafe fn register_custom_view_class_and_create_view(window: id, width: f64, hei
                 if now - last < 0.15 {
                     return;
                 }
-                apply_to_all_views(|v| unsafe {
+                apply_to_all_views(|v| {
                     *(*v).get_mut_ivar::<f64>("_lastToggleTs") = now;
                 });
 
@@ -1087,8 +1073,8 @@ unsafe fn register_custom_view_class_and_create_view(window: id, width: f64, hei
                 }
 
                 prefs_set_double(PREF_RADIUS, v);
-                apply_to_all_views(|vv| unsafe { (*vv).set_ivar::<f64>("_radius", v) });
-                apply_to_all_views(|vv| unsafe { let _: () = msg_send![vv, setNeedsDisplay: YES]; });
+                apply_to_all_views(|vv| { (*vv).set_ivar::<f64>("_radius", v) });
+                apply_to_all_views(|vv| { let _: () = msg_send![vv, setNeedsDisplay: YES]; });
             }
         }
         // These are no-ops now (text fields became labels)
@@ -1104,8 +1090,8 @@ unsafe fn register_custom_view_class_and_create_view(window: id, width: f64, hei
                 }
 
                 prefs_set_double(PREF_BORDER, v);
-                apply_to_all_views(|vv| unsafe { (*vv).set_ivar::<f64>("_borderWidth", v) });
-                apply_to_all_views(|vv| unsafe { let _: () = msg_send![vv, setNeedsDisplay: YES]; });
+                apply_to_all_views(|vv| { (*vv).set_ivar::<f64>("_borderWidth", v) });
+                apply_to_all_views(|vv| { let _: () = msg_send![vv, setNeedsDisplay: YES]; });
             }
         }
         extern "C" fn set_border_from_field(_this: &mut Object, _cmd: Sel, _sender: id) {}
@@ -1121,8 +1107,8 @@ unsafe fn register_custom_view_class_and_create_view(window: id, width: f64, hei
                 }
 
                 prefs_set_double(PREF_FILL_T, v);
-                apply_to_all_views(|vv| unsafe { (*vv).set_ivar::<f64>("_fillTransparencyPct", v) });
-                apply_to_all_views(|vv| unsafe { let _: () = msg_send![vv, setNeedsDisplay: YES]; });
+                apply_to_all_views(|vv| { (*vv).set_ivar::<f64>("_fillTransparencyPct", v) });
+                apply_to_all_views(|vv| { let _: () = msg_send![vv, setNeedsDisplay: YES]; });
             }
         }
         extern "C" fn set_fill_transparency_from_field(_this: &mut Object, _cmd: Sel, _sender: id) {}
@@ -1139,7 +1125,7 @@ unsafe fn register_custom_view_class_and_create_view(window: id, width: f64, hei
                 prefs_set_double(PREF_B, b);
                 prefs_set_double(PREF_A, a);
 
-                apply_to_all_views(|vv| unsafe {
+                apply_to_all_views(|vv| {
                     (*vv).set_ivar::<f64>("_strokeR", r);
                     (*vv).set_ivar::<f64>("_strokeG", g);
                     (*vv).set_ivar::<f64>("_strokeB", b);
@@ -1151,7 +1137,7 @@ unsafe fn register_custom_view_class_and_create_view(window: id, width: f64, hei
                     let s = color_to_hex(r, g, b, a);
                     let _: () = msg_send![hex_field, setStringValue: nsstring(&s)];
                 }
-                apply_to_all_views(|vv| unsafe { let _: () = msg_send![vv, setNeedsDisplay: YES]; });
+                apply_to_all_views(|vv| { let _: () = msg_send![vv, setNeedsDisplay: YES]; });
             }
         }
         extern "C" fn hex_changed(this: &mut Object, _cmd: Sel, sender: id) {
@@ -1166,7 +1152,7 @@ unsafe fn register_custom_view_class_and_create_view(window: id, width: f64, hei
                         prefs_set_double(PREF_B, b);
                         prefs_set_double(PREF_A, a);
 
-                        apply_to_all_views(|vv| unsafe {
+                        apply_to_all_views(|vv| {
                             (*vv).set_ivar::<f64>("_strokeR", r);
                             (*vv).set_ivar::<f64>("_strokeG", g);
                             (*vv).set_ivar::<f64>("_strokeB", b);
@@ -1187,7 +1173,7 @@ unsafe fn register_custom_view_class_and_create_view(window: id, width: f64, hei
                         }
                         let norm = color_to_hex(r, g, b, a);
                         let _: () = msg_send![sender, setStringValue: nsstring(&norm)];
-                        apply_to_all_views(|vv| unsafe { let _: () = msg_send![vv, setNeedsDisplay: YES]; });
+                        apply_to_all_views(|vv| { let _: () = msg_send![vv, setNeedsDisplay: YES]; });
                     } else {
                         let r = *this.get_ivar::<f64>("_strokeR");
                         let g = *this.get_ivar::<f64>("_strokeG");
@@ -1211,7 +1197,7 @@ unsafe fn register_custom_view_class_and_create_view(window: id, width: f64, hei
                 let new_lang = if idx == 1 { 1 } else { 0 };
 
                 prefs_set_int(PREF_LANG, new_lang);
-                apply_to_all_views(|v| unsafe { (*v).set_ivar::<i32>("_lang", new_lang) });
+                apply_to_all_views(|v| { (*v).set_ivar::<i32>("_lang", new_lang) });
 
                 let es = new_lang == 1;
 
@@ -1856,9 +1842,11 @@ unsafe fn install_mouse_monitors(view: id) {
     let cls = class!(NSEvent);
 
     // LEFT DOWN -> L mode
-    let h1 = ConcreteBlock::new(move |_e: id| unsafe {
-        apply_to_all_views(|v| unsafe { *(*v).get_mut_ivar::<i32>("_displayMode") = 1 });
-        apply_to_all_views(|v| unsafe { let _: () = msg_send![v, setNeedsDisplay: YES]; });
+    let h1 = ConcreteBlock::new(move |_e: id| {
+        unsafe {
+            apply_to_all_views(|v| { *(*v).get_mut_ivar::<i32>("_displayMode") = 1 });
+            apply_to_all_views(|v| { let _: () = msg_send![v, setNeedsDisplay: YES]; });
+        }
     })
         .copy();
     let mon_ld: id =
@@ -1866,9 +1854,11 @@ unsafe fn install_mouse_monitors(view: id) {
     (*view).set_ivar::<id>("_monLeftDown", mon_ld);
 
     // LEFT UP -> circle
-    let h2 = ConcreteBlock::new(move |_e: id| unsafe {
-        apply_to_all_views(|v| unsafe { *(*v).get_mut_ivar::<i32>("_displayMode") = 0 });
-        apply_to_all_views(|v| unsafe { let _: () = msg_send![v, setNeedsDisplay: YES]; });
+    let h2 = ConcreteBlock::new(move |_e: id| {
+        unsafe {
+            apply_to_all_views(|v| { *(*v).get_mut_ivar::<i32>("_displayMode") = 0 });
+            apply_to_all_views(|v| { let _: () = msg_send![v, setNeedsDisplay: YES]; });
+        }
     })
         .copy();
     let mon_lu: id =
@@ -1876,9 +1866,11 @@ unsafe fn install_mouse_monitors(view: id) {
     (*view).set_ivar::<id>("_monLeftUp", mon_lu);
 
     // RIGHT DOWN -> R mode
-    let h3 = ConcreteBlock::new(move |_e: id| unsafe {
-        apply_to_all_views(|v| unsafe { *(*v).get_mut_ivar::<i32>("_displayMode") = 2 });
-        apply_to_all_views(|v| unsafe { let _: () = msg_send![v, setNeedsDisplay: YES]; });
+    let h3 = ConcreteBlock::new(move |_e: id| {
+        unsafe {
+            apply_to_all_views(|v| { *(*v).get_mut_ivar::<i32>("_displayMode") = 2 });
+            apply_to_all_views(|v| { let _: () = msg_send![v, setNeedsDisplay: YES]; });
+        }
     })
         .copy();
     let mon_rd: id =
@@ -1886,9 +1878,11 @@ unsafe fn install_mouse_monitors(view: id) {
     (*view).set_ivar::<id>("_monRightDown", mon_rd);
 
     // RIGHT UP -> circle
-    let h4 = ConcreteBlock::new(move |_e: id| unsafe {
-        apply_to_all_views(|v| unsafe { *(*v).get_mut_ivar::<i32>("_displayMode") = 0 });
-        apply_to_all_views(|v| unsafe { let _: () = msg_send![v, setNeedsDisplay: YES]; });
+    let h4 = ConcreteBlock::new(move |_e: id| {
+        unsafe {
+            apply_to_all_views(|v| { *(*v).get_mut_ivar::<i32>("_displayMode") = 0 });
+            apply_to_all_views(|v| { let _: () = msg_send![v, setNeedsDisplay: YES]; });
+        }
     })
         .copy();
     let mon_ru: id =
@@ -1897,13 +1891,15 @@ unsafe fn install_mouse_monitors(view: id) {
 
     // mouseMoved → schedule update on the main thread
     let host = view;
-    let hmove = ConcreteBlock::new(move |_e: id| unsafe {
-        let _: () = msg_send![
-            host,
-            performSelectorOnMainThread: sel!(update_cursor_multi)
-            withObject: nil
-            waitUntilDone: NO
-        ];
+    let hmove = ConcreteBlock::new(move |_e: id| {
+        unsafe {
+            let _: () = msg_send![
+                host,
+                performSelectorOnMainThread: sel!(update_cursor_multi)
+                withObject: nil
+                waitUntilDone: NO
+            ];
+        }
     })
         .copy();
     let mon_move: id =
