@@ -206,12 +206,12 @@ fn main() {
         load_preferences_into_view(host_view);
         sync_visual_prefs_to_all_views(host_view);
 
-        // Timer ~60 FPS (programado por AppKit)
+        // Timer ~60 FPS
         let _ = create_timer(host_view, sel!(update_cursor_multi), 0.016);
 
         // Hotkeys/monitores
         install_hotkeys(host_view);
-        install_mouse_monitors(host_view); // incluye mouseMoved para refresco
+        install_mouse_monitors(host_view);
         install_termination_observer(host_view);
         install_local_ctrl_a_monitor(host_view);
 
@@ -698,6 +698,11 @@ fn open_settings_window(view: id) {
         let _: () = msg_send![btn_close, setTarget: view];
         let _: () = msg_send![btn_close, setAction: sel!(closeSettings:)];
 
+        // Enter/Return activa “Cerrar”
+        let _: () = msg_send![btn_close, setKeyEquivalent: nsstring("\r")];
+        let cell: id = msg_send![btn_close, cell];
+        let _: () = msg_send![settings, setDefaultButtonCell: cell];
+
         // Añadir subviews
         let _: () = msg_send![content, addSubview: label_lang];
         let _: () = msg_send![content, addSubview: popup_lang];
@@ -746,7 +751,47 @@ fn open_settings_window(view: id) {
 
         (*view).set_ivar::<id>("_btnClose", btn_close);
 
+        // 👉 Foco por defecto en “Cerrar”
+        let _: () = msg_send![settings, setInitialFirstResponder: btn_close];
+
+        // Mostrar ventana
         let _: () = msg_send![settings, makeKeyAndOrderFront: nil];
+
+        // Asegurar foco cuando ya es keyWindow
+        let _: () = msg_send![settings, makeFirstResponder: btn_close];
+
+        // 👉 ESC cierra la ventana de configuración (monitor local)
+        const KEY_DOWN_MASK: u64 = 1 << 10;
+        let settings_for_block = settings;
+        let host_view = view;
+        let esc_block = ConcreteBlock::new(move |event: id| -> id {
+            unsafe {
+                // Sólo si la ventana de configuración es la key window
+                let app = NSApp();
+                let key_win: id = msg_send![app, keyWindow];
+                if key_win == settings_for_block {
+                    let keycode: u16 = msg_send![event, keyCode];
+                    if keycode == 53 {
+                        // 53 = Escape
+                        let _: () = msg_send![
+                            host_view,
+                            performSelectorOnMainThread: sel!(closeSettings:)
+                            withObject: nil
+                            waitUntilDone: NO
+                        ];
+                        return nil; // consumir el evento
+                    }
+                }
+            }
+            event
+        })
+            .copy();
+        let esc_mon: id = msg_send![
+            class!(NSEvent),
+            addLocalMonitorForEventsMatchingMask: KEY_DOWN_MASK
+            handler: &*esc_block
+        ];
+        (*view).set_ivar::<id>("_settingsEscMonitor", esc_mon);
     }
 }
 
@@ -761,6 +806,13 @@ unsafe fn the_hex_field_config(view: id, field_hex: id) {
 
 fn close_settings_window(view: id) {
     unsafe {
+        // Quitar monitor de ESC si existiera
+        let esc_mon: id = *(*view).get_ivar::<id>("_settingsEscMonitor");
+        if esc_mon != nil {
+            let _: () = msg_send![class!(NSEvent), removeMonitor: esc_mon];
+            (*view).set_ivar::<id>("_settingsEscMonitor", nil);
+        }
+
         let settings: id = *(*view).get_ivar::<id>("_settingsWindow");
         if settings != nil {
             let _: () = msg_send![settings, orderOut: nil];
@@ -906,6 +958,9 @@ unsafe fn register_custom_view_class_and_create_view(window: id, width: f64, hei
         // Timer de refresco
         decl.add_ivar::<id>("_updateTimer");
 
+        // Monitor local para ESC en settings
+        decl.add_ivar::<id>("_settingsEscMonitor");
+
         // ====== Methods ======
 
         extern "C" fn update_cursor_multi(this: &mut Object, _cmd: Sel) {
@@ -1024,7 +1079,7 @@ unsafe fn register_custom_view_class_and_create_view(window: id, width: f64, hei
                 apply_to_all_views(|vv| unsafe { let _: () = msg_send![vv, setNeedsDisplay: YES]; });
             }
         }
-        // Estos tres handlers ya no se usan (campos no editables), pero se dejan por compat
+        // Ya no se usan (campos no editables), se dejan vacíos por compat
         extern "C" fn set_radius_from_field(_this: &mut Object, _cmd: Sel, _sender: id) {}
         extern "C" fn set_border_width(this: &mut Object, _cmd: Sel, sender: id) {
             unsafe {
@@ -1485,6 +1540,9 @@ unsafe fn register_custom_view_class_and_create_view(window: id, width: f64, hei
 
     // Timer de refresco
     (*view).set_ivar::<id>("_updateTimer", nil);
+
+    // Monitor ESC settings
+    (*view).set_ivar::<id>("_settingsEscMonitor", nil);
 
     let _: () = msg_send![window, setContentView: view];
     view
