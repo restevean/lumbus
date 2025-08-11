@@ -66,7 +66,7 @@ type EventHotKeyRef = *mut std::ffi::c_void;
 #[repr(C)]
 #[derive(Copy, Clone)]
 struct EventTypeSpec {
-    // Layout Carbon
+    // Keep snake_case to avoid lint warnings; memory layout matches Carbon
     event_class: u32,
     event_kind: u32,
 }
@@ -87,22 +87,22 @@ const TYPE_EVENT_HOTKEY_ID: u32 = 0x686B_6964; // 'hkid'
 
 // Modifiers
 const CMD_KEY: u32 = 1 << 8;
-const SHIFT_KEY: u32 = 1 << 9;      // ← nuevo
+const SHIFT_KEY: u32 = 1 << 9;
 const CONTROL_KEY: u32 = 1 << 12;
 
 // ANSI keycodes
 const KC_A: u32 = 0;
-const KC_Q: u32 = 12;               // ← nuevo
+const KC_Q: u32 = 12;
 const KC_SEMICOLON: u32 = 41;
 const KC_COMMA: u32 = 43;
 
 // Hotkey signature: 'mhlt'
 const SIG_MHLT: u32 = 0x6D68_6C74;
-// IDs
+// Hotkey IDs
 const HKID_TOGGLE: u32 = 1;
 const HKID_SETTINGS_COMMA: u32 = 2;
 const HKID_SETTINGS_SEMI: u32 = 3;
-const HKID_QUIT: u32 = 4;           // ← nuevo
+const HKID_QUIT: u32 = 4;
 
 //
 // ======= CoreText / CoreGraphics / CoreFoundation (glyphs & paths) =======
@@ -142,7 +142,7 @@ extern "C" {
     fn CFAbsoluteTimeGetCurrent() -> f64;
 }
 
-// Para TCC Accesibilidad
+// TCC Accessibility (to prompt for permissions if missing)
 #[link(name = "ApplicationServices", kind = "framework")]
 extern "C" {
     fn AXIsProcessTrustedWithOptions(options: *const std::ffi::c_void) -> bool;
@@ -155,7 +155,7 @@ extern "C" {
 const DEFAULT_DIAMETER: f64 = 38.5;
 const DEFAULT_BORDER_WIDTH: f64 = 3.0;
 const DEFAULT_COLOR: (f64, f64, f64, f64) = (1.0, 1.0, 1.0, 1.0);
-const DEFAULT_FILL_TRANSPARENCY_PCT: f64 = 100.0; // 100% transparente
+const DEFAULT_FILL_TRANSPARENCY_PCT: f64 = 100.0; // 100% transparent
 
 //
 // ===================== NSUserDefaults keys =====================
@@ -178,7 +178,7 @@ fn main() {
     unsafe {
         let _pool = NSAutoreleasePool::new(nil);
 
-        // Solicita (si falta) el permiso de Accesibilidad con prompt del sistema
+        // Ask for Accessibility permission (shows a system prompt if needed)
         ensure_accessibility_prompt();
 
         let app = NSApp();
@@ -186,7 +186,7 @@ fn main() {
             NSApplicationActivationPolicy::NSApplicationActivationPolicyAccessory,
         );
 
-        // Una ventana por pantalla
+        // Create one transparent overlay window per screen
         let screens: id = msg_send![class!(NSScreen), screens];
         let count: usize = msg_send![screens, count];
         if count == 0 {
@@ -202,22 +202,23 @@ fn main() {
             views.push(view);
         }
 
-        // Host
+        // Host view
         let host_view = *views.first().unwrap();
 
-        // Carga y sincroniza prefs
+        // Load and broadcast preferences
         load_preferences_into_view(host_view);
         sync_visual_prefs_to_all_views(host_view);
 
-        // Timer ~60 FPS
+        // ~60 FPS timer: updates cursor and visibility per screen
         let _ = create_timer(host_view, sel!(update_cursor_multi), 0.016);
 
-        // Hotkeys/monitores
+        // Carbon hotkeys + global mouse monitors + termination observer
         install_hotkeys(host_view);
         install_mouse_monitors(host_view);
         install_termination_observer(host_view);
         install_local_ctrl_a_monitor(host_view);
 
+        // Defensive re-install of hotkeys on system events
         start_hotkey_keepalive(host_view);
         install_wakeup_space_observers(host_view);
 
@@ -225,7 +226,7 @@ fn main() {
     }
 }
 
-/// Window level un poco por encima de menús emergentes/Dock
+/// Window level slightly above context menus and Dock (approx.)
 fn nspop_up_menu_window_level() -> i64 {
     201
 }
@@ -234,7 +235,7 @@ fn overlay_window_level() -> i64 {
     nspop_up_menu_window_level() + 1
 }
 
-/// Posición global del puntero (coords Cocoa)
+/// Global mouse position in Cocoa coordinates (origin bottom-left)
 fn get_mouse_position_cocoa() -> (f64, f64) {
     unsafe {
         let cls = class!(NSEvent);
@@ -250,7 +251,7 @@ unsafe fn nsstring(s: &str) -> id {
     ns
 }
 
-/// DisplayID (CGDirectDisplayID) estable para un NSScreen
+/// Stable CGDirectDisplayID for an NSScreen (does not change across Space/sleep)
 unsafe fn display_id_for_screen(screen: id) -> u32 {
     let desc: id = msg_send![screen, deviceDescription];
     let key = nsstring("NSScreenNumber");
@@ -325,7 +326,7 @@ unsafe fn load_preferences_into_view(view: id) {
 }
 
 //
-// ===================== Utilities / Localization =====================
+// ===================== Utilities / Localisation =====================
 //
 
 fn clamp(v: f64, lo: f64, hi: f64) -> f64 {
@@ -378,7 +379,7 @@ fn parse_hex_color(s: &str) -> Option<(f64, f64, f64, f64)> {
     ))
 }
 
-// Localization via Cow to avoid lifetime issues
+// Localised strings via Cow to avoid lifetime issues
 fn tr_key(key: &str, es: bool) -> Cow<'static, str> {
     match (key, es) {
         ("Settings", true) => Cow::Borrowed("Configuración"),
@@ -411,7 +412,6 @@ fn tr_key(key: &str, es: bool) -> Cow<'static, str> {
         ("Close", true) => Cow::Borrowed("Cerrar"),
         ("Close", false) => Cow::Borrowed("Close"),
 
-        // ← nuevos
         ("Quit", true) => Cow::Borrowed("Salir"),
         ("Quit", false) => Cow::Borrowed("Quit"),
         ("Cancel", true) => Cow::Borrowed("Cancelar"),
@@ -432,7 +432,7 @@ fn lang_is_es(view: id) -> bool {
 // ===================== Multi-monitor helpers =====================
 //
 
-/// Aplica un closure a todos los contentView de clase CustomViewMulti
+/// Apply a closure to every contentView whose class is CustomViewMulti
 unsafe fn apply_to_all_views<F: Fn(id)>(f: F) {
     let app: id = NSApp();
     let windows: id = msg_send![app, windows];
@@ -452,7 +452,7 @@ unsafe fn apply_to_all_views<F: Fn(id)>(f: F) {
     }
 }
 
-/// Copia prefs visuales de src a todas las vistas
+/// Copy visual prefs from src view to all views
 unsafe fn sync_visual_prefs_to_all_views(src: id) {
     let radius = *(*src).get_ivar::<f64>("_radius");
     let border = *(*src).get_ivar::<f64>("_borderWidth");
@@ -481,6 +481,7 @@ unsafe fn sync_visual_prefs_to_all_views(src: id) {
 // ===================== Settings window =====================
 //
 
+/// Install a minimal main menu so that local key equivalents work while Regular
 fn ensure_hotkey_menu(view: id) {
     unsafe {
         let installed = *(*view).get_ivar::<bool>("_menuInstalled");
@@ -522,16 +523,16 @@ fn open_settings_window(view: id) {
             return;
         }
 
-        // Pasa a Regular para mostrar la ventana y enfoque
+        // Temporarily switch to Regular to show and focus the window
         let app = NSApp();
         app.setActivationPolicy_(NSApplicationActivationPolicy::NSApplicationActivationPolicyRegular);
         let _: () = msg_send![app, activateIgnoringOtherApps: YES];
 
-        // Menú + hotkeys activos
+        // Ensure menu + hotkeys are active while Regular
         ensure_hotkey_menu(view);
         reinstall_hotkeys(view);
 
-        // Mantén overlays arriba y refresca
+        // Keep overlays on top and refresh them
         apply_to_all_views(|v| {
             unsafe {
                 let overlay_win: id = msg_send![v, window];
@@ -552,7 +553,7 @@ fn open_settings_window(view: id) {
             | NSWindowStyleMask::NSClosableWindowMask
             | NSWindowStyleMask::NSMiniaturizableWindowMask;
         let w = 520.0;
-        let h = 330.0; // espacio extra selector idioma
+        let h = 330.0; // extra space for language selector
         let settings = NSWindow::alloc(nil).initWithContentRect_styleMask_backing_defer_(
             NSRect::new(NSPoint::new(0.0, 0.0), NSSize::new(w, h)),
             style,
@@ -573,7 +574,7 @@ fn open_settings_window(view: id) {
         let fill_t: f64 = *(*view).get_ivar::<f64>("_fillTransparencyPct");
         let cur_lang: i32 = *(*view).get_ivar::<i32>("_lang");
 
-        // Helper label
+        // Helper: static label
         let mk_label = |x, y, text: &str| -> id {
             let lbl: id = msg_send![class!(NSTextField), alloc];
             let lbl: id = msg_send![
@@ -588,7 +589,7 @@ fn open_settings_window(view: id) {
             lbl
         };
 
-        // Helper value-label (no interactivo)
+        // Helper: value as a non-interactive label
         let mk_value_label = |x, y, w, h, val: &str| -> id {
             let tf: id = msg_send![class!(NSTextField), alloc];
             let tf: id =
@@ -601,7 +602,7 @@ fn open_settings_window(view: id) {
             tf
         };
 
-        // Idioma
+        // Language selector
         let label_lang = mk_label(20.0, h - 40.0, tr_key("Language", es).as_ref());
         let popup_lang: id = msg_send![class!(NSPopUpButton), alloc];
         let popup_lang: id = msg_send![
@@ -614,7 +615,7 @@ fn open_settings_window(view: id) {
         let _: () = msg_send![popup_lang, setTarget: view];
         let _: () = msg_send![popup_lang, setAction: sel!(langChanged:)];
 
-        // Labels estáticos
+        // Static labels
         let label_radius = mk_label(20.0, h - 80.0, tr_key("Radius (px)", es).as_ref());
         let label_border = mk_label(20.0, h - 130.0, tr_key("Border (px)", es).as_ref());
         let label_color = mk_label(20.0, h - 180.0, tr_key("Color", es).as_ref());
@@ -622,8 +623,8 @@ fn open_settings_window(view: id) {
         let _: () = msg_send![label_hex, sizeToFit];
         let label_fill_t = mk_label(20.0, h - 230.0, tr_key("Fill Transparency (%)", es).as_ref());
 
-        // Value labels (no interactivos) + sliders (SIN marcas visuales)
-        // Radius (valor como etiqueta)
+        // Value labels (non-interactive) + sliders (NO tick marks, still snapping in code)
+        // Radius
         let field_radius = mk_value_label(160.0, h - 84.0, 60.0, 24.0, &format!("{:.0}", radius));
         let slider_radius: id = msg_send![class!(NSSlider), alloc];
         let slider_radius: id = msg_send![
@@ -637,7 +638,7 @@ fn open_settings_window(view: id) {
         let _: () = msg_send![slider_radius, setAction: sel!(setRadius:)];
         let _: () = msg_send![slider_radius, setContinuous: YES];
 
-        // Border (valor como etiqueta)
+        // Border
         let field_border = mk_value_label(160.0, h - 134.0, 60.0, 24.0, &format!("{:.0}", border));
         let slider_border: id = msg_send![class!(NSSlider), alloc];
         let slider_border: id = msg_send![
@@ -651,7 +652,7 @@ fn open_settings_window(view: id) {
         let _: () = msg_send![slider_border, setAction: sel!(setBorderWidth:)];
         let _: () = msg_send![slider_border, setContinuous: YES];
 
-        // Color + Hex (Hex se mantiene editable)
+        // Colour + Hex (Hex remains editable)
         let color_well: id = msg_send![class!(NSColorWell), alloc];
         let color_well: id = msg_send![
             color_well,
@@ -665,7 +666,7 @@ fn open_settings_window(view: id) {
         let _: () = msg_send![color_well, setAction: sel!(colorChanged:)];
 
         let hex_str = color_to_hex(r, g, b, a);
-        // Campo Hex a la derecha del label "Hex"
+        // Place Hex field right after "Hex" label
         let label_hex_frame: NSRect = msg_send![label_hex, frame];
         let padding: f64 = 8.0;
         let right_margin: f64 = 175.0;
@@ -680,7 +681,7 @@ fn open_settings_window(view: id) {
         let _: () = msg_send![field_hex, setStringValue: nsstring(&hex_str)];
         the_hex_field_config(view, field_hex);
 
-        // Fill transparency (valor como etiqueta)
+        // Fill transparency
         let field_fill_t = mk_value_label(160.0, h - 234.0, 60.0, 24.0, &format!("{:.0}", fill_t));
         let slider_fill_t: id = msg_send![class!(NSSlider), alloc];
         let slider_fill_t: id = msg_send![
@@ -694,7 +695,7 @@ fn open_settings_window(view: id) {
         let _: () = msg_send![slider_fill_t, setAction: sel!(setFillTransparency:)];
         let _: () = msg_send![slider_fill_t, setContinuous: YES];
 
-        // Close
+        // Close button
         let btn_close: id = msg_send![class!(NSButton), alloc];
         let btn_close: id = msg_send![
             btn_close,
@@ -704,12 +705,12 @@ fn open_settings_window(view: id) {
         let _: () = msg_send![btn_close, setTarget: view];
         let _: () = msg_send![btn_close, setAction: sel!(closeSettings:)];
 
-        // Enter/Return activa “Cerrar”
+        // Enter/Return activates “Close”
         let _: () = msg_send![btn_close, setKeyEquivalent: nsstring("\r")];
         let cell: id = msg_send![btn_close, cell];
         let _: () = msg_send![settings, setDefaultButtonCell: cell];
 
-        // Añadir subviews
+        // Add subviews
         let _: () = msg_send![content, addSubview: label_lang];
         let _: () = msg_send![content, addSubview: popup_lang];
 
@@ -732,17 +733,17 @@ fn open_settings_window(view: id) {
 
         let _: () = msg_send![content, addSubview: btn_close];
 
-        // Guardar refs
+        // Save refs for later sync
         (*view).set_ivar::<id>("_settingsWindow", settings);
         (*view).set_ivar::<id>("_labelLang", label_lang);
         (*view).set_ivar::<id>("_popupLang", popup_lang);
 
         (*view).set_ivar::<id>("_labelRadius", label_radius);
-        (*view).set_ivar::<id>("_fieldRadius", field_radius); // etiqueta
+        (*view).set_ivar::<id>("_fieldRadius", field_radius); // label
         (*view).set_ivar::<id>("_sliderRadius", slider_radius);
 
         (*view).set_ivar::<id>("_labelBorder", label_border);
-        (*view).set_ivar::<id>("_fieldBorder", field_border); // etiqueta
+        (*view).set_ivar::<id>("_fieldBorder", field_border); // label
         (*view).set_ivar::<id>("_sliderBorder", slider_border);
 
         (*view).set_ivar::<id>("_labelColor", label_color);
@@ -752,40 +753,35 @@ fn open_settings_window(view: id) {
         (*view).set_ivar::<id>("_fieldHex", field_hex); // editable
 
         (*view).set_ivar::<id>("_labelFillT", label_fill_t);
-        (*view).set_ivar::<id>("_fieldFillT", field_fill_t); // etiqueta
+        (*view).set_ivar::<id>("_fieldFillT", field_fill_t); // label
         (*view).set_ivar::<id>("_sliderFillT", slider_fill_t);
 
         (*view).set_ivar::<id>("_btnClose", btn_close);
 
-        // 👉 Foco por defecto en “Cerrar”
+        // Default focus on “Close”
         let _: () = msg_send![settings, setInitialFirstResponder: btn_close];
-
-        // Mostrar ventana
         let _: () = msg_send![settings, makeKeyAndOrderFront: nil];
-
-        // Asegurar foco cuando ya es keyWindow
         let _: () = msg_send![settings, makeFirstResponder: btn_close];
 
-        // 👉 ESC cierra la ventana de configuración (monitor local)
+        // ESC should close the settings window: add a local monitor whilst this window is key
         const KEY_DOWN_MASK: u64 = 1 << 10;
         let settings_for_block = settings;
         let host_view = view;
         let esc_block = ConcreteBlock::new(move |event: id| -> id {
             unsafe {
-                // Sólo si la ventana de configuración es la key window
                 let app = NSApp();
                 let key_win: id = msg_send![app, keyWindow];
                 if key_win == settings_for_block {
                     let keycode: u16 = msg_send![event, keyCode];
                     if keycode == 53 {
-                        // 53 = Escape
+                        // Escape
                         let _: () = msg_send![
                             host_view,
                             performSelectorOnMainThread: sel!(closeSettings:)
                             withObject: nil
                             waitUntilDone: NO
                         ];
-                        return nil; // consumir el evento
+                        return nil; // consume event
                     }
                 }
             }
@@ -812,7 +808,7 @@ unsafe fn the_hex_field_config(view: id, field_hex: id) {
 
 fn close_settings_window(view: id) {
     unsafe {
-        // Quitar monitor de ESC si existiera
+        // Remove ESC monitor if present
         let esc_mon: id = *(*view).get_ivar::<id>("_settingsEscMonitor");
         if esc_mon != nil {
             let _: () = msg_send![class!(NSEvent), removeMonitor: esc_mon];
@@ -824,13 +820,13 @@ fn close_settings_window(view: id) {
             let _: () = msg_send![settings, orderOut: nil];
             (*view).set_ivar::<id>("_settingsWindow", nil);
         }
-        // De vuelta a Accessory
+        // Back to Accessory (no Dock icon, no focus beeps)
         let app = NSApp();
         app.setActivationPolicy_(
             NSApplicationActivationPolicy::NSApplicationActivationPolicyAccessory,
         );
 
-        // Recoloca overlays y refresca
+        // Ensure overlays are in front and refreshed
         apply_to_all_views(|v| {
             unsafe {
                 let overlay_win: id = msg_send![v, window];
@@ -845,23 +841,23 @@ fn close_settings_window(view: id) {
             }
         });
 
-        // Reinstala hotkeys
+        // Re-install hotkeys so Ctrl+A never dies after switching activation policy
         reinstall_hotkeys(view);
     }
 }
 
 //
-// ===================== Confirmación de salida (Ctrl+Shift+Q) =====================
+// ===================== Quit confirmation (Ctrl+Shift+Q) =====================
 //
 
 fn confirm_and_maybe_quit(view: id) {
     unsafe {
-        // Subimos a Regular para mostrar el diálogo
+        // Temporarily switch to Regular to show the alert
         let app = NSApp();
         app.setActivationPolicy_(NSApplicationActivationPolicy::NSApplicationActivationPolicyRegular);
         let _: () = msg_send![app, activateIgnoringOtherApps: YES];
 
-        // Mantener overlays al frente
+        // Keep overlays on top whilst the alert is up
         apply_to_all_views(|v| {
             unsafe {
                 let overlay_win: id = msg_send![v, window];
@@ -885,16 +881,16 @@ fn confirm_and_maybe_quit(view: id) {
         let _: () = msg_send![alert, setMessageText: nsstring(title)];
         let _: () = msg_send![alert, setInformativeText: nsstring(msg)];
 
-        // Botones: Cancelar (primero, default) y Salir (segundo)
+        // Buttons: Cancel (default) and Quit
         let _: () = msg_send![alert, addButtonWithTitle: nsstring(tr_key("Cancel", es).as_ref())];
         let _: () = msg_send![alert, addButtonWithTitle: nsstring(tr_key("Quit", es).as_ref())];
 
-        // Asegurar que el primero es default (Enter)
+        // Make the first button the default (Enter)
         let buttons: id = msg_send![alert, buttons];
         let cancel_btn: id = msg_send![buttons, objectAtIndex: 0usize];
         let _: () = msg_send![cancel_btn, setKeyEquivalent: nsstring("\r")];
 
-        // Monitor local para ESC = cancelar
+        // Local monitor so ESC cancels the modal quickly
         const KEY_DOWN_MASK: u64 = 1 << 10;
         let alert_window: id = msg_send![alert, window];
         let esc_block = ConcreteBlock::new(move |event: id| -> id {
@@ -916,22 +912,22 @@ fn confirm_and_maybe_quit(view: id) {
             handler: &*esc_block
         ];
 
-        // Mostrar modal
+        // Run modal
         let response: i64 = msg_send![alert, runModal];
 
-        // Limpiar monitor ESC
+        // Clean local monitor
         let _: () = msg_send![class!(NSEvent), removeMonitor: esc_mon];
-        let _ = alert_window; // silenciar warning si no se usa en debug
+        let _ = alert_window;
 
         // NSAlert runModal: 1000 = first, 1001 = second
         if response == 1001 {
-            // “Salir”
+            // Quit selected
             let app = NSApp();
             let _: () = msg_send![app, terminate: nil];
             return;
         }
 
-        // “Cancelar”: volver a Accessory si no hay settings abiertos
+        // Cancel: go back to Accessory if settings are not open
         let settings: id = *(*view).get_ivar::<id>("_settingsWindow");
         if settings == nil {
             let app = NSApp();
@@ -940,7 +936,7 @@ fn confirm_and_maybe_quit(view: id) {
             );
         }
 
-        // Re-ordenar overlays y re-instalar hotkeys por si acaso
+        // Ensure overlays are back on top and hotkeys are solid
         apply_to_all_views(|v| unsafe {
             let overlay_win: id = msg_send![v, window];
             let _: () = msg_send![overlay_win, setLevel: overlay_window_level()];
@@ -966,7 +962,7 @@ unsafe fn make_window_for_screen(screen: id) -> (id, id) {
     window.setOpaque_(NO);
     window.setBackgroundColor_(NSColor::clearColor(nil));
     window.setIgnoresMouseEvents_(YES);
-    window.setAcceptsMouseMovedEvents_(YES); // aceptar movimientos
+    window.setAcceptsMouseMovedEvents_(YES); // allow mouse move events
     window.setLevel_(overlay_window_level().into());
     window.setCollectionBehavior_(
         NSWindowCollectionBehavior::NSWindowCollectionBehaviorCanJoinAllSpaces
@@ -977,7 +973,7 @@ unsafe fn make_window_for_screen(screen: id) -> (id, id) {
     let view: id =
         register_custom_view_class_and_create_view(window, frame.size.width, frame.size.height);
     (*view).set_ivar::<id>("_ownScreen", screen);
-    // Guardar DisplayID estable
+    // Store stable DisplayID for this view's screen
     let did = display_id_for_screen(screen);
     (*view).set_ivar::<u32>("_ownDisplayID", did);
 
@@ -995,11 +991,11 @@ unsafe fn register_custom_view_class_and_create_view(window: id, width: f64, hei
         // Base state
         decl.add_ivar::<f64>("_cursorXScreen");
         decl.add_ivar::<f64>("_cursorYScreen");
-        decl.add_ivar::<bool>("_visible"); // visible por selección de pantalla
-        decl.add_ivar::<bool>("_overlayEnabled"); // toggle global
+        decl.add_ivar::<bool>("_visible"); // visible by screen selection
+        decl.add_ivar::<bool>("_overlayEnabled"); // global toggle
         decl.add_ivar::<i32>("_displayMode"); // 0=circle, 1=L, 2=R
-        decl.add_ivar::<id>("_ownScreen"); // NSScreen
-        decl.add_ivar::<u32>("_ownDisplayID"); // DisplayID estable
+        decl.add_ivar::<id>("_ownScreen"); // owning NSScreen
+        decl.add_ivar::<u32>("_ownDisplayID"); // stable DisplayID
         decl.add_ivar::<i32>("_lang"); // 0=en, 1=es
 
         // Visual parameters
@@ -1016,9 +1012,9 @@ unsafe fn register_custom_view_class_and_create_view(window: id, width: f64, hei
         decl.add_ivar::<*mut std::ffi::c_void>("_hkToggle");
         decl.add_ivar::<*mut std::ffi::c_void>("_hkComma");
         decl.add_ivar::<*mut std::ffi::c_void>("_hkSemi");
-        decl.add_ivar::<*mut std::ffi::c_void>("_hkQuit"); // ← nuevo
+        decl.add_ivar::<*mut std::ffi::c_void>("_hkQuit");
 
-        // Keep-alive timer para hotkeys
+        // Keep-alive timer for hotkeys
         decl.add_ivar::<id>("_hkKeepAliveTimer");
 
         // Global mouse monitors
@@ -1034,38 +1030,38 @@ unsafe fn register_custom_view_class_and_create_view(window: id, width: f64, hei
         decl.add_ivar::<id>("_popupLang");
 
         decl.add_ivar::<id>("_labelRadius");
-        decl.add_ivar::<id>("_fieldRadius"); // ahora etiqueta
+        decl.add_ivar::<id>("_fieldRadius"); // now a label
         decl.add_ivar::<id>("_sliderRadius");
 
         decl.add_ivar::<id>("_labelBorder");
-        decl.add_ivar::<id>("_fieldBorder"); // ahora etiqueta
+        decl.add_ivar::<id>("_fieldBorder"); // now a label
         decl.add_ivar::<id>("_sliderBorder");
 
         decl.add_ivar::<id>("_labelColor");
         decl.add_ivar::<id>("_colorWell");
 
         decl.add_ivar::<id>("_labelHex");
-        decl.add_ivar::<id>("_fieldHex"); // sigue editable
+        decl.add_ivar::<id>("_fieldHex"); // remains editable
 
         decl.add_ivar::<id>("_labelFillT");
-        decl.add_ivar::<id>("_fieldFillT"); // ahora etiqueta
+        decl.add_ivar::<id>("_fieldFillT"); // now a label
         decl.add_ivar::<id>("_sliderFillT");
 
         decl.add_ivar::<id>("_btnClose");
 
-        // Monitor local (Ctrl+A)
+        // Local key monitor (for Ctrl+A redundancy)
         decl.add_ivar::<id>("_localKeyMonitor");
 
-        // Debounce
+        // Debounce toggles
         decl.add_ivar::<f64>("_lastToggleTs");
 
-        // Menú instalado
+        // Menu installed flag
         decl.add_ivar::<bool>("_menuInstalled");
 
-        // Timer de refresco
+        // Refresh timer
         decl.add_ivar::<id>("_updateTimer");
 
-        // Monitor local para ESC en settings
+        // Local monitor used while settings window is open (ESC)
         decl.add_ivar::<id>("_settingsEscMonitor");
 
         // ====== Methods ======
@@ -1076,7 +1072,7 @@ unsafe fn register_custom_view_class_and_create_view(window: id, width: f64, hei
                 let screens: id = msg_send![class!(NSScreen), screens];
                 let count: usize = msg_send![screens, count];
 
-                // Determina la pantalla bajo el cursor por DisplayID (estable)
+                // Work out the screen under the cursor using a stable DisplayID
                 let mut target_id: u32 = 0;
                 for i in 0..count {
                     let s: id = msg_send![screens, objectAtIndex: i];
@@ -1139,7 +1135,7 @@ unsafe fn register_custom_view_class_and_create_view(window: id, width: f64, hei
             }
         }
 
-        // Debounced toggle para menú/teclas locales
+        // Debounced toggle used by the temporary menu / local key equivalents
         extern "C" fn request_toggle(this: &mut Object, _cmd: Sel) {
             unsafe {
                 let now = CFAbsoluteTimeGetCurrent();
@@ -1160,7 +1156,7 @@ unsafe fn register_custom_view_class_and_create_view(window: id, width: f64, hei
             }
         }
 
-        // Hotkey keep-alive: re-install periódicamente
+        // Hotkey keep-alive: periodically re-install (idempotent)
         extern "C" fn hotkey_keepalive(this: &mut Object, _cmd: Sel) {
             unsafe {
                 reinstall_hotkeys(this as *mut _ as id);
@@ -1171,10 +1167,11 @@ unsafe fn register_custom_view_class_and_create_view(window: id, width: f64, hei
         extern "C" fn set_radius(this: &mut Object, _cmd: Sel, sender: id) {
             unsafe {
                 let mut v: f64 = msg_send![sender, doubleValue];
+                // snap to 5 to match desired increments (no visual ticks)
                 v = (v / 5.0).round() * 5.0;
                 v = clamp(v, 5.0, 200.0);
 
-                // actualiza etiqueta inmediata
+                // update non-interactive label immediately
                 let field: id = *this.get_ivar("_fieldRadius");
                 if field != nil {
                     let _: () = msg_send![field, setStringValue: nsstring(&format!("{:.0}", v))];
@@ -1185,12 +1182,12 @@ unsafe fn register_custom_view_class_and_create_view(window: id, width: f64, hei
                 apply_to_all_views(|vv| unsafe { let _: () = msg_send![vv, setNeedsDisplay: YES]; });
             }
         }
-        // Ya no se usan (campos no editables), se dejan vacíos por compat
+        // These are no-ops now (text fields became labels)
         extern "C" fn set_radius_from_field(_this: &mut Object, _cmd: Sel, _sender: id) {}
         extern "C" fn set_border_width(this: &mut Object, _cmd: Sel, sender: id) {
             unsafe {
                 let mut v: f64 = msg_send![sender, doubleValue];
-                v = clamp(v.round(), 1.0, 20.0); // step 1
+                v = clamp(v.round(), 1.0, 20.0); // integer steps
 
                 let field: id = *this.get_ivar("_fieldBorder");
                 if field != nil {
@@ -1206,7 +1203,7 @@ unsafe fn register_custom_view_class_and_create_view(window: id, width: f64, hei
         extern "C" fn set_fill_transparency(this: &mut Object, _cmd: Sel, sender: id) {
             unsafe {
                 let mut v: f64 = msg_send![sender, doubleValue];
-                v = (v / 5.0).round() * 5.0; // step 5
+                v = (v / 5.0).round() * 5.0; // 5% steps
                 v = clamp(v, 0.0, 100.0);
 
                 let field: id = *this.get_ivar("_fieldFillT");
@@ -1298,7 +1295,7 @@ unsafe fn register_custom_view_class_and_create_view(window: id, width: f64, hei
             close_settings_window(view);
         }
 
-        // Cambio de idioma + ajuste de layout del campo Hex
+        // Change language (0=en,1=es), update labels and Hex field layout
         extern "C" fn lang_changed(this: &mut Object, _cmd: Sel, sender: id) {
             unsafe {
                 let idx: i32 = msg_send![sender, indexOfSelectedItem];
@@ -1391,7 +1388,7 @@ unsafe fn register_custom_view_class_and_create_view(window: id, width: f64, hei
             }
         }
 
-        // Delegate ya no se usa (campos no editables), lo dejamos vacío para compat
+        // Live delegate not required any more (value fields are labels)
         extern "C" fn control_text_did_change(_this: &mut Object, _cmd: Sel, _notif: id) {}
 
         // ===== Drawing (circle or L/R letter) =====
@@ -1455,7 +1452,7 @@ unsafe fn register_custom_view_class_and_create_view(window: id, width: f64, hei
                 }
 
                 // Letter L/R
-                let target_letter_height = 3.0 * radius; // 1.5 × diámetro
+                let target_letter_height = 3.0 * radius; // 1.5 × diameter
                 let font_class = Class::get("NSFont").unwrap();
                 let font: id = msg_send![font_class, boldSystemFontOfSize: target_letter_height];
 
@@ -1497,7 +1494,7 @@ unsafe fn register_custom_view_class_and_create_view(window: id, width: f64, hei
 
                 let _: () = msg_send![path, setLineJoinStyle: 1u64 /* round */];
 
-                // Fill como el círculo
+                // Fill exactly like the circle
                 let fill_alpha = a * (1.0 - clamp(fill_t, 0.0, 100.0) / 100.0);
                 if fill_alpha > 0.0 {
                     let fill: id = msg_send![
@@ -1522,7 +1519,7 @@ unsafe fn register_custom_view_class_and_create_view(window: id, width: f64, hei
             }
         }
 
-        // Register methods (incluye delegado en vivo vacío)
+        // Register methods (including no-op live delegate)
         decl.add_method(
             sel!(update_cursor_multi),
             update_cursor_multi as extern "C" fn(&mut Object, Sel),
@@ -1581,7 +1578,7 @@ unsafe fn register_custom_view_class_and_create_view(window: id, width: f64, hei
     let frame = NSRect::new(NSPoint::new(0.0, 0.0), NSSize::new(width, height));
     let view: id = msg_send![view, initWithFrame: frame];
 
-    // Estado inicial
+    // Initial state
     (*view).set_ivar::<f64>("_cursorXScreen", 0.0);
     (*view).set_ivar::<f64>("_cursorYScreen", 0.0);
     (*view).set_ivar::<bool>("_visible", false);
@@ -1590,7 +1587,7 @@ unsafe fn register_custom_view_class_and_create_view(window: id, width: f64, hei
     (*view).set_ivar::<i32>("_lang", 0);
     (*view).set_ivar::<u32>("_ownDisplayID", 0);
 
-    // Visual defaults
+    // Visual defaults (overridden by prefs + sync)
     (*view).set_ivar::<f64>("_radius", DEFAULT_DIAMETER / 2.0);
     (*view).set_ivar::<f64>("_borderWidth", DEFAULT_BORDER_WIDTH);
     (*view).set_ivar::<f64>("_strokeR", DEFAULT_COLOR.0);
@@ -1604,7 +1601,7 @@ unsafe fn register_custom_view_class_and_create_view(window: id, width: f64, hei
     (*view).set_ivar::<*mut std::ffi::c_void>("_hkToggle", std::ptr::null_mut());
     (*view).set_ivar::<*mut std::ffi::c_void>("_hkComma", std::ptr::null_mut());
     (*view).set_ivar::<*mut std::ffi::c_void>("_hkSemi", std::ptr::null_mut());
-    (*view).set_ivar::<*mut std::ffi::c_void>("_hkQuit", std::ptr::null_mut()); // nuevo
+    (*view).set_ivar::<*mut std::ffi::c_void>("_hkQuit", std::ptr::null_mut());
 
     // Keep-alive timer ref
     (*view).set_ivar::<id>("_hkKeepAliveTimer", nil);
@@ -1645,17 +1642,17 @@ unsafe fn register_custom_view_class_and_create_view(window: id, width: f64, hei
     (*view).set_ivar::<f64>("_lastToggleTs", 0.0);
     (*view).set_ivar::<bool>("_menuInstalled", false);
 
-    // Timer de refresco
+    // Refresh timer
     (*view).set_ivar::<id>("_updateTimer", nil);
 
-    // Monitor ESC settings
+    // ESC monitor (settings)
     (*view).set_ivar::<id>("_settingsEscMonitor", nil);
 
     let _: () = msg_send![window, setContentView: view];
     view
 }
 
-// Timer programado por AppKit (más fiable tras abrir paneles/modos de UI)
+// AppKit timer (reliable even after panels / UI mode changes)
 unsafe fn create_timer(target: id, selector: Sel, interval: f64) -> id {
     let prev: id = *(*target).get_ivar::<id>("_updateTimer");
     if prev != nil {
@@ -1735,7 +1732,7 @@ extern "C" fn hotkey_event_handler(
 }
 
 unsafe fn install_hotkeys(view: id) {
-    // Handler Carbon
+    // Install Carbon handler for hotkey events
     let types = [EventTypeSpec {
         event_class: K_EVENT_CLASS_KEYBOARD,
         event_kind: K_EVENT_HOTKEY_PRESSED,
@@ -1783,10 +1780,10 @@ unsafe fn install_hotkeys(view: id) {
 
     // Ctrl + A (toggle)
     register_hotkey!(KC_A, CONTROL_KEY, HKID_TOGGLE, "_hkToggle");
-    // ⌘ + ,  y ⌘ + ; → Settings
+    // ⌘ + ,  and ⌘ + ; → Settings
     register_hotkey!(KC_COMMA, CMD_KEY, HKID_SETTINGS_COMMA, "_hkComma");
     register_hotkey!(KC_SEMICOLON, CMD_KEY, HKID_SETTINGS_SEMI, "_hkSemi");
-    // Ctrl + Shift + Q → Confirmar salir
+    // Ctrl + Shift + Q → Quit confirmation
     register_hotkey!(KC_Q, CONTROL_KEY | SHIFT_KEY, HKID_QUIT, "_hkQuit");
 }
 
@@ -1819,14 +1816,14 @@ unsafe fn uninstall_hotkeys(view: id) {
     }
 }
 
-/// Re-install hotkeys safely
+/// Re-install hotkeys safely (unregister first to avoid leaks)
 unsafe fn reinstall_hotkeys(view: id) {
     uninstall_hotkeys(view);
     install_hotkeys(view);
 }
 
 unsafe fn install_termination_observer(view: id) {
-    // Al terminar app: limpiar Carbon
+    // On app termination: clean Carbon resources
     let center: id = msg_send![class!(NSNotificationCenter), defaultCenter];
     let queue: id = nil; // main thread
 
@@ -1849,16 +1846,16 @@ unsafe fn install_termination_observer(view: id) {
 // ===================== Hotkey keep-alive & wake/space observers =====================
 //
 
-/// Timer que periódicamente re-instala hotkeys
+/// Start a repeating NSTimer to periodically re-install hotkeys (defensive)
 unsafe fn start_hotkey_keepalive(view: id) {
-    // Limpiar anterior si existe
+    // Clear previous timer if any
     let prev: id = *(*view).get_ivar::<id>("_hkKeepAliveTimer");
     if prev != nil {
         let _: () = msg_send![prev, invalidate];
         (*view).set_ivar::<id>("_hkKeepAliveTimer", nil);
     }
 
-    // 60s; operación barata
+    // 60s interval; cheap operation
     let timer_class = Class::get("NSTimer").unwrap();
     let timer: id = msg_send![
         timer_class,
@@ -1871,11 +1868,12 @@ unsafe fn start_hotkey_keepalive(view: id) {
     (*view).set_ivar::<id>("_hkKeepAliveTimer", timer);
 }
 
-/// Observa eventos del sistema que suelen “romper” Carbon y re-instala
+/// Observe system events that may disrupt Carbon hotkeys and re-install on demand
 unsafe fn install_wakeup_space_observers(view: id) {
     let ws: id = msg_send![class!(NSWorkspace), sharedWorkspace];
     let nc: id = msg_send![ws, notificationCenter];
 
+    // Helper to add an observer for a given notification name (C string)
     let add_obs = |name_cstr: &'static [u8]| {
         let name: id =
             msg_send![class!(NSString), stringWithUTF8String: name_cstr.as_ptr() as *const _];
@@ -1988,7 +1986,7 @@ unsafe fn install_mouse_monitors(view: id) {
         msg_send![cls, addGlobalMonitorForEventsMatchingMask: RIGHT_UP_MASK handler: &*h4];
     (*view).set_ivar::<id>("_monRightUp", mon_ru);
 
-    // mouseMoved → obliga a refrescar en el hilo principal
+    // mouseMoved → schedule update on the main thread
     let host = view;
     let hmove = ConcreteBlock::new(move |_e: id| unsafe {
         let _: () = msg_send![
@@ -2005,7 +2003,7 @@ unsafe fn install_mouse_monitors(view: id) {
 }
 
 //
-// ===================== TCC: solicitar Accesibilidad =====================
+// ===================== TCC: Accessibility prompt =====================
 //
 
 unsafe fn ensure_accessibility_prompt() {
@@ -2018,5 +2016,5 @@ unsafe fn ensure_accessibility_prompt() {
     let dict: id = msg_send![class!(NSDictionary), dictionaryWithObject: val_true forKey: key];
 
     let _trusted: bool = AXIsProcessTrustedWithOptions(dict as *const _);
-    // Ignoramos el booleano: si no está confiado, esto dispara el prompt del sistema.
+    // We ignore the boolean: if not trusted this triggers the system prompt.
 }
