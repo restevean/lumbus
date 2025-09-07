@@ -138,8 +138,6 @@ Implemented with **Carbon HotKeys** (no beep) and a local key monitor for extra 
 ## 🧪 Troubleshooting
 
 - **Shortcuts beep or don’t trigger:** Use **Ctrl+A**, **⌘+,**, **⌘+;**, or **Ctrl+Shift+Q**. Other apps may intercept overlapping shortcuts—adjust their settings if necessary.
-- **Overlay not following the cursor:** Ensure **Input Monitoring** and/or **Accessibility** are enabled for your binary (or for your IDE if launching from it).
-- **Hex field layout:** It sits to the right of the “Hex” label; tweak the constants if you change window width.
 
 ------
 
@@ -157,10 +155,7 @@ Implemented with **Carbon HotKeys** (no beep) and a local key monitor for extra 
 
 ## 🛣️ Roadmap
 
-- Option to show **only** the circle (no letters)
-- Short “flash” on click instead of letters
-- Presets for colour/size
-- Entry/exit animations
+- ...
 
 ------
 
