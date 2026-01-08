@@ -765,29 +765,25 @@ fn close_settings_window(view: id) {
 
 fn confirm_and_maybe_quit(view: id) {
     unsafe {
-        // Temporarily switch to Regular to show the alert
-        let app = NSApp();
-        app.setActivationPolicy_(NSApplicationActivationPolicy::NSApplicationActivationPolicyRegular);
-        let _: () = msg_send![app, activateIgnoringOtherApps: YES];
-
-        // Keep overlays on top whilst the alert is up
+        // Save current overlay state and hide circle during alert
+        let was_enabled = *(*view).get_ivar::<bool>("_overlayEnabled");
         apply_to_all_views(|v| {
-            let overlay_win: id = msg_send![v, window];
-            let _: () = msg_send![overlay_win, setLevel: overlay_window_level()];
-            let _: () = msg_send![overlay_win, orderFrontRegardless];
+            *(*v).get_mut_ivar::<bool>("_overlayEnabled") = false;
+            *(*v).get_mut_ivar::<bool>("_visible") = false;
+            let _: () = msg_send![v, setNeedsDisplay: YES];
         });
 
         let es = lang_is_es(view);
 
-        // NSAlert
+        // NSAlert - create BEFORE activating app so window exists
         let alert: id = msg_send![class!(NSAlert), new];
         // 2 = Warning
         let _: () = msg_send![alert, setAlertStyle: 2u64];
         let title = if es { "¿Salir de la aplicación?" } else { "Quit the app?" };
         let msg = if es {
-            "Se cerrará la app y desaparecerá el overlay."
+            "Se cerrará la app"
         } else {
-            "The app will close and the overlay will disappear."
+            "The app will close"
         };
         let _: () = msg_send![alert, setMessageText: nsstring(title)];
         let _: () = msg_send![alert, setInformativeText: nsstring(msg)];
@@ -802,9 +798,48 @@ fn confirm_and_maybe_quit(view: id) {
         let quit_btn: id = msg_send![buttons, objectAtIndex: 0usize];
         let _: () = msg_send![quit_btn, setKeyEquivalent: nsstring("\r")];
 
+        // Get alert window BEFORE activating app
+        let alert_window: id = msg_send![alert, window];
+
+        // Get current mouse location to determine which screen/Space we're on
+        let mouse_loc: NSPoint = msg_send![class!(NSEvent), mouseLocation];
+        let screens: id = msg_send![class!(NSScreen), screens];
+        let screen_count: usize = msg_send![screens, count];
+        let mut target_screen: id = msg_send![class!(NSScreen), mainScreen];
+
+        for i in 0..screen_count {
+            let scr: id = msg_send![screens, objectAtIndex: i];
+            let frame: NSRect = msg_send![scr, frame];
+            if mouse_loc.x >= frame.origin.x
+                && mouse_loc.x < frame.origin.x + frame.size.width
+                && mouse_loc.y >= frame.origin.y
+                && mouse_loc.y < frame.origin.y + frame.size.height
+            {
+                target_screen = scr;
+                break;
+            }
+        }
+
+        // Center alert window on the screen where the cursor is
+        let screen_frame: NSRect = msg_send![target_screen, frame];
+        let alert_frame: NSRect = msg_send![alert_window, frame];
+        let centered_x = screen_frame.origin.x + (screen_frame.size.width - alert_frame.size.width) / 2.0;
+        let centered_y = screen_frame.origin.y + (screen_frame.size.height - alert_frame.size.height) / 2.0;
+        let centered_origin = NSPoint { x: centered_x, y: centered_y };
+        let _: () = msg_send![alert_window, setFrameOrigin: centered_origin];
+
+        // NSWindowCollectionBehaviorCanJoinAllSpaces = 1 << 0 = 1
+        // This makes the alert visible in ALL Spaces so it appears where the user is
+        let _: () = msg_send![alert_window, setCollectionBehavior: 1u64];
+
+        // NOW activate app and focus the alert window
+        let app = NSApp();
+        app.setActivationPolicy_(NSApplicationActivationPolicy::NSApplicationActivationPolicyRegular);
+        let _: () = msg_send![app, activateIgnoringOtherApps: YES];
+        let _: () = msg_send![alert_window, makeKeyAndOrderFront: nil];
+
         // Local monitor so ESC cancels the modal quickly
         const KEY_DOWN_MASK: u64 = 1 << 10;
-        let alert_window: id = msg_send![alert, window];
         let esc_block = ConcreteBlock::new(move |event: id| -> id {
             let keycode: u16 = msg_send![event, keyCode];
             if keycode == 53 {
@@ -827,7 +862,6 @@ fn confirm_and_maybe_quit(view: id) {
 
         // Clean local monitor
         let _: () = msg_send![class!(NSEvent), removeMonitor: esc_mon];
-        let _ = alert_window;
 
         // NSAlert runModal: 1000 = first button (Quit), 1001 = second button (Cancel)
         if response == 1000 {
@@ -844,6 +878,20 @@ fn confirm_and_maybe_quit(view: id) {
             app.setActivationPolicy_(
                 NSApplicationActivationPolicy::NSApplicationActivationPolicyAccessory,
             );
+        }
+
+        // Restore overlay if it was enabled before the alert
+        if was_enabled {
+            apply_to_all_views(|v| {
+                *(*v).get_mut_ivar::<bool>("_overlayEnabled") = true;
+            });
+            // Trigger cursor update to restore circle at current position
+            let _: () = msg_send![
+                view,
+                performSelectorOnMainThread: sel!(update_cursor_multi)
+                withObject: nil
+                waitUntilDone: NO
+            ];
         }
 
         // Ensure overlays are back on top and hotkeys are solid
