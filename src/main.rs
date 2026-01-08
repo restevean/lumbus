@@ -93,7 +93,7 @@ const CONTROL_KEY: u32 = 1 << 12;
 
 // ANSI keycodes
 const KC_A: u32 = 0;
-const KC_Q: u32 = 12;
+const KC_X: u32 = 7;
 const KC_SEMICOLON: u32 = 41;
 const KC_COMMA: u32 = 43;
 
@@ -141,12 +141,24 @@ extern "C" {
 extern "C" {
     fn CFRelease(obj: *const std::ffi::c_void);
     fn CFAbsoluteTimeGetCurrent() -> f64;
+    fn CFDictionaryCreate(
+        allocator: *const std::ffi::c_void,
+        keys: *const *const std::ffi::c_void,
+        values: *const *const std::ffi::c_void,
+        numValues: isize,
+        keyCallBacks: *const std::ffi::c_void,
+        valueCallBacks: *const std::ffi::c_void,
+    ) -> *const std::ffi::c_void;
+    static kCFBooleanTrue: *const std::ffi::c_void;
+    static kCFTypeDictionaryKeyCallBacks: *const std::ffi::c_void;
+    static kCFTypeDictionaryValueCallBacks: *const std::ffi::c_void;
 }
 
 // TCC Accessibility (to prompt for permissions if missing)
 #[link(name = "ApplicationServices", kind = "framework")]
 extern "C" {
     fn AXIsProcessTrustedWithOptions(options: *const std::ffi::c_void) -> bool;
+    static kAXTrustedCheckOptionPrompt: *const std::ffi::c_void;
 }
 
 //
@@ -673,21 +685,19 @@ fn open_settings_window(view: id) {
         let settings_for_block = settings;
         let host_view = view;
         let esc_block = ConcreteBlock::new(move |event: id| -> id {
-            unsafe {
-                let app = NSApp();
-                let key_win: id = msg_send![app, keyWindow];
-                if key_win == settings_for_block {
-                    let keycode: u16 = msg_send![event, keyCode];
-                    if keycode == 53 {
-                        // Escape
-                        let _: () = msg_send![
-                            host_view,
-                            performSelectorOnMainThread: sel!(closeSettings:)
-                            withObject: nil
-                            waitUntilDone: NO
-                        ];
-                        return nil; // consume event
-                    }
+            let app = NSApp();
+            let key_win: id = msg_send![app, keyWindow];
+            if key_win == settings_for_block {
+                let keycode: u16 = msg_send![event, keyCode];
+                if keycode == 53 {
+                    // Escape
+                    let _: () = msg_send![
+                        host_view,
+                        performSelectorOnMainThread: sel!(closeSettings:)
+                        withObject: nil
+                        waitUntilDone: NO
+                    ];
+                    return nil; // consume event
                 }
             }
             event
@@ -750,7 +760,7 @@ fn close_settings_window(view: id) {
 }
 
 //
-// ===================== Quit confirmation (Ctrl+Shift+Q) =====================
+// ===================== Quit confirmation (Ctrl+Shift+X) =====================
 //
 
 fn confirm_and_maybe_quit(view: id) {
@@ -782,27 +792,26 @@ fn confirm_and_maybe_quit(view: id) {
         let _: () = msg_send![alert, setMessageText: nsstring(title)];
         let _: () = msg_send![alert, setInformativeText: nsstring(msg)];
 
-        // Buttons: Cancel (default) and Quit
-        let _: () = msg_send![alert, addButtonWithTitle: nsstring(tr_key("Cancel", es).as_ref())];
+        // Buttons: Quit (default) and Cancel
+        // First button added appears on the right and is default
         let _: () = msg_send![alert, addButtonWithTitle: nsstring(tr_key("Quit", es).as_ref())];
+        let _: () = msg_send![alert, addButtonWithTitle: nsstring(tr_key("Cancel", es).as_ref())];
 
-        // Make the first button the default (Enter)
+        // Make the first button (Quit) respond to Enter - it's already default
         let buttons: id = msg_send![alert, buttons];
-        let cancel_btn: id = msg_send![buttons, objectAtIndex: 0usize];
-        let _: () = msg_send![cancel_btn, setKeyEquivalent: nsstring("\r")];
+        let quit_btn: id = msg_send![buttons, objectAtIndex: 0usize];
+        let _: () = msg_send![quit_btn, setKeyEquivalent: nsstring("\r")];
 
         // Local monitor so ESC cancels the modal quickly
         const KEY_DOWN_MASK: u64 = 1 << 10;
         let alert_window: id = msg_send![alert, window];
         let esc_block = ConcreteBlock::new(move |event: id| -> id {
-            unsafe {
-                let keycode: u16 = msg_send![event, keyCode];
-                if keycode == 53 {
-                    let app = NSApp();
-                    // 0 = cancel
-                    let _: () = msg_send![app, stopModalWithCode: 0i64];
-                    return nil;
-                }
+            let keycode: u16 = msg_send![event, keyCode];
+            if keycode == 53 {
+                let app = NSApp();
+                // 1001 = second button (Cancel)
+                let _: () = msg_send![app, stopModalWithCode: 1001i64];
+                return nil;
             }
             event
         })
@@ -820,9 +829,9 @@ fn confirm_and_maybe_quit(view: id) {
         let _: () = msg_send![class!(NSEvent), removeMonitor: esc_mon];
         let _ = alert_window;
 
-        // NSAlert runModal: 1000 = first, 1001 = second
-        if response == 1001 {
-            // Quit selected
+        // NSAlert runModal: 1000 = first button (Quit), 1001 = second button (Cancel)
+        if response == 1000 {
+            // Quit selected (first button)
             let app = NSApp();
             let _: () = msg_send![app, terminate: nil];
             return;
@@ -1678,8 +1687,8 @@ unsafe fn install_hotkeys(view: id) {
     // ⌘ + ,  and ⌘ + ; → Settings
     register_hotkey!(KC_COMMA, CMD_KEY, HKID_SETTINGS_COMMA, "_hkComma");
     register_hotkey!(KC_SEMICOLON, CMD_KEY, HKID_SETTINGS_SEMI, "_hkSemi");
-    // Ctrl + Shift + Q → Quit confirmation
-    register_hotkey!(KC_Q, CONTROL_KEY | SHIFT_KEY, HKID_QUIT, "_hkQuit");
+    // Ctrl + Shift + X → Quit confirmation
+    register_hotkey!(KC_X, CONTROL_KEY | SHIFT_KEY, HKID_QUIT, "_hkQuit");
 }
 
 unsafe fn uninstall_hotkeys(view: id) {
@@ -1912,14 +1921,24 @@ unsafe fn install_mouse_monitors(view: id) {
 //
 
 unsafe fn ensure_accessibility_prompt() {
-    // NSDictionary { "kAXTrustedCheckOptionPrompt": true }
-    let key: id = msg_send![
-        class!(NSString),
-        stringWithUTF8String: b"kAXTrustedCheckOptionPrompt\0".as_ptr() as *const _
-    ];
-    let val_true: id = msg_send![class!(NSNumber), numberWithBool: YES];
-    let dict: id = msg_send![class!(NSDictionary), dictionaryWithObject: val_true forKey: key];
+    // Create CFDictionary with kAXTrustedCheckOptionPrompt = true
+    let keys = [kAXTrustedCheckOptionPrompt];
+    let values = [kCFBooleanTrue];
 
-    let _trusted: bool = AXIsProcessTrustedWithOptions(dict as *const _);
+    let dict = CFDictionaryCreate(
+        std::ptr::null(),  // default allocator
+        keys.as_ptr(),
+        values.as_ptr(),
+        1,  // one key-value pair
+        kCFTypeDictionaryKeyCallBacks,
+        kCFTypeDictionaryValueCallBacks,
+    );
+
+    let _trusted: bool = AXIsProcessTrustedWithOptions(dict);
+
+    // Clean up
+    if !dict.is_null() {
+        CFRelease(dict);
+    }
     // We ignore the boolean: if not trusted this triggers the system prompt.
 }
