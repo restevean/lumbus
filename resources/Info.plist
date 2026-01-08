@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!-- Basic App Identity -->
+    <key>CFBundleName</key>
+    <string>Mouse Highlighter</string>
+
+    <key>CFBundleDisplayName</key>
+    <string>Mouse Highlighter</string>
+
+    <key>CFBundleIdentifier</key>
+    <string>com.restevean.mouse-highlighter</string>
+
+    <key>CFBundleVersion</key>
+    <string>1</string>
+
+    <key>CFBundleShortVersionString</key>
+    <string>0.1.0</string>
+
+    <key>CFBundleExecutable</key>
+    <string>mouse_highlighter</string>
+
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+
+    <key>CFBundleSignature</key>
+    <string>mhlt</string>
+
+    <!-- Icon -->
+    <key>CFBundleIconFile</key>
+    <string>AppIcon</string>
+
+    <!-- macOS Version Requirements -->
+    <key>LSMinimumSystemVersion</key>
+    <string>10.13</string>
+
+    <!-- UI Configuration: LSUIElement makes it an accessory app (no Dock icon) -->
+    <key>LSUIElement</key>
+    <true/>
+
+    <key>NSHighResolutionCapable</key>
+    <true/>
+
+    <key>NSSupportsAutomaticGraphicsSwitching</key>
+    <true/>
+
+    <!-- Copyright -->
+    <key>NSHumanReadableCopyright</key>
+    <string>Copyright 2025 Rafael Esteve Antonino. MIT License.</string>
+
+    <!-- Privacy/Permission Descriptions -->
+    <key>NSAccessibilityUsageDescription</key>
+    <string>Mouse Highlighter needs Accessibility access to display the cursor overlay and respond to global hotkeys.</string>
+
+    <!-- Architecture Support -->
+    <key>LSArchitecturePriority</key>
+    <array>
+        <string>arm64</string>
+        <string>x86_64</string>
+    </array>
+</dict>
+</plist>

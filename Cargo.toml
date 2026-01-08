@@ -4,9 +4,26 @@ version = "0.1.0"
 authors = ["restevean <restevean@prtonmail.com>"]
 edition = "2021"
 license = "MIT"
+description = "Highlight the mouse pointer with a configurable circle on macOS"
+repository = "https://github.com/restevean/mouse_highlighter"
+keywords = ["macos", "mouse", "cursor", "highlighter", "presentation"]
+categories = ["gui"]
 
 [dependencies]
 cocoa = "0.25"
 objc = "0.2"
 block = "0.1"
 core-graphics = "0.24"
+
+# Release profile optimizations
+[profile.release]
+opt-level = "z"          # Optimize for size
+lto = true               # Link-time optimization
+codegen-units = 1        # Better optimization (slower compile)
+panic = "abort"          # Smaller binary (no unwinding)
+strip = true             # Strip symbols
+
+# Development profile
+[profile.dev]
+opt-level = 0
+debug = true

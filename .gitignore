@@ -4,4 +4,7 @@
 github-inspired-theme-rea/
 .DS_Store
 
-
+# App bundle artifacts
+*.app
+*.dmg
+resources/icons/AppIcon.iconset/
