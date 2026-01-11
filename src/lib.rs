@@ -1,7 +1,14 @@
+#![allow(unexpected_cfgs)] // Silence cfg warnings from objc macros
+
 //! Pure helpers used by the app. Keep this file free of macOS FFI so tests
 //! can run as normal integration tests.
 
+pub mod model;
+
 use std::borrow::Cow;
+
+// Re-export model types for convenience
+pub use model::OverlayState;
 
 /// Clamp a value to [lo, hi]
 pub fn clamp(v: f64, lo: f64, hi: f64) -> f64 {

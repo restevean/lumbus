@@ -13,32 +13,17 @@ use objc::runtime::{Class, Object, Sel};
 use objc::{class, declare::ClassDecl, msg_send, sel, sel_impl};
 // Import helpers from the library crate (tests use the same code)
 use mouse_highlighter::{clamp, color_to_hex, parse_hex_color, tr_key};
+// Import model constants and preferences
+use mouse_highlighter::model::{
+    DEFAULT_DIAMETER, DEFAULT_BORDER_WIDTH, DEFAULT_COLOR, DEFAULT_FILL_TRANSPARENCY_PCT,
+    PREF_RADIUS, PREF_BORDER, PREF_STROKE_R, PREF_STROKE_G, PREF_STROKE_B, PREF_STROKE_A,
+    PREF_FILL_TRANSPARENCY, PREF_LANG,
+    prefs_get_double, prefs_set_double, prefs_get_int, prefs_set_int,
+};
 use std::ffi::CStr;
 
 // FFI bindings from local module
 use crate::ffi::*;
-
-//
-// ===================== Defaults / Appearance =====================
-//
-
-const DEFAULT_DIAMETER: f64 = 38.5;
-const DEFAULT_BORDER_WIDTH: f64 = 3.0;
-const DEFAULT_COLOR: (f64, f64, f64, f64) = (1.0, 1.0, 1.0, 1.0);
-const DEFAULT_FILL_TRANSPARENCY_PCT: f64 = 100.0; // 100% transparent
-
-//
-// ===================== NSUserDefaults keys =====================
-//
-
-const PREF_RADIUS: &str = "radius";
-const PREF_BORDER: &str = "borderWidth";
-const PREF_R: &str = "strokeR";
-const PREF_G: &str = "strokeG";
-const PREF_B: &str = "strokeB";
-const PREF_A: &str = "strokeA";
-const PREF_FILL_T: &str = "fillTransparencyPct";
-const PREF_LANG: &str = "lang"; // 0 = en, 1 = es
 
 //
 // ===================== App =====================
@@ -96,55 +81,15 @@ fn main() {
     }
 }
 
-//
-// ===================== NSUserDefaults helpers =====================
-//
-
-unsafe fn prefs_get_double(key: &str, default: f64) -> f64 {
-    let ud: id = msg_send![class!(NSUserDefaults), standardUserDefaults];
-    let k = nsstring(key);
-    let obj: id = msg_send![ud, objectForKey: k];
-    if obj == nil {
-        default
-    } else {
-        let v: f64 = msg_send![ud, doubleForKey: k];
-        v
-    }
-}
-
-unsafe fn prefs_set_double(key: &str, val: f64) {
-    let ud: id = msg_send![class!(NSUserDefaults), standardUserDefaults];
-    let k = nsstring(key);
-    let _: () = msg_send![ud, setDouble: val forKey: k];
-}
-
-unsafe fn prefs_get_int(key: &str, default: i32) -> i32 {
-    let ud: id = msg_send![class!(NSUserDefaults), standardUserDefaults];
-    let k = nsstring(key);
-    let obj: id = msg_send![ud, objectForKey: k];
-    if obj == nil {
-        default
-    } else {
-        let v: i32 = msg_send![ud, integerForKey: k];
-        v
-    }
-}
-
-unsafe fn prefs_set_int(key: &str, val: i32) {
-    let ud: id = msg_send![class!(NSUserDefaults), standardUserDefaults];
-    let k = nsstring(key);
-    let _: () = msg_send![ud, setInteger: val forKey: k];
-}
-
 /// Load preferences into a view
 unsafe fn load_preferences_into_view(view: id) {
     let radius = prefs_get_double(PREF_RADIUS, DEFAULT_DIAMETER / 2.0);
     let border = prefs_get_double(PREF_BORDER, DEFAULT_BORDER_WIDTH);
-    let r = prefs_get_double(PREF_R, DEFAULT_COLOR.0);
-    let g = prefs_get_double(PREF_G, DEFAULT_COLOR.1);
-    let b = prefs_get_double(PREF_B, DEFAULT_COLOR.2);
-    let a = prefs_get_double(PREF_A, DEFAULT_COLOR.3);
-    let fill_t = prefs_get_double(PREF_FILL_T, DEFAULT_FILL_TRANSPARENCY_PCT);
+    let r = prefs_get_double(PREF_STROKE_R, DEFAULT_COLOR.0);
+    let g = prefs_get_double(PREF_STROKE_G, DEFAULT_COLOR.1);
+    let b = prefs_get_double(PREF_STROKE_B, DEFAULT_COLOR.2);
+    let a = prefs_get_double(PREF_STROKE_A, DEFAULT_COLOR.3);
+    let fill_t = prefs_get_double(PREF_FILL_TRANSPARENCY, DEFAULT_FILL_TRANSPARENCY_PCT);
     let lang = prefs_get_int(PREF_LANG, 0); // 0 en, 1 es
 
     (*view).set_ivar::<f64>("_radius", radius);
@@ -1164,7 +1109,7 @@ unsafe fn register_custom_view_class_and_create_view(window: id, width: f64, hei
                     let _: () = msg_send![field, setStringValue: nsstring(&format!("{:.0}", v))];
                 }
 
-                prefs_set_double(PREF_FILL_T, v);
+                prefs_set_double(PREF_FILL_TRANSPARENCY, v);
                 apply_to_all_views(|vv| { (*vv).set_ivar::<f64>("_fillTransparencyPct", v) });
                 apply_to_all_views(|vv| { let _: () = msg_send![vv, setNeedsDisplay: YES]; });
             }
@@ -1178,10 +1123,10 @@ unsafe fn register_custom_view_class_and_create_view(window: id, width: f64, hei
                 let b: f64 = msg_send![color, blueComponent];
                 let a: f64 = msg_send![color, alphaComponent];
 
-                prefs_set_double(PREF_R, r);
-                prefs_set_double(PREF_G, g);
-                prefs_set_double(PREF_B, b);
-                prefs_set_double(PREF_A, a);
+                prefs_set_double(PREF_STROKE_R, r);
+                prefs_set_double(PREF_STROKE_G, g);
+                prefs_set_double(PREF_STROKE_B, b);
+                prefs_set_double(PREF_STROKE_A, a);
 
                 apply_to_all_views(|vv| {
                     (*vv).set_ivar::<f64>("_strokeR", r);
@@ -1205,10 +1150,10 @@ unsafe fn register_custom_view_class_and_create_view(window: id, width: f64, hei
                 if !cstr_ptr.is_null() {
                     let txt = CStr::from_ptr(cstr_ptr).to_string_lossy();
                     if let Some((r, g, b, a)) = parse_hex_color(&txt) {
-                        prefs_set_double(PREF_R, r);
-                        prefs_set_double(PREF_G, g);
-                        prefs_set_double(PREF_B, b);
-                        prefs_set_double(PREF_A, a);
+                        prefs_set_double(PREF_STROKE_R, r);
+                        prefs_set_double(PREF_STROKE_G, g);
+                        prefs_set_double(PREF_STROKE_B, b);
+                        prefs_set_double(PREF_STROKE_A, a);
 
                         apply_to_all_views(|vv| {
                             (*vv).set_ivar::<f64>("_strokeR", r);

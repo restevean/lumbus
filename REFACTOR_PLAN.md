@@ -102,7 +102,7 @@ tests/
 |------|--------|-------------|
 | Fase 1 | ✅ COMPLETADO | Preparación y rama |
 | Fase 2 | ✅ COMPLETADO | Extraer FFI bindings |
-| Fase 3 | ⬜ PENDIENTE | Extraer model + tests |
+| Fase 3 | ✅ COMPLETADO | Extraer model + tests |
 | Fase 4 | ⬜ PENDIENTE | Extraer input handlers |
 | Fase 5 | ⬜ PENDIENTE | Modularizar UI |
 | Fase 6 | ⬜ PENDIENTE | Cleanup final |
@@ -462,43 +462,43 @@ refactor: extract FFI bindings to src/ffi/
 
 **Líneas origen en main.rs**: 165-185 (~20 líneas)
 
-- [ ] 3.1.1 Crear archivo `src/model/constants.rs`
-- [ ] 3.1.2 Mover y organizar constantes
+- [x] 3.1.1 Crear archivo `src/model/constants.rs`
+- [x] 3.1.2 Mover y organizar constantes
 
 ---
 
 ### 3.2 Crear `src/model/app_state.rs` (TDD)
 
-- [ ] 3.2.1 Crear `tests/model_tests.rs` con tests primero
-- [ ] 3.2.2 Crear `src/model/app_state.rs`
-- [ ] 3.2.3 Verificar `cargo test` pasa
+- [x] 3.2.1 Crear `tests/model_tests.rs` con tests primero
+- [x] 3.2.2 Crear `src/model/app_state.rs`
+- [x] 3.2.3 Verificar `cargo test` pasa (27 tests)
 
 ---
 
 ### 3.3 Crear `src/model/preferences.rs`
 
-- [ ] 3.3.1 Crear `src/model/preferences.rs`
-- [ ] 3.3.2 Mover funciones de prefs de main.rs
+- [x] 3.3.1 Crear `src/model/preferences.rs`
+- [x] 3.3.2 Mover funciones de prefs de main.rs
 
 ---
 
 ### 3.4 Crear `src/model/mod.rs`
 
-- [ ] 3.4.1 Crear `src/model/mod.rs`
+- [x] 3.4.1 Crear `src/model/mod.rs`
 
 ---
 
 ### 3.5 Actualizar lib.rs para exports
 
-- [ ] 3.5.1 Actualizar lib.rs con exports de model
+- [x] 3.5.1 Actualizar lib.rs con exports de model
 
 ---
 
 ### Verificación Fase 3
 
-- [ ] `cargo test` pasa (tests existentes + nuevos)
-- [ ] Build compila
-- [ ] App funciona normalmente
+- [x] `cargo test` pasa (tests existentes + nuevos)
+- [x] Build compila
+- [x] App funciona normalmente
 
 ---
 
