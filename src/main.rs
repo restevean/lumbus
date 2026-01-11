@@ -442,35 +442,20 @@ fn open_settings_window(view: id) {
             return;
         }
 
-        // Temporarily switch to Regular to show and focus the window
-        let app = NSApp();
-        app.setActivationPolicy_(NSApplicationActivationPolicy::NSApplicationActivationPolicyRegular);
-        let _: () = msg_send![app, activateIgnoringOtherApps: YES];
-
-        // Ensure menu + hotkeys are active while Regular
-        ensure_hotkey_menu(view);
-        reinstall_hotkeys(view);
-
-        // Keep overlays on top and refresh them
+        // Save current overlay state and hide circle during settings
+        let was_enabled = *(*view).get_ivar::<bool>("_overlayEnabled");
         apply_to_all_views(|v| {
-            let overlay_win: id = msg_send![v, window];
-            let _: () = msg_send![overlay_win, setLevel: overlay_window_level()];
-            let _: () = msg_send![overlay_win, orderFrontRegardless];
-            let _: () = msg_send![
-                v,
-                performSelectorOnMainThread: sel!(update_cursor_multi)
-                withObject: nil
-                waitUntilDone: NO
-            ];
+            *(*v).get_mut_ivar::<bool>("_overlayEnabled") = false;
+            *(*v).get_mut_ivar::<bool>("_visible") = false;
+            let _: () = msg_send![v, setNeedsDisplay: YES];
         });
 
         let es = lang_is_es(view);
 
         let style = NSWindowStyleMask::NSTitledWindowMask
-            | NSWindowStyleMask::NSClosableWindowMask
-            | NSWindowStyleMask::NSMiniaturizableWindowMask;
+            | NSWindowStyleMask::NSClosableWindowMask;
         let w = 520.0;
-        let h = 330.0; // extra space for language selector
+        let h = 330.0;
         let settings = NSWindow::alloc(nil).initWithContentRect_styleMask_backing_defer_(
             NSRect::new(NSPoint::new(0.0, 0.0), NSSize::new(w, h)),
             style,
@@ -479,10 +464,10 @@ fn open_settings_window(view: id) {
         );
         let _: () = msg_send![settings, setTitle: nsstring(tr_key("Settings", es).as_ref())];
 
-        // Collection behavior to appear over fullscreen apps and across Spaces
+        // High level and collection behavior to appear over fullscreen apps
+        let _: () = msg_send![settings, setLevel: overlay_window_level()];
         // CanJoinAllSpaces (1) + FullScreenAuxiliary (256) = 257
         let _: () = msg_send![settings, setCollectionBehavior: 257u64];
-        let _: () = msg_send![settings, setLevel: overlay_window_level()];
 
         // Center on the screen where the cursor is (not just main screen)
         let mouse_loc: NSPoint = msg_send![class!(NSEvent), mouseLocation];
@@ -652,7 +637,7 @@ fn open_settings_window(view: id) {
         let _: () = msg_send![btn_close, setTarget: view];
         let _: () = msg_send![btn_close, setAction: sel!(closeSettings:)];
 
-        // Enter/Return activates “Close”
+        // Enter/Return activates "Close"
         let _: () = msg_send![btn_close, setKeyEquivalent: nsstring("\r")];
         let cell: id = msg_send![btn_close, cell];
         let _: () = msg_send![settings, setDefaultButtonCell: cell];
@@ -705,71 +690,46 @@ fn open_settings_window(view: id) {
 
         (*view).set_ivar::<id>("_btnClose", btn_close);
 
-        // Default focus on “Close”
-        let _: () = msg_send![settings, setInitialFirstResponder: btn_close];
-        let _: () = msg_send![settings, makeKeyAndOrderFront: nil];
-        let _: () = msg_send![settings, makeFirstResponder: btn_close];
-
-        // ESC should close the settings window: add a local monitor whilst this window is key
+        // Local monitor for ESC/Enter to close modal
         const KEY_DOWN_MASK: u64 = 1 << 10;
-        let settings_for_block = settings;
-        let host_view = view;
-        let esc_block = ConcreteBlock::new(move |event: id| -> id {
-            let app = NSApp();
-            let key_win: id = msg_send![app, keyWindow];
-            if key_win == settings_for_block {
-                let keycode: u16 = msg_send![event, keyCode];
-                if keycode == 53 {
-                    // Escape
-                    let _: () = msg_send![
-                        host_view,
-                        performSelectorOnMainThread: sel!(closeSettings:)
-                        withObject: nil
-                        waitUntilDone: NO
-                    ];
-                    return nil; // consume event
-                }
+        let key_block = ConcreteBlock::new(move |event: id| -> id {
+            let keycode: u16 = msg_send![event, keyCode];
+            if keycode == 53 || keycode == 36 {
+                // 53 = Escape, 36 = Return/Enter - stop modal
+                let app = NSApp();
+                let _: () = msg_send![app, stopModal];
+                return nil;
             }
             event
         })
-            .copy();
-        let esc_mon: id = msg_send![
+        .copy();
+        let key_mon: id = msg_send![
             class!(NSEvent),
             addLocalMonitorForEventsMatchingMask: KEY_DOWN_MASK
-            handler: &*esc_block
+            handler: &*key_block
         ];
-        (*view).set_ivar::<id>("_settingsEscMonitor", esc_mon);
-    }
-}
 
-unsafe fn the_hex_field_config(view: id, field_hex: id) {
-    let _: () = msg_send![field_hex, setBezeled: YES];
-    let _: () = msg_send![field_hex, setDrawsBackground: YES];
-    let _: () = msg_send![field_hex, setEditable: YES];
-    let _: () = msg_send![field_hex, setSelectable: YES];
-    let _: () = msg_send![field_hex, setTarget: view];
-    let _: () = msg_send![field_hex, setAction: sel!(hexChanged:)];
-}
-
-fn close_settings_window(view: id) {
-    unsafe {
-        // Remove ESC monitor if present
-        let esc_mon: id = *(*view).get_ivar::<id>("_settingsEscMonitor");
-        if esc_mon != nil {
-            let _: () = msg_send![class!(NSEvent), removeMonitor: esc_mon];
-            (*view).set_ivar::<id>("_settingsEscMonitor", nil);
-        }
-
-        let settings: id = *(*view).get_ivar::<id>("_settingsWindow");
-        if settings != nil {
-            let _: () = msg_send![settings, orderOut: nil];
-            (*view).set_ivar::<id>("_settingsWindow", nil);
-        }
-        // Back to Accessory (no Dock icon, no focus beeps)
+        // Force activation and show window, then run modal
         let app = NSApp();
-        app.setActivationPolicy_(
-            NSApplicationActivationPolicy::NSApplicationActivationPolicyAccessory,
-        );
+        let _: () = msg_send![app, activateIgnoringOtherApps: YES];
+        let _: () = msg_send![settings, makeKeyAndOrderFront: nil];
+        let _: () = msg_send![app, runModalForWindow: settings];
+
+        // Modal ended - clean up
+        let _: () = msg_send![class!(NSEvent), removeMonitor: key_mon];
+        let _: () = msg_send![settings, orderOut: nil];
+
+        // Clear stored references
+        (*view).set_ivar::<id>("_settingsWindow", nil);
+        (*view).set_ivar::<id>("_settingsEscMonitor", nil);
+        (*view).set_ivar::<id>("_settingsGlobalMonitor", nil);
+
+        // Restore overlay if it was enabled
+        if was_enabled {
+            apply_to_all_views(|v| {
+                *(*v).get_mut_ivar::<bool>("_overlayEnabled") = true;
+            });
+        }
 
         // Ensure overlays are in front and refreshed
         apply_to_all_views(|v| {
@@ -784,8 +744,24 @@ fn close_settings_window(view: id) {
             ];
         });
 
-        // Re-install hotkeys so Ctrl+A never dies after switching activation policy
         reinstall_hotkeys(view);
+    }
+}
+
+unsafe fn the_hex_field_config(view: id, field_hex: id) {
+    let _: () = msg_send![field_hex, setBezeled: YES];
+    let _: () = msg_send![field_hex, setDrawsBackground: YES];
+    let _: () = msg_send![field_hex, setEditable: YES];
+    let _: () = msg_send![field_hex, setSelectable: YES];
+    let _: () = msg_send![field_hex, setTarget: view];
+    let _: () = msg_send![field_hex, setAction: sel!(hexChanged:)];
+}
+
+fn close_settings_window(_view: id) {
+    unsafe {
+        // Just stop the modal - cleanup happens in open_settings_window after runModalForWindow returns
+        let app = NSApp();
+        let _: () = msg_send![app, stopModal];
     }
 }
 
@@ -1210,6 +1186,7 @@ unsafe fn register_custom_view_class_and_create_view(window: id, width: f64, hei
         decl.add_ivar::<id>("_sliderFillT");
 
         decl.add_ivar::<id>("_btnClose");
+        decl.add_ivar::<id>("_previousApp"); // App to restore focus to when closing settings
 
         // Local key monitor (for Ctrl+A redundancy)
         decl.add_ivar::<id>("_localKeyMonitor");
@@ -1223,8 +1200,9 @@ unsafe fn register_custom_view_class_and_create_view(window: id, width: f64, hei
         // Refresh timer
         decl.add_ivar::<id>("_updateTimer");
 
-        // Local monitor used while settings window is open (ESC)
+        // Monitors used while settings window is open (ESC/Enter)
         decl.add_ivar::<id>("_settingsEscMonitor");
+        decl.add_ivar::<id>("_settingsGlobalMonitor");
 
         // ====== Methods ======
 
@@ -1738,7 +1716,7 @@ unsafe fn register_custom_view_class_and_create_view(window: id, width: f64, hei
     (*view).set_ivar::<f64>("_cursorXScreen", 0.0);
     (*view).set_ivar::<f64>("_cursorYScreen", 0.0);
     (*view).set_ivar::<bool>("_visible", false);
-    (*view).set_ivar::<bool>("_overlayEnabled", false);
+    (*view).set_ivar::<bool>("_overlayEnabled", true); // Circle visible on app start
     (*view).set_ivar::<i32>("_displayMode", 0);
     (*view).set_ivar::<i32>("_lang", 0);
     (*view).set_ivar::<u32>("_ownDisplayID", 0);
