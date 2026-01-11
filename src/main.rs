@@ -1,6 +1,9 @@
 #![allow(unexpected_cfgs)] // Silence cfg warnings inside objc/cocoa macros
 
+mod app;
 mod ffi;
+mod input;
+mod ui;
 
 use block::ConcreteBlock;
 use cocoa::appkit::{
@@ -24,6 +27,8 @@ use std::ffi::CStr;
 
 // FFI bindings from local module
 use crate::ffi::*;
+// Global helpers (apply_to_all_views, etc.)
+use crate::app::*;
 
 //
 // ===================== App =====================
@@ -100,64 +105,6 @@ unsafe fn load_preferences_into_view(view: id) {
     (*view).set_ivar::<f64>("_strokeA", a);
     (*view).set_ivar::<f64>("_fillTransparencyPct", clamp(fill_t, 0.0, 100.0));
     (*view).set_ivar::<i32>("_lang", if lang == 1 { 1 } else { 0 });
-}
-
-//
-// ===================== Localisation helpers =====================
-//
-
-fn lang_is_es(view: id) -> bool {
-    unsafe {
-        let l = *(*view).get_ivar::<i32>("_lang");
-        l == 1
-    }
-}
-
-//
-// ===================== Multi-monitor helpers =====================
-//
-
-/// Apply a closure to every contentView whose class is CustomViewMulti
-unsafe fn apply_to_all_views<F: Fn(id)>(f: F) {
-    let app: id = NSApp();
-    let windows: id = msg_send![app, windows];
-    let wcount: usize = msg_send![windows, count];
-
-    let custom_cls = Class::get("CustomViewMulti").unwrap();
-
-    for j in 0..wcount {
-        let win: id = msg_send![windows, objectAtIndex: j];
-        let view: id = msg_send![win, contentView];
-        if view != nil {
-            let is_custom: bool = msg_send![view, isKindOfClass: custom_cls];
-            if is_custom {
-                f(view);
-            }
-        }
-    }
-}
-
-/// Copy visual prefs from src view to all views
-unsafe fn sync_visual_prefs_to_all_views(src: id) {
-    let radius = *(*src).get_ivar::<f64>("_radius");
-    let border = *(*src).get_ivar::<f64>("_borderWidth");
-    let r = *(*src).get_ivar::<f64>("_strokeR");
-    let g = *(*src).get_ivar::<f64>("_strokeG");
-    let b = *(*src).get_ivar::<f64>("_strokeB");
-    let a = *(*src).get_ivar::<f64>("_strokeA");
-    let fill_t = *(*src).get_ivar::<f64>("_fillTransparencyPct");
-    let lang = *(*src).get_ivar::<i32>("_lang");
-
-    apply_to_all_views(|v| {
-        (*v).set_ivar::<f64>("_radius", radius);
-        (*v).set_ivar::<f64>("_borderWidth", border);
-        (*v).set_ivar::<f64>("_strokeR", r);
-        (*v).set_ivar::<f64>("_strokeG", g);
-        (*v).set_ivar::<f64>("_strokeB", b);
-        (*v).set_ivar::<f64>("_strokeA", a);
-        (*v).set_ivar::<f64>("_fillTransparencyPct", fill_t);
-        (*v).set_ivar::<i32>("_lang", lang);
-    });
 }
 
 //
