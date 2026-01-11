@@ -158,7 +158,7 @@ unsafe fn register_custom_view_class_and_create_view(window: id, width: f64, hei
         let mut decl = ClassDecl::new(class_name, superclass).unwrap();
 
         // Base state
-        decl.add_ivar::<f64>("_cursorXScreen");
+        decl.add_ivar::<f64>("todo correcto_cursorXScreen");
         decl.add_ivar::<f64>("_cursorYScreen");
         decl.add_ivar::<bool>("_visible"); // visible by screen selection
         decl.add_ivar::<bool>("_overlayEnabled"); // global toggle

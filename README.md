@@ -29,7 +29,7 @@ Highlight the mouse pointer across **all** macOS displays with a configurable ci
     - `Ctrl` + `A` → **Toggle overlay visibility**
     - `⌘` + `,` → **Open Settings**
     - `⌘` + `;` → **Open Settings** (alternate)
-    - `Ctrl` + `Shift` + `Q` → **Quit** (with confirmation)
+    - `Ctrl` + `Shift` + `X` → **Quit** (with confirmation)
 - **Persistence** via `NSUserDefaults` (restored on launch)
 
 ---
@@ -120,7 +120,7 @@ make install
     - **Right down** → shows **R**
     - On release → reverts to **circle**
 
-6. Quit with **Ctrl + Shift + Q**.
+6. Quit with **Ctrl + Shift + X**.
    A confirmation dialog appears with **Cancel** (default) and **Quit**.
 
     - **Enter/Return** activates the highlighted default button.
@@ -151,7 +151,7 @@ make install
 - `Ctrl` + `A` → Toggle overlay
 - `⌘` + `,` → Open Settings
 - `⌘` + `;` → Open Settings (alternate)
-- `Ctrl` + `Shift` + `Q` → **Quit** (with confirmation; **Esc** cancels)
+- `Ctrl` + `Shift` + `X` → **Quit** (with confirmation; **Esc** cancels)
 
 Implemented with **Carbon HotKeys** (no beep) and a local key monitor for extra reliability while windows are key.
 
@@ -179,15 +179,42 @@ Implemented with **Carbon HotKeys** (no beep) and a local key monitor for extra 
 
 ------
 
-## 🗂️ Code Structure (high level)
+## 🗂️ Code Structure
 
-- **`main.rs`**
-    - FFI: Carbon, CoreText, CoreGraphics, CoreFoundation, ApplicationServices (Accessibility prompt)
-    - Helpers: `clamp`, `color_to_hex`, `parse_hex_color`, NSUserDefaults
-    - Overlay `NSWindow` + `CustomView` (state, drawing, settings actions)
-    - Hotkey registration/unregistration (+ keep-alive + wake/space observers)
-    - Global mouse monitors and local key monitors
-    - Settings window (live-synced sliders, read-only numeric labels, editable Hex)
+```
+src/
+├── main.rs              # Entry point + overlay view registration (~900 lines)
+├── lib.rs               # Pure helpers (clamp, color_to_hex, parse_hex_color, tr_key)
+│
+├── ffi/                 # FFI bindings encapsulated
+│   ├── carbon.rs        # Carbon Event Manager (hotkeys)
+│   ├── coretext.rs      # CoreText (glyph rendering)
+│   ├── coregraphics.rs  # CoreGraphics/CoreFoundation
+│   ├── accessibility.rs # Accessibility permissions
+│   └── cocoa_utils.rs   # NSString, display_id, mouse position helpers
+│
+├── model/               # Pure domain logic (testable, no FFI)
+│   ├── constants.rs     # Default values, pref keys, limits
+│   ├── app_state.rs     # OverlayState struct with validation
+│   └── preferences.rs   # NSUserDefaults load/save
+│
+├── input/               # Input handling
+│   ├── hotkeys.rs       # Carbon hotkey install/uninstall
+│   ├── observers.rs     # Wake/space/termination observers
+│   ├── mouse_monitors.rs    # Global mouse event monitors
+│   └── keyboard_monitors.rs # Local Ctrl+A monitor
+│
+├── ui/
+│   ├── settings/        # Settings window
+│   │   └── window.rs    # open/close settings, controls
+│   └── dialogs/         # Dialog windows
+│       └── quit_dialog.rs   # Quit confirmation
+│
+└── app/                 # Shared application helpers
+    └── helpers.rs       # apply_to_all_views, sync_visual_prefs
+```
+
+**Tests:** `tests/helpers.rs` (13 tests) + `tests/model_tests.rs` (27 tests)
 
 ------
 
