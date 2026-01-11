@@ -11,10 +11,8 @@ use objc::{class, msg_send, sel, sel_impl};
 
 use crate::app::{apply_to_all_views, lang_is_es};
 use crate::ffi::{nsstring, overlay_window_level};
+use mouse_highlighter::events::{publish, AppEvent};
 use mouse_highlighter::{color_to_hex, tr_key};
-
-/// Type alias for the callback to reinstall hotkeys after settings closes.
-pub type OnSettingsClose = unsafe fn(id);
 
 /// Configure a hex color text field.
 unsafe fn configure_hex_field(view: id, field_hex: id) {
@@ -28,13 +26,15 @@ unsafe fn configure_hex_field(view: id, field_hex: id) {
 
 /// Open the settings window.
 ///
+/// When the window closes, publishes `AppEvent::SettingsClosed` to the event bus.
+/// The dispatcher handles hotkey reinstallation.
+///
 /// # Arguments
 /// * `view` - The host view (for accessing ivars and triggering updates)
-/// * `on_close` - Callback to run when settings closes (typically reinstalls hotkeys)
 ///
 /// # Safety
 /// Must be called from main thread.
-pub fn open_settings_window(view: id, on_close: OnSettingsClose) {
+pub fn open_settings_window(view: id) {
     unsafe {
         let existing: id = *(*view).get_ivar::<id>("_settingsWindow");
         if existing != nil {
@@ -344,8 +344,8 @@ pub fn open_settings_window(view: id, on_close: OnSettingsClose) {
             ];
         });
 
-        // Call the on_close callback to reinstall hotkeys
-        on_close(view);
+        // Publish event - dispatcher will handle hotkey reinstallation
+        publish(AppEvent::SettingsClosed);
     }
 }
 
