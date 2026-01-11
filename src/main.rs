@@ -1,5 +1,7 @@
 #![allow(unexpected_cfgs)] // Silence cfg warnings inside objc/cocoa macros
 
+mod ffi;
+
 use block::ConcreteBlock;
 use cocoa::appkit::{
     NSApp, NSApplication, NSApplicationActivationPolicy, NSBackingStoreType, NSColor, NSWindow,
@@ -11,155 +13,10 @@ use objc::runtime::{Class, Object, Sel};
 use objc::{class, declare::ClassDecl, msg_send, sel, sel_impl};
 // Import helpers from the library crate (tests use the same code)
 use mouse_highlighter::{clamp, color_to_hex, parse_hex_color, tr_key};
-use std::ffi::{CStr, CString};
+use std::ffi::CStr;
 
-//
-// ===================== Carbon HotKeys (FFI) =====================
-//
-
-#[link(name = "Carbon", kind = "framework")]
-extern "C" {
-    fn RegisterEventHotKey(
-        inHotKeyCode: u32,
-        inHotKeyModifiers: u32,
-        inHotKeyID: EventHotKeyID,
-        inTarget: EventTargetRef,
-        inOptions: u32,
-        outRef: *mut EventHotKeyRef,
-    ) -> i32;
-
-    fn UnregisterEventHotKey(inHotKeyRef: EventHotKeyRef) -> i32;
-
-    fn InstallEventHandler(
-        inTarget: EventTargetRef,
-        inHandler: EventHandlerUPP,
-        inNumTypes: u32,
-        inList: *const EventTypeSpec,
-        inUserData: *mut std::ffi::c_void,
-        outRef: *mut EventHandlerRef,
-    ) -> i32;
-
-    fn RemoveEventHandler(inHandlerRef: EventHandlerRef) -> i32;
-
-    fn GetApplicationEventTarget() -> EventTargetRef;
-
-    fn GetEventClass(inEvent: EventRef) -> u32;
-    fn GetEventKind(inEvent: EventRef) -> u32;
-
-    fn GetEventParameter(
-        inEvent: EventRef,
-        inName: u32,
-        inDesiredType: u32,
-        outActualType: *mut u32,
-        inBufferSize: u32,
-        outActualSize: *mut u32,
-        outData: *mut std::ffi::c_void,
-    ) -> i32;
-}
-
-type EventTargetRef = *mut std::ffi::c_void;
-type EventHandlerRef = *mut std::ffi::c_void;
-type EventRef = *mut std::ffi::c_void;
-type EventHandlerUPP = extern "C" fn(EventHandlerCallRef, EventRef, *mut std::ffi::c_void) -> i32;
-type EventHandlerCallRef = *mut std::ffi::c_void;
-type EventHotKeyRef = *mut std::ffi::c_void;
-
-#[repr(C)]
-#[derive(Copy, Clone)]
-struct EventTypeSpec {
-    // Keep snake_case to avoid lint warnings; memory layout matches Carbon
-    event_class: u32,
-    event_kind: u32,
-}
-
-#[repr(C)]
-#[derive(Copy, Clone)]
-struct EventHotKeyID {
-    signature: u32,
-    id: u32,
-}
-
-// Carbon constants
-const NO_ERR: i32 = 0;
-const K_EVENT_CLASS_KEYBOARD: u32 = 0x6B65_7962; // 'keyb'
-const K_EVENT_HOTKEY_PRESSED: u32 = 6;
-const K_EVENT_PARAM_DIRECT_OBJECT: u32 = 0x2D2D_2D2D; // '----'
-const TYPE_EVENT_HOTKEY_ID: u32 = 0x686B_6964; // 'hkid'
-
-// Modifiers
-const CMD_KEY: u32 = 1 << 8;
-const SHIFT_KEY: u32 = 1 << 9;
-const CONTROL_KEY: u32 = 1 << 12;
-
-// ANSI keycodes
-const KC_A: u32 = 0;
-const KC_X: u32 = 7;
-const KC_SEMICOLON: u32 = 41;
-const KC_COMMA: u32 = 43;
-
-// Hotkey signature: 'mhlt'
-const SIG_MHLT: u32 = 0x6D68_6C74;
-// Hotkey IDs
-const HKID_TOGGLE: u32 = 1;
-const HKID_SETTINGS_COMMA: u32 = 2;
-const HKID_SETTINGS_SEMI: u32 = 3;
-const HKID_QUIT: u32 = 4;
-
-//
-// ======= CoreText / CoreGraphics / CoreFoundation (glyphs & paths) =======
-//
-
-type CTFontRef = *const std::ffi::c_void;
-type CGPathRef = *const std::ffi::c_void;
-
-#[link(name = "CoreText", kind = "framework")]
-extern "C" {
-    fn CTFontCreateWithName(
-        name: *const std::ffi::c_void,
-        size: f64,
-        matrix: *const std::ffi::c_void,
-    ) -> CTFontRef;
-    fn CTFontGetGlyphsForCharacters(
-        font: CTFontRef,
-        chars: *const u16,
-        glyphs: *mut u16,
-        count: isize,
-    ) -> bool;
-    fn CTFontCreatePathForGlyph(
-        font: CTFontRef,
-        glyph: u16,
-        transform: *const std::ffi::c_void,
-    ) -> CGPathRef;
-}
-
-#[link(name = "CoreGraphics", kind = "framework")]
-extern "C" {
-    fn CGPathRelease(path: CGPathRef);
-}
-
-#[link(name = "CoreFoundation", kind = "framework")]
-extern "C" {
-    fn CFRelease(obj: *const std::ffi::c_void);
-    fn CFAbsoluteTimeGetCurrent() -> f64;
-    fn CFDictionaryCreate(
-        allocator: *const std::ffi::c_void,
-        keys: *const *const std::ffi::c_void,
-        values: *const *const std::ffi::c_void,
-        numValues: isize,
-        keyCallBacks: *const std::ffi::c_void,
-        valueCallBacks: *const std::ffi::c_void,
-    ) -> *const std::ffi::c_void;
-    static kCFBooleanTrue: *const std::ffi::c_void;
-    static kCFTypeDictionaryKeyCallBacks: *const std::ffi::c_void;
-    static kCFTypeDictionaryValueCallBacks: *const std::ffi::c_void;
-}
-
-// TCC Accessibility (to prompt for permissions if missing)
-#[link(name = "ApplicationServices", kind = "framework")]
-extern "C" {
-    fn AXIsProcessTrustedWithOptions(options: *const std::ffi::c_void) -> bool;
-    static kAXTrustedCheckOptionPrompt: *const std::ffi::c_void;
-}
+// FFI bindings from local module
+use crate::ffi::*;
 
 //
 // ===================== Defaults / Appearance =====================
@@ -236,44 +93,6 @@ fn main() {
         install_wakeup_space_observers(host_view);
 
         app.run();
-    }
-}
-
-/// Window level slightly above context menus and Dock (approx.)
-fn nspop_up_menu_window_level() -> i64 {
-    201
-}
-
-fn overlay_window_level() -> i64 {
-    nspop_up_menu_window_level() + 1
-}
-
-/// Global mouse position in Cocoa coordinates (origin bottom-left)
-fn get_mouse_position_cocoa() -> (f64, f64) {
-    unsafe {
-        let cls = class!(NSEvent);
-        let p: NSPoint = msg_send![cls, mouseLocation];
-        (p.x, p.y)
-    }
-}
-
-/// NSString* from &str
-unsafe fn nsstring(s: &str) -> id {
-    let cstr = CString::new(s).unwrap();
-    let ns: id = msg_send![class!(NSString), stringWithUTF8String: cstr.as_ptr()];
-    ns
-}
-
-/// Stable CGDirectDisplayID for an NSScreen (does not change across Space/sleep)
-unsafe fn display_id_for_screen(screen: id) -> u32 {
-    let desc: id = msg_send![screen, deviceDescription];
-    let key = nsstring("NSScreenNumber");
-    let num: id = msg_send![desc, objectForKey: key];
-    if num == nil {
-        0
-    } else {
-        let v: u64 = msg_send![num, unsignedIntegerValue];
-        v as u32
     }
 }
 

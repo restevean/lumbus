@@ -100,8 +100,8 @@ tests/
 
 | Fase | Estado | Descripción |
 |------|--------|-------------|
-| Fase 1 | 🔄 EN PROGRESO | Preparación y rama |
-| Fase 2 | ⬜ PENDIENTE | Extraer FFI bindings |
+| Fase 1 | ✅ COMPLETADO | Preparación y rama |
+| Fase 2 | ✅ COMPLETADO | Extraer FFI bindings |
 | Fase 3 | ⬜ PENDIENTE | Extraer model + tests |
 | Fase 4 | ⬜ PENDIENTE | Extraer input handlers |
 | Fase 5 | ⬜ PENDIENTE | Modularizar UI |
@@ -117,15 +117,15 @@ tests/
 
 ### Tareas
 - [x] 1.1 Crear rama `refactor/modular-architecture` desde `main`
-- [ ] 1.2 Crear directorios vacíos:
-  - [ ] `src/ffi/`
-  - [ ] `src/model/`
-  - [ ] `src/ui/overlay/`
-  - [ ] `src/ui/settings/`
-  - [ ] `src/ui/dialogs/`
-  - [ ] `src/input/`
-- [ ] 1.3 Crear archivos `mod.rs` vacíos en cada directorio
-- [ ] 1.4 Verificar `cargo build` compila sin cambios
+- [x] 1.2 Crear directorios vacíos:
+  - [x] `src/ffi/`
+  - [x] `src/model/`
+  - [x] `src/ui/overlay/`
+  - [x] `src/ui/settings/`
+  - [x] `src/ui/dialogs/`
+  - [x] `src/input/`
+- [x] 1.3 Crear archivos `mod.rs` vacíos en cada directorio
+- [x] 1.4 Verificar `cargo build` compila sin cambios
 
 ### Verificación
 ```bash
@@ -238,10 +238,10 @@ pub const K_EVENT_PARAM_DIRECT_OBJECT: u32 = 0x2D2D2D2D; // '----'
 pub const TYPE_EVENT_HOTKEY_ID: u32 = 0x686B6964;        // 'hkid'
 ```
 
-- [ ] 2.1.1 Crear archivo `src/ffi/carbon.rs`
-- [ ] 2.1.2 Mover tipos y constantes de Carbon
-- [ ] 2.1.3 Mover extern "C" declarations
-- [ ] 2.1.4 Añadir `pub use` en `src/ffi/mod.rs`
+- [x] 2.1.1 Crear archivo `src/ffi/carbon.rs`
+- [x] 2.1.2 Mover tipos y constantes de Carbon
+- [x] 2.1.3 Mover extern "C" declarations
+- [x] 2.1.4 Añadir `pub use` en `src/ffi/mod.rs`
 
 ---
 
@@ -280,8 +280,8 @@ extern "C" {
 }
 ```
 
-- [ ] 2.2.1 Crear archivo `src/ffi/coretext.rs`
-- [ ] 2.2.2 Mover tipos y funciones de CoreText
+- [x] 2.2.1 Crear archivo `src/ffi/coretext.rs`
+- [x] 2.2.2 Mover tipos y funciones de CoreText
 
 ---
 
@@ -321,8 +321,8 @@ pub const K_CF_TYPE_DICTIONARY_KEY_CALLBACKS: *const () = std::ptr::null();
 pub const K_CF_TYPE_DICTIONARY_VALUE_CALLBACKS: *const () = std::ptr::null();
 ```
 
-- [ ] 2.3.1 Crear archivo `src/ffi/coregraphics.rs`
-- [ ] 2.3.2 Mover tipos y funciones de CoreGraphics/CoreFoundation
+- [x] 2.3.1 Crear archivo `src/ffi/coregraphics.rs`
+- [x] 2.3.2 Mover tipos y funciones de CoreGraphics/CoreFoundation
 
 ---
 
@@ -345,8 +345,8 @@ extern "C" {
 }
 ```
 
-- [ ] 2.4.1 Crear archivo `src/ffi/accessibility.rs`
-- [ ] 2.4.2 Mover función y constante de Accessibility
+- [x] 2.4.1 Crear archivo `src/ffi/accessibility.rs`
+- [x] 2.4.2 Mover función y constante de Accessibility
 
 ---
 
@@ -388,8 +388,8 @@ pub fn overlay_window_level() -> i64 {
 }
 ```
 
-- [ ] 2.5.1 Crear archivo `src/ffi/cocoa_utils.rs`
-- [ ] 2.5.2 Mover helpers de Cocoa
+- [x] 2.5.1 Crear archivo `src/ffi/cocoa_utils.rs`
+- [x] 2.5.2 Mover helpers de Cocoa
 
 ---
 
@@ -416,16 +416,16 @@ pub use accessibility::{AXIsProcessTrustedWithOptions, kAXTrustedCheckOptionProm
 pub use cocoa_utils::{nsstring, display_id_for_screen, get_mouse_position_cocoa, overlay_window_level};
 ```
 
-- [ ] 2.6.1 Crear archivo `src/ffi/mod.rs`
-- [ ] 2.6.2 Añadir re-exports
+- [x] 2.6.1 Crear archivo `src/ffi/mod.rs`
+- [x] 2.6.2 Añadir re-exports
 
 ---
 
 ### 2.7 Actualizar main.rs
 
-- [ ] 2.7.1 Añadir `mod ffi;` al inicio de main.rs
-- [ ] 2.7.2 Reemplazar declaraciones locales por `use crate::ffi::*;`
-- [ ] 2.7.3 Eliminar código duplicado de main.rs
+- [x] 2.7.1 Añadir `mod ffi;` al inicio de main.rs
+- [x] 2.7.2 Reemplazar declaraciones locales por `use crate::ffi::*;`
+- [x] 2.7.3 Eliminar código duplicado de main.rs
 
 ### Verificación Fase 2
 ```bash
@@ -433,10 +433,10 @@ cargo build --release  # Debe compilar sin errores
 cargo run --release    # Verificar que la app funciona
 ```
 
-- [ ] Build compila
-- [ ] App abre correctamente
-- [ ] Overlay se dibuja
-- [ ] Hotkeys funcionan
+- [x] Build compila
+- [x] App abre correctamente
+- [x] Overlay se dibuja
+- [x] Hotkeys funcionan
 
 ### Commit sugerido
 ```
