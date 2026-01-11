@@ -29,6 +29,8 @@ use std::ffi::CStr;
 use crate::ffi::*;
 // Global helpers (apply_to_all_views, etc.)
 use crate::app::*;
+// Input handling (hotkeys)
+use crate::input::{install_hotkeys, uninstall_hotkeys, reinstall_hotkeys};
 
 //
 // ===================== App =====================
@@ -73,7 +75,7 @@ fn main() {
         let _ = create_timer(host_view, sel!(update_cursor_multi), 0.016);
 
         // Carbon hotkeys + global mouse monitors + termination observer
-        install_hotkeys(host_view);
+        install_hotkeys(host_view, hotkey_event_handler);
         install_mouse_monitors(host_view);
         install_termination_observer(host_view);
         install_local_ctrl_a_monitor(host_view);
@@ -455,7 +457,7 @@ fn open_settings_window(view: id) {
             ];
         });
 
-        reinstall_hotkeys(view);
+        reinstall_hotkeys(view, hotkey_event_handler);
     }
 }
 
@@ -791,7 +793,7 @@ fn confirm_and_maybe_quit(view: id) {
             let _: () = msg_send![overlay_win, setLevel: overlay_window_level()];
             let _: () = msg_send![overlay_win, orderFrontRegardless];
         });
-        reinstall_hotkeys(view);
+        reinstall_hotkeys(view, hotkey_event_handler);
     }
 }
 
@@ -1004,7 +1006,7 @@ unsafe fn register_custom_view_class_and_create_view(window: id, width: f64, hei
         // Hotkey keep-alive: periodically re-install (idempotent)
         extern "C" fn hotkey_keepalive(this: &mut Object, _cmd: Sel) {
             unsafe {
-                reinstall_hotkeys(this as *mut _ as id);
+                reinstall_hotkeys(this as *mut _ as id, hotkey_event_handler);
             }
         }
 
@@ -1576,97 +1578,6 @@ extern "C" fn hotkey_event_handler(
     }
 }
 
-unsafe fn install_hotkeys(view: id) {
-    // Install Carbon handler for hotkey events
-    let types = [EventTypeSpec {
-        event_class: K_EVENT_CLASS_KEYBOARD,
-        event_kind: K_EVENT_HOTKEY_PRESSED,
-    }];
-    let mut handler_ref: EventHandlerRef = std::ptr::null_mut();
-    let status = InstallEventHandler(
-        GetApplicationEventTarget(),
-        hotkey_event_handler,
-        types.len() as u32,
-        types.as_ptr(),
-        view as *mut std::ffi::c_void,
-        &mut handler_ref,
-    );
-    if status != NO_ERR {
-        eprintln!("❌ InstallEventHandler failed: {}", status);
-        return;
-    }
-    (*view).set_ivar::<*mut std::ffi::c_void>("_hkHandler", handler_ref);
-
-    macro_rules! register_hotkey {
-        ($keycode:expr, $mods:expr, $idconst:expr, $slot:literal) => {{
-            let hk_id = EventHotKeyID {
-                signature: SIG_MHLT,
-                id: $idconst,
-            };
-            let mut out_ref: EventHotKeyRef = std::ptr::null_mut();
-            let st = RegisterEventHotKey(
-                $keycode as u32,
-                $mods as u32,
-                hk_id,
-                GetApplicationEventTarget(),
-                0,
-                &mut out_ref,
-            );
-            if st != NO_ERR || out_ref.is_null() {
-                eprintln!(
-                    "❌ RegisterEventHotKey failed (code={}, mods={}, id={}): {}",
-                    $keycode, $mods, $idconst, st
-                );
-            } else {
-                (*view).set_ivar::<*mut std::ffi::c_void>($slot, out_ref);
-            }
-        }};
-    }
-
-    // Ctrl + A (toggle)
-    register_hotkey!(KC_A, CONTROL_KEY, HKID_TOGGLE, "_hkToggle");
-    // ⌘ + ,  and ⌘ + ; → Settings
-    register_hotkey!(KC_COMMA, CMD_KEY, HKID_SETTINGS_COMMA, "_hkComma");
-    register_hotkey!(KC_SEMICOLON, CMD_KEY, HKID_SETTINGS_SEMI, "_hkSemi");
-    // Ctrl + Shift + X → Quit confirmation
-    register_hotkey!(KC_X, CONTROL_KEY | SHIFT_KEY, HKID_QUIT, "_hkQuit");
-}
-
-unsafe fn uninstall_hotkeys(view: id) {
-    let hk_toggle: *mut std::ffi::c_void = *(*view).get_ivar("_hkToggle");
-    let hk_comma: *mut std::ffi::c_void = *(*view).get_ivar("_hkComma");
-    let hk_semi: *mut std::ffi::c_void = *(*view).get_ivar("_hkSemi");
-    let hk_quit: *mut std::ffi::c_void = *(*view).get_ivar("_hkQuit");
-    let hk_handler: *mut std::ffi::c_void = *(*view).get_ivar("_hkHandler");
-
-    if !hk_toggle.is_null() {
-        let _ = UnregisterEventHotKey(hk_toggle);
-        (*view).set_ivar::<*mut std::ffi::c_void>("_hkToggle", std::ptr::null_mut());
-    }
-    if !hk_comma.is_null() {
-        let _ = UnregisterEventHotKey(hk_comma);
-        (*view).set_ivar::<*mut std::ffi::c_void>("_hkComma", std::ptr::null_mut());
-    }
-    if !hk_semi.is_null() {
-        let _ = UnregisterEventHotKey(hk_semi);
-        (*view).set_ivar::<*mut std::ffi::c_void>("_hkSemi", std::ptr::null_mut());
-    }
-    if !hk_quit.is_null() {
-        let _ = UnregisterEventHotKey(hk_quit);
-        (*view).set_ivar::<*mut std::ffi::c_void>("_hkQuit", std::ptr::null_mut());
-    }
-    if !hk_handler.is_null() {
-        let _ = RemoveEventHandler(hk_handler);
-        (*view).set_ivar::<*mut std::ffi::c_void>("_hkHandler", std::ptr::null_mut());
-    }
-}
-
-/// Re-install hotkeys safely (unregister first to avoid leaks)
-unsafe fn reinstall_hotkeys(view: id) {
-    uninstall_hotkeys(view);
-    install_hotkeys(view);
-}
-
 unsafe fn install_termination_observer(view: id) {
     // On app termination: clean Carbon resources
     let center: id = msg_send![class!(NSNotificationCenter), defaultCenter];
@@ -1723,7 +1634,7 @@ unsafe fn install_wakeup_space_observers(view: id) {
         let name: id =
             msg_send![class!(NSString), stringWithUTF8String: name_cstr.as_ptr() as *const _];
         let block = ConcreteBlock::new(move |_note: id| unsafe {
-            reinstall_hotkeys(view);
+            reinstall_hotkeys(view, hotkey_event_handler);
         })
             .copy();
         let _: id = msg_send![nc, addObserverForName: name object: nil queue: nil usingBlock: &*block];
