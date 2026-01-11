@@ -103,9 +103,9 @@ tests/
 | Fase 1 | ✅ COMPLETADO | Preparación y rama |
 | Fase 2 | ✅ COMPLETADO | Extraer FFI bindings |
 | Fase 3 | ✅ COMPLETADO | Extraer model + tests |
-| Fase 4 | ⬜ PENDIENTE | Extraer input handlers |
-| Fase 5 | ⬜ PENDIENTE | Modularizar UI |
-| Fase 6 | ⬜ PENDIENTE | Cleanup final |
+| Fase 4 | 🔄 PARCIAL | Extraer input handlers (placeholder, pendiente desacoplar) |
+| Fase 5 | 🔄 PARCIAL | Modularizar UI (placeholder, requiere refactor arquitectónico) |
+| Fase 6 | ✅ COMPLETADO | Cleanup y documentación |
 
 **Leyenda**: ⬜ Pendiente | 🔄 En progreso | ✅ Completado | ❌ Bloqueado
 
