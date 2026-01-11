@@ -2,6 +2,11 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Communication Preferences
+
+- **Use technical jargon** (milestone, sprint, refactor, etc.) - it helps the user learn industry terminology
+- Explain new terms when they appear for the first time
+
 ## Project Overview
 
 **Mouse Highlighter** is a macOS-native application written in Rust that highlights the mouse pointer across all displays with a configurable circle and click indicators (L/R). Built using Cocoa FFI bindings (`cocoa`, `objc`, `block` crates) and low-level Carbon/CoreText/CoreGraphics APIs.
