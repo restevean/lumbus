@@ -10,20 +10,21 @@ use objc::{class, msg_send, sel, sel_impl};
 
 use crate::app::{apply_to_all_views, lang_is_es};
 use crate::ffi::{nsstring, overlay_window_level};
+use mouse_highlighter::events::{publish, AppEvent};
 use mouse_highlighter::tr_key;
-
-/// Type alias for the callback to reinstall hotkeys after dialog closes.
-pub type OnDialogClose = unsafe fn(id);
 
 /// Show a quit confirmation dialog.
 ///
+/// If user cancels, publishes `AppEvent::QuitCancelled` to the event bus.
+/// The dispatcher handles hotkey reinstallation.
+/// If user confirms quit, terminates the application.
+///
 /// # Arguments
 /// * `view` - The host view (for accessing ivars and triggering updates)
-/// * `on_cancel` - Callback to run when user cancels (typically reinstalls hotkeys)
 ///
 /// # Safety
 /// Must be called from main thread.
-pub fn confirm_and_maybe_quit(view: id, on_cancel: OnDialogClose) {
+pub fn confirm_and_maybe_quit(view: id) {
     unsafe {
         // Save current overlay state and hide circle during dialog
         let was_enabled = *(*view).get_ivar::<bool>("_overlayEnabled");
@@ -291,8 +292,9 @@ pub fn confirm_and_maybe_quit(view: id, on_cancel: OnDialogClose) {
         ];
 
         // Show dialog and run modal
-        let _: () = msg_send![dialog, makeKeyAndOrderFront: nil];
         let app = NSApp();
+        let _: () = msg_send![app, activateIgnoringOtherApps: YES];
+        let _: () = msg_send![dialog, makeKeyAndOrderFront: nil];
         let _: () = msg_send![app, runModalForWindow: dialog];
 
         // Clean up monitors
@@ -334,7 +336,7 @@ pub fn confirm_and_maybe_quit(view: id, on_cancel: OnDialogClose) {
             let _: () = msg_send![overlay_win, orderFrontRegardless];
         });
 
-        // Call the on_cancel callback to reinstall hotkeys
-        on_cancel(view);
+        // Publish event - dispatcher will handle hotkey reinstallation
+        publish(AppEvent::QuitCancelled);
     }
 }

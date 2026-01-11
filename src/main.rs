@@ -2,10 +2,10 @@
 
 mod app;
 mod ffi;
+mod handlers;
 mod input;
 mod ui;
 
-use block::ConcreteBlock;
 use cocoa::appkit::{
     NSApp, NSApplication, NSApplicationActivationPolicy, NSBackingStoreType, NSColor, NSWindow,
     NSWindowCollectionBehavior, NSWindowStyleMask,
@@ -16,6 +16,8 @@ use objc::runtime::{Class, Object, Sel};
 use objc::{class, declare::ClassDecl, msg_send, sel, sel_impl};
 // Import helpers from the library crate (tests use the same code)
 use mouse_highlighter::{clamp, color_to_hex, parse_hex_color, tr_key};
+// Import event system
+use mouse_highlighter::events::{init_event_bus, publish, AppEvent};
 // Import model constants and preferences
 use mouse_highlighter::model::{
     DEFAULT_DIAMETER, DEFAULT_BORDER_WIDTH, DEFAULT_COLOR, DEFAULT_FILL_TRANSPARENCY_PCT,
@@ -37,12 +39,17 @@ use crate::input::{
 };
 // UI components
 use crate::ui::{confirm_and_maybe_quit, open_settings_window, close_settings_window};
+// Event dispatcher
+use crate::handlers::dispatch_events;
 
 //
 // ===================== App =====================
 //
 
 fn main() {
+    // Initialize event bus before anything else
+    init_event_bus();
+
     unsafe {
         let _pool = NSAutoreleasePool::new(nil);
 
@@ -158,7 +165,7 @@ unsafe fn register_custom_view_class_and_create_view(window: id, width: f64, hei
         let mut decl = ClassDecl::new(class_name, superclass).unwrap();
 
         // Base state
-        decl.add_ivar::<f64>("todo correcto_cursorXScreen");
+        decl.add_ivar::<f64>("_cursorXScreen");
         decl.add_ivar::<f64>("_cursorYScreen");
         decl.add_ivar::<bool>("_visible"); // visible by screen selection
         decl.add_ivar::<bool>("_overlayEnabled"); // global toggle
@@ -239,6 +246,9 @@ unsafe fn register_custom_view_class_and_create_view(window: id, width: f64, hei
 
         extern "C" fn update_cursor_multi(this: &mut Object, _cmd: Sel) {
             unsafe {
+                // Process any pending events from the event bus
+                process_pending_events(this as *mut _ as id);
+
                 let (x, y) = get_mouse_position_cocoa();
                 let screens: id = msg_send![class!(NSScreen), screens];
                 let count: usize = msg_send![screens, count];
@@ -847,10 +857,23 @@ unsafe fn reinstall_hotkeys_callback(view: id) {
     reinstall_hotkeys(view, hotkey_event_handler);
 }
 
+/// Process all pending events from the event bus.
+///
+/// This is called from the timer (60fps) to dispatch queued events.
+/// It's a global function so it can be called from the CustomView method.
+unsafe fn process_pending_events(view: id) {
+    dispatch_events(
+        view,
+        open_settings_window,
+        confirm_and_maybe_quit,
+        reinstall_hotkeys_callback,
+    );
+}
+
 extern "C" fn hotkey_event_handler(
     _call_ref: EventHandlerCallRef,
     event: EventRef,
-    user_data: *mut std::ffi::c_void,
+    _user_data: *mut std::ffi::c_void,
 ) -> i32 {
     unsafe {
         if GetEventClass(event) == K_EVENT_CLASS_KEYBOARD
@@ -867,32 +890,16 @@ extern "C" fn hotkey_event_handler(
                 &mut hot_id as *mut _ as *mut std::ffi::c_void,
             );
             if status == NO_ERR && hot_id.signature == SIG_MHLT {
-                let view = user_data as id;
+                // Publish events to the bus - they'll be processed in the main loop
                 match hot_id.id {
                     HKID_TOGGLE => {
-                        // Toggle overlay (main thread)
-                        let _: () = msg_send![
-                            view,
-                            performSelectorOnMainThread: sel!(requestToggle)
-                            withObject: nil
-                            waitUntilDone: NO
-                        ];
+                        publish(AppEvent::ToggleOverlay);
                     }
                     HKID_SETTINGS_COMMA | HKID_SETTINGS_SEMI => {
-                        let block = ConcreteBlock::new(move || {
-                            open_settings_window(view, reinstall_hotkeys_callback);
-                        })
-                            .copy();
-                        let main_queue: id = msg_send![class!(NSOperationQueue), mainQueue];
-                        let _: () = msg_send![main_queue, addOperationWithBlock: &*block];
+                        publish(AppEvent::OpenSettings);
                     }
                     HKID_QUIT => {
-                        let block = ConcreteBlock::new(move || {
-                            confirm_and_maybe_quit(view, reinstall_hotkeys_callback);
-                        })
-                            .copy();
-                        let main_queue: id = msg_send![class!(NSOperationQueue), mainQueue];
-                        let _: () = msg_send![main_queue, addOperationWithBlock: &*block];
+                        publish(AppEvent::RequestQuit);
                     }
                     _ => {}
                 }
