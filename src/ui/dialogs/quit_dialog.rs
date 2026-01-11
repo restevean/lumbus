@@ -292,8 +292,9 @@ pub fn confirm_and_maybe_quit(view: id) {
         ];
 
         // Show dialog and run modal
-        let _: () = msg_send![dialog, makeKeyAndOrderFront: nil];
         let app = NSApp();
+        let _: () = msg_send![app, activateIgnoringOtherApps: YES];
+        let _: () = msg_send![dialog, makeKeyAndOrderFront: nil];
         let _: () = msg_send![app, runModalForWindow: dialog];
 
         // Clean up monitors
