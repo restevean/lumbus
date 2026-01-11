@@ -5,4 +5,4 @@
 
 pub mod helpers;
 
-pub use helpers::{apply_to_all_views, lang_is_es, redraw_all_views, sync_visual_prefs_to_all_views};
+pub use helpers::{apply_to_all_views, lang_is_es, sync_visual_prefs_to_all_views};

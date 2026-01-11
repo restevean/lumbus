@@ -6,7 +6,6 @@ use block::ConcreteBlock;
 use cocoa::appkit::{NSApp, NSBackingStoreType, NSColor, NSWindow, NSWindowStyleMask};
 use cocoa::base::{id, nil, NO, YES};
 use cocoa::foundation::{NSPoint, NSRect, NSSize};
-use objc::runtime::Object;
 use objc::{class, msg_send, sel, sel_impl};
 
 use crate::app::{apply_to_all_views, lang_is_es};

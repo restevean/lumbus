@@ -6,7 +6,7 @@ use block::ConcreteBlock;
 use cocoa::appkit::{NSApp, NSBackingStoreType, NSWindow, NSWindowStyleMask};
 use cocoa::base::{id, nil, NO, YES};
 use cocoa::foundation::{NSPoint, NSRect, NSSize};
-use objc::runtime::{Class, Object};
+use objc::runtime::Class;
 use objc::{class, msg_send, sel, sel_impl};
 
 use crate::app::{apply_to_all_views, lang_is_es};
@@ -15,40 +15,6 @@ use mouse_highlighter::{color_to_hex, tr_key};
 
 /// Type alias for the callback to reinstall hotkeys after settings closes.
 pub type OnSettingsClose = unsafe fn(id);
-
-/// Install a minimal main menu so that local key equivalents work.
-pub fn ensure_hotkey_menu(view: id) {
-    unsafe {
-        let installed = *(*view).get_ivar::<bool>("_menuInstalled");
-        if installed {
-            return;
-        }
-
-        let main_menu: id = msg_send![class!(NSMenu), new];
-        let app_item: id = msg_send![class!(NSMenuItem), new];
-        let _: () = msg_send![main_menu, addItem: app_item];
-
-        let app_menu: id = msg_send![class!(NSMenu), new];
-        let _: () = msg_send![app_item, setSubmenu: app_menu];
-
-        let mi_toggle: id = msg_send![class!(NSMenuItem), alloc];
-        let mi_toggle: id = msg_send![
-            mi_toggle,
-            initWithTitle: nsstring("Toggle Overlay")
-            action: sel!(requestToggle)
-            keyEquivalent: nsstring("a")
-        ];
-        let ctrl_mask: u64 = 1 << 18; // Control
-        let _: () = msg_send![mi_toggle, setKeyEquivalentModifierMask: ctrl_mask];
-        let _: () = msg_send![mi_toggle, setTarget: view];
-        let _: () = msg_send![app_menu, addItem: mi_toggle];
-
-        let app = NSApp();
-        let _: () = msg_send![app, setMainMenu: main_menu];
-
-        (*view).set_ivar::<bool>("_menuInstalled", true);
-    }
-}
 
 /// Configure a hex color text field.
 unsafe fn configure_hex_field(view: id, field_hex: id) {

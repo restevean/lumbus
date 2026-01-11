@@ -132,7 +132,7 @@ unsafe fn make_window_for_screen(screen: id) -> (id, id) {
     window.setBackgroundColor_(NSColor::clearColor(nil));
     window.setIgnoresMouseEvents_(YES);
     window.setAcceptsMouseMovedEvents_(YES); // allow mouse move events
-    window.setLevel_(overlay_window_level().into());
+    window.setLevel_(overlay_window_level());
     window.setCollectionBehavior_(
         NSWindowCollectionBehavior::NSWindowCollectionBehaviorCanJoinAllSpaces
             | NSWindowCollectionBehavior::NSWindowCollectionBehaviorFullScreenAuxiliary

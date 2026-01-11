@@ -27,7 +27,7 @@ pub fn color_to_hex(r: f64, g: f64, b: f64, a: f64) -> String {
     let gi = (clamp(g, 0.0, 1.0) * 255.0).round() as u8;
     let bi = (clamp(b, 0.0, 1.0) * 255.0).round() as u8;
     let ai = (clamp(a, 0.0, 1.0) * 255.0).round() as u8;
-    if ai >= 255 {
+    if ai == 255 {
         format!("#{:02X}{:02X}{:02X}", ri, gi, bi)
     } else {
         format!("#{:02X}{:02X}{:02X}{:02X}", ri, gi, bi, ai)

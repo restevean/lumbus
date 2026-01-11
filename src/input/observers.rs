@@ -7,7 +7,6 @@ use block::ConcreteBlock;
 use cocoa::base::{id, nil};
 use objc::{class, msg_send, sel, sel_impl};
 
-use crate::ffi::*;
 use crate::input::hotkeys::{uninstall_hotkeys, reinstall_hotkeys, HotkeyHandler};
 
 /// Install an observer that cleans up Carbon resources when app terminates.
@@ -26,7 +25,7 @@ pub unsafe fn install_termination_observer(view: id, handler: HotkeyHandler) {
 
     let name: id = msg_send![
         class!(NSString),
-        stringWithUTF8String: b"NSApplicationWillTerminateNotification\0".as_ptr() as *const _
+        stringWithUTF8String: c"NSApplicationWillTerminateNotification".as_ptr()
     ];
     let _: id =
         msg_send![center, addObserverForName: name object: nil queue: queue usingBlock: &*block];
@@ -69,9 +68,9 @@ pub unsafe fn install_wakeup_space_observers(view: id, handler: HotkeyHandler) {
     let nc: id = msg_send![ws, notificationCenter];
 
     // Helper to add an observer for a given notification name (C string)
-    let add_obs = |name_cstr: &'static [u8]| {
+    let add_obs = |name_cstr: &std::ffi::CStr| {
         let name: id =
-            msg_send![class!(NSString), stringWithUTF8String: name_cstr.as_ptr() as *const _];
+            msg_send![class!(NSString), stringWithUTF8String: name_cstr.as_ptr()];
         let block = ConcreteBlock::new(move |_note: id| unsafe {
             reinstall_hotkeys(view, handler);
         })
@@ -80,9 +79,9 @@ pub unsafe fn install_wakeup_space_observers(view: id, handler: HotkeyHandler) {
     };
 
     // Wake from sleep
-    add_obs(b"NSWorkspaceDidWakeNotification\0");
+    add_obs(c"NSWorkspaceDidWakeNotification");
     // Session became active (unlock/login)
-    add_obs(b"NSWorkspaceSessionDidBecomeActiveNotification\0");
+    add_obs(c"NSWorkspaceSessionDidBecomeActiveNotification");
     // Active Space changed (Mission Control / Spaces)
-    add_obs(b"NSWorkspaceActiveSpaceDidChangeNotification\0");
+    add_obs(c"NSWorkspaceActiveSpaceDidChangeNotification");
 }

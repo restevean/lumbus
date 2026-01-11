@@ -4,7 +4,7 @@
 //! and are used across multiple modules (input, ui).
 
 use cocoa::appkit::NSApp;
-use cocoa::base::{id, nil, YES};
+use cocoa::base::{id, nil};
 use objc::runtime::Class;
 use objc::{msg_send, sel, sel_impl};
 
@@ -63,14 +63,4 @@ pub fn lang_is_es(view: id) -> bool {
         let l = *(*view).get_ivar::<i32>("_lang");
         l == 1
     }
-}
-
-/// Trigger a redraw on all views.
-///
-/// # Safety
-/// Must be called from main thread.
-pub unsafe fn redraw_all_views() {
-    apply_to_all_views(|v| {
-        let _: () = msg_send![v, setNeedsDisplay: YES];
-    });
 }

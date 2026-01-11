@@ -7,7 +7,6 @@ use block::ConcreteBlock;
 use cocoa::base::{id, YES};
 use objc::{class, msg_send, sel, sel_impl};
 
-use crate::ffi::*;
 use crate::app::apply_to_all_views;
 
 /// Install global mouse monitors for tracking clicks and movement.

@@ -7,7 +7,6 @@
 //! to call UI functions (open_settings_window, confirm_and_maybe_quit).
 
 use cocoa::base::id;
-use objc::runtime::Object;
 
 use crate::ffi::{
     EventHotKeyID, EventHotKeyRef, EventHandlerRef, EventTypeSpec,

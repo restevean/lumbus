@@ -4,4 +4,4 @@
 
 pub mod quit_dialog;
 
-pub use quit_dialog::{confirm_and_maybe_quit, OnDialogClose};
+pub use quit_dialog::confirm_and_maybe_quit;

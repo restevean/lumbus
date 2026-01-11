@@ -17,5 +17,5 @@
 pub mod dialogs;
 pub mod settings;
 
-pub use dialogs::{confirm_and_maybe_quit, OnDialogClose};
-pub use settings::{close_settings_window, ensure_hotkey_menu, open_settings_window, OnSettingsClose};
+pub use dialogs::confirm_and_maybe_quit;
+pub use settings::{close_settings_window, open_settings_window};

@@ -4,4 +4,4 @@
 
 pub mod window;
 
-pub use window::{close_settings_window, ensure_hotkey_menu, open_settings_window, OnSettingsClose};
+pub use window::{close_settings_window, open_settings_window};

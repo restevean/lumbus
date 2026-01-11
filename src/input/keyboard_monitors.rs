@@ -7,7 +7,6 @@ use block::ConcreteBlock;
 use cocoa::base::{id, nil};
 use objc::{class, msg_send, sel, sel_impl};
 
-use crate::ffi::*;
 
 /// Install a local monitor for Ctrl+A key combination.
 ///
