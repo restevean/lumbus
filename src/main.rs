@@ -903,29 +903,3 @@ extern "C" fn hotkey_event_handler(
 }
 
 
-//
-// ===================== TCC: Accessibility prompt =====================
-//
-
-unsafe fn ensure_accessibility_prompt() {
-    // Create CFDictionary with kAXTrustedCheckOptionPrompt = true
-    let keys = [kAXTrustedCheckOptionPrompt];
-    let values = [kCFBooleanTrue];
-
-    let dict = CFDictionaryCreate(
-        std::ptr::null(),  // default allocator
-        keys.as_ptr(),
-        values.as_ptr(),
-        1,  // one key-value pair
-        kCFTypeDictionaryKeyCallBacks,
-        kCFTypeDictionaryValueCallBacks,
-    );
-
-    let _trusted: bool = AXIsProcessTrustedWithOptions(dict);
-
-    // Clean up
-    if !dict.is_null() {
-        CFRelease(dict);
-    }
-    // We ignore the boolean: if not trusted this triggers the system prompt.
-}
