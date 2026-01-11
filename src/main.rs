@@ -29,8 +29,12 @@ use std::ffi::CStr;
 use crate::ffi::*;
 // Global helpers (apply_to_all_views, etc.)
 use crate::app::*;
-// Input handling (hotkeys)
-use crate::input::{install_hotkeys, uninstall_hotkeys, reinstall_hotkeys};
+// Input handling (hotkeys, observers, monitors)
+use crate::input::{
+    install_hotkeys, reinstall_hotkeys,
+    install_termination_observer, start_hotkey_keepalive, install_wakeup_space_observers,
+    install_local_ctrl_a_monitor, install_mouse_monitors,
+};
 // UI components
 use crate::ui::{confirm_and_maybe_quit, open_settings_window, close_settings_window};
 
@@ -79,12 +83,12 @@ fn main() {
         // Carbon hotkeys + global mouse monitors + termination observer
         install_hotkeys(host_view, hotkey_event_handler);
         install_mouse_monitors(host_view);
-        install_termination_observer(host_view);
+        install_termination_observer(host_view, hotkey_event_handler);
         install_local_ctrl_a_monitor(host_view);
 
         // Defensive re-install of hotkeys on system events
         start_hotkey_keepalive(host_view);
-        install_wakeup_space_observers(host_view);
+        install_wakeup_space_observers(host_view, hotkey_event_handler);
 
         app.run();
     }
@@ -898,195 +902,6 @@ extern "C" fn hotkey_event_handler(
     }
 }
 
-unsafe fn install_termination_observer(view: id) {
-    // On app termination: clean Carbon resources
-    let center: id = msg_send![class!(NSNotificationCenter), defaultCenter];
-    let queue: id = nil; // main thread
-
-    let block = ConcreteBlock::new(move |_note: id| {
-        unsafe {
-            uninstall_hotkeys(view);
-        }
-    })
-        .copy();
-
-    let name: id = msg_send![
-        class!(NSString),
-        stringWithUTF8String: b"NSApplicationWillTerminateNotification\0".as_ptr() as *const _
-    ];
-    let _: id =
-        msg_send![center, addObserverForName: name object: nil queue: queue usingBlock: &*block];
-}
-
-//
-// ===================== Hotkey keep-alive & wake/space observers =====================
-//
-
-/// Start a repeating NSTimer to periodically re-install hotkeys (defensive)
-unsafe fn start_hotkey_keepalive(view: id) {
-    // Clear previous timer if any
-    let prev: id = *(*view).get_ivar::<id>("_hkKeepAliveTimer");
-    if prev != nil {
-        let _: () = msg_send![prev, invalidate];
-        (*view).set_ivar::<id>("_hkKeepAliveTimer", nil);
-    }
-
-    // 60s interval; cheap operation
-    let timer_class = Class::get("NSTimer").unwrap();
-    let timer: id = msg_send![
-        timer_class,
-        scheduledTimerWithTimeInterval: 60.0f64
-        target: view
-        selector: sel!(hotkeyKeepAlive)
-        userInfo: nil
-        repeats: YES
-    ];
-    (*view).set_ivar::<id>("_hkKeepAliveTimer", timer);
-}
-
-/// Observe system events that may disrupt Carbon hotkeys and re-install on demand
-unsafe fn install_wakeup_space_observers(view: id) {
-    let ws: id = msg_send![class!(NSWorkspace), sharedWorkspace];
-    let nc: id = msg_send![ws, notificationCenter];
-
-    // Helper to add an observer for a given notification name (C string)
-    let add_obs = |name_cstr: &'static [u8]| {
-        let name: id =
-            msg_send![class!(NSString), stringWithUTF8String: name_cstr.as_ptr() as *const _];
-        let block = ConcreteBlock::new(move |_note: id| unsafe {
-            reinstall_hotkeys(view, hotkey_event_handler);
-        })
-            .copy();
-        let _: id = msg_send![nc, addObserverForName: name object: nil queue: nil usingBlock: &*block];
-    };
-
-    // Wake from sleep
-    add_obs(b"NSWorkspaceDidWakeNotification\0");
-    // Session became active (unlock/login)
-    add_obs(b"NSWorkspaceSessionDidBecomeActiveNotification\0");
-    // Active Space changed (Mission Control / Spaces)
-    add_obs(b"NSWorkspaceActiveSpaceDidChangeNotification\0");
-}
-
-//
-// ===================== Local Ctrl+A monitor =====================
-//
-
-unsafe fn install_local_ctrl_a_monitor(view: id) {
-    let existing: id = *(*view).get_ivar::<id>("_localKeyMonitor");
-    if existing != nil {
-        return;
-    }
-
-    const KEY_DOWN_MASK: u64 = 1 << 10;
-    const CTRL_FLAG: u64 = 1 << 18;
-    const KEYCODE_A: u16 = 0;
-
-    let host = view;
-    let block = ConcreteBlock::new(move |event: id| {
-        unsafe {
-            let keycode: u16 = msg_send![event, keyCode];
-            let flags: u64 = msg_send![event, modifierFlags];
-            if keycode == KEYCODE_A && (flags & CTRL_FLAG) != 0 {
-                let _: () = msg_send![
-                    host,
-                    performSelectorOnMainThread: sel!(requestToggle)
-                    withObject: nil
-                    waitUntilDone: NO
-                ];
-            }
-        }
-        event
-    })
-        .copy();
-
-    let mon: id = msg_send![
-        class!(NSEvent),
-        addLocalMonitorForEventsMatchingMask: KEY_DOWN_MASK
-        handler: &*block
-    ];
-    (*view).set_ivar::<id>("_localKeyMonitor", mon);
-}
-
-//
-// ===================== Global mouse monitors =====================
-//
-
-unsafe fn install_mouse_monitors(view: id) {
-    // NSEvent masks: leftDown=1<<1, leftUp=1<<2, rightDown=1<<3, rightUp=1<<4, mouseMoved=1<<6
-    const LEFT_DOWN_MASK: u64 = 1 << 1;
-    const LEFT_UP_MASK: u64 = 1 << 2;
-    const RIGHT_DOWN_MASK: u64 = 1 << 3;
-    const RIGHT_UP_MASK: u64 = 1 << 4;
-    const MOUSE_MOVED_MASK: u64 = 1 << 6;
-
-    let cls = class!(NSEvent);
-
-    // LEFT DOWN -> L mode
-    let h1 = ConcreteBlock::new(move |_e: id| {
-        unsafe {
-            apply_to_all_views(|v| { *(*v).get_mut_ivar::<i32>("_displayMode") = 1 });
-            apply_to_all_views(|v| { let _: () = msg_send![v, setNeedsDisplay: YES]; });
-        }
-    })
-        .copy();
-    let mon_ld: id =
-        msg_send![cls, addGlobalMonitorForEventsMatchingMask: LEFT_DOWN_MASK handler: &*h1];
-    (*view).set_ivar::<id>("_monLeftDown", mon_ld);
-
-    // LEFT UP -> circle
-    let h2 = ConcreteBlock::new(move |_e: id| {
-        unsafe {
-            apply_to_all_views(|v| { *(*v).get_mut_ivar::<i32>("_displayMode") = 0 });
-            apply_to_all_views(|v| { let _: () = msg_send![v, setNeedsDisplay: YES]; });
-        }
-    })
-        .copy();
-    let mon_lu: id =
-        msg_send![cls, addGlobalMonitorForEventsMatchingMask: LEFT_UP_MASK handler: &*h2];
-    (*view).set_ivar::<id>("_monLeftUp", mon_lu);
-
-    // RIGHT DOWN -> R mode
-    let h3 = ConcreteBlock::new(move |_e: id| {
-        unsafe {
-            apply_to_all_views(|v| { *(*v).get_mut_ivar::<i32>("_displayMode") = 2 });
-            apply_to_all_views(|v| { let _: () = msg_send![v, setNeedsDisplay: YES]; });
-        }
-    })
-        .copy();
-    let mon_rd: id =
-        msg_send![cls, addGlobalMonitorForEventsMatchingMask: RIGHT_DOWN_MASK handler: &*h3];
-    (*view).set_ivar::<id>("_monRightDown", mon_rd);
-
-    // RIGHT UP -> circle
-    let h4 = ConcreteBlock::new(move |_e: id| {
-        unsafe {
-            apply_to_all_views(|v| { *(*v).get_mut_ivar::<i32>("_displayMode") = 0 });
-            apply_to_all_views(|v| { let _: () = msg_send![v, setNeedsDisplay: YES]; });
-        }
-    })
-        .copy();
-    let mon_ru: id =
-        msg_send![cls, addGlobalMonitorForEventsMatchingMask: RIGHT_UP_MASK handler: &*h4];
-    (*view).set_ivar::<id>("_monRightUp", mon_ru);
-
-    // mouseMoved → schedule update on the main thread
-    let host = view;
-    let hmove = ConcreteBlock::new(move |_e: id| {
-        unsafe {
-            let _: () = msg_send![
-                host,
-                performSelectorOnMainThread: sel!(update_cursor_multi)
-                withObject: nil
-                waitUntilDone: NO
-            ];
-        }
-    })
-        .copy();
-    let mon_move: id =
-        msg_send![cls, addGlobalMonitorForEventsMatchingMask: MOUSE_MOVED_MASK handler: &*hmove];
-    (*view).set_ivar::<id>("_monMove", mon_move);
-}
 
 //
 // ===================== TCC: Accessibility prompt =====================
