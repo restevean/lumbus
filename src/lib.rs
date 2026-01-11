@@ -1,7 +1,14 @@
+#![allow(unexpected_cfgs)] // Silence cfg warnings from objc macros
+
 //! Pure helpers used by the app. Keep this file free of macOS FFI so tests
 //! can run as normal integration tests.
 
+pub mod model;
+
 use std::borrow::Cow;
+
+// Re-export model types for convenience
+pub use model::OverlayState;
 
 /// Clamp a value to [lo, hi]
 pub fn clamp(v: f64, lo: f64, hi: f64) -> f64 {
@@ -20,7 +27,7 @@ pub fn color_to_hex(r: f64, g: f64, b: f64, a: f64) -> String {
     let gi = (clamp(g, 0.0, 1.0) * 255.0).round() as u8;
     let bi = (clamp(b, 0.0, 1.0) * 255.0).round() as u8;
     let ai = (clamp(a, 0.0, 1.0) * 255.0).round() as u8;
-    if ai >= 255 {
+    if ai == 255 {
         format!("#{:02X}{:02X}{:02X}", ri, gi, bi)
     } else {
         format!("#{:02X}{:02X}{:02X}{:02X}", ri, gi, bi, ai)
