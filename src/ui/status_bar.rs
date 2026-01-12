@@ -11,7 +11,7 @@ use objc::{class, msg_send, sel, sel_impl};
 
 use crate::app::lang_is_es;
 use crate::ffi::nsstring;
-use mouse_highlighter::tr_key;
+use lumbus::tr_key;
 
 /// Global reference to the status item (must be kept alive)
 static mut STATUS_ITEM: id = nil;

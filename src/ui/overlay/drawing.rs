@@ -14,7 +14,7 @@ use crate::ffi::{
     CTFontCreateWithName, CTFontGetGlyphsForCharacters, CTFontCreatePathForGlyph,
     CGPathRelease, CFRelease,
 };
-use mouse_highlighter::clamp;
+use lumbus::clamp;
 
 /// Drawing parameters extracted from view ivars.
 ///

@@ -1,7 +1,7 @@
 //! Tests for the model layer (OverlayState).
 
-use mouse_highlighter::model::app_state::OverlayState;
-use mouse_highlighter::model::constants::*;
+use lumbus::model::app_state::OverlayState;
+use lumbus::model::constants::*;
 
 fn approx_eq(a: f64, b: f64) -> bool {
     (a - b).abs() < 1e-6

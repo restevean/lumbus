@@ -32,7 +32,7 @@
 //! # Usage
 //!
 //! ```ignore
-//! use mouse_highlighter::events::{self, AppEvent};
+//! use lumbus::events::{self, AppEvent};
 //!
 //! // Initialize at app startup (once only)
 //! events::init_event_bus();

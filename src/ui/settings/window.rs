@@ -11,8 +11,8 @@ use objc::{class, msg_send, sel, sel_impl};
 
 use crate::app::{apply_to_all_views, lang_is_es};
 use crate::ffi::{nsstring, overlay_window_level};
-use mouse_highlighter::events::{publish, AppEvent};
-use mouse_highlighter::{color_to_hex, tr_key};
+use lumbus::events::{publish, AppEvent};
+use lumbus::{color_to_hex, tr_key};
 
 /// Configure a hex color text field.
 unsafe fn configure_hex_field(view: id, field_hex: id) {

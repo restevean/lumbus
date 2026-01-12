@@ -1,5 +1,5 @@
 [package]
-name = "mouse_highlighter"
+name = "lumbus"
 version = "0.2.1"
 authors = ["restevean <restevean@prtonmail.com>"]
 edition = "2021"

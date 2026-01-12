@@ -1,4 +1,4 @@
-use mouse_highlighter::{clamp, color_to_hex, parse_hex_color, tr_key};
+use lumbus::{clamp, color_to_hex, parse_hex_color, tr_key};
 
 fn approx_eq(a: f64, b: f64) -> bool {
     (a - b).abs() < 1e-6

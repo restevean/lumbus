@@ -10,8 +10,8 @@ use objc::{class, msg_send, sel, sel_impl};
 
 use crate::app::{apply_to_all_views, lang_is_es};
 use crate::ffi::{nsstring, overlay_window_level};
-use mouse_highlighter::events::{publish, AppEvent};
-use mouse_highlighter::tr_key;
+use lumbus::events::{publish, AppEvent};
+use lumbus::tr_key;
 
 /// Show a quit confirmation dialog.
 ///

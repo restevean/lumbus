@@ -17,7 +17,7 @@ use cocoa::appkit::NSApp;
 use cocoa::base::{id, nil};
 use objc::{msg_send, sel, sel_impl};
 
-use mouse_highlighter::events::{drain_events, AppEvent};
+use lumbus::events::{drain_events, AppEvent};
 
 /// Callback type for reinstalling hotkeys.
 ///
@@ -102,7 +102,7 @@ unsafe fn dispatch_single_event(
 
 #[cfg(test)]
 mod tests {
-    use mouse_highlighter::events::AppEvent;
+    use lumbus::events::AppEvent;
 
     // Note: Full integration testing requires macOS runtime.
     // These tests verify the dispatch logic at a structural level.

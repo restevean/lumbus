@@ -19,7 +19,7 @@ use super::types::AppEvent;
 /// # Example
 ///
 /// ```
-/// use mouse_highlighter::events::{EventBus, AppEvent};
+/// use lumbus::events::{EventBus, AppEvent};
 ///
 /// let bus = EventBus::new();
 /// let publisher = bus.publisher();

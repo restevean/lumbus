@@ -15,11 +15,11 @@ use cocoa::foundation::{NSAutoreleasePool, NSPoint, NSRect, NSSize, NSString};
 use objc::runtime::{Class, Object, Sel};
 use objc::{class, declare::ClassDecl, msg_send, sel, sel_impl};
 // Import helpers from the library crate (tests use the same code)
-use mouse_highlighter::{clamp, color_to_hex, parse_hex_color, tr_key};
+use lumbus::{clamp, color_to_hex, parse_hex_color, tr_key};
 // Import event system
-use mouse_highlighter::events::{init_event_bus, publish, AppEvent};
+use lumbus::events::{init_event_bus, publish, AppEvent};
 // Import model constants and preferences
-use mouse_highlighter::model::{
+use lumbus::model::{
     DEFAULT_DIAMETER, DEFAULT_BORDER_WIDTH, DEFAULT_COLOR, DEFAULT_FILL_TRANSPARENCY_PCT,
     PREF_RADIUS, PREF_BORDER, PREF_STROKE_R, PREF_STROKE_G, PREF_STROKE_B, PREF_STROKE_A,
     PREF_FILL_TRANSPARENCY, PREF_LANG,
