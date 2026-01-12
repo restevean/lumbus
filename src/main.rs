@@ -11,7 +11,7 @@ use cocoa::appkit::{
     NSWindowCollectionBehavior, NSWindowStyleMask,
 };
 use cocoa::base::{id, nil, NO, YES};
-use cocoa::foundation::{NSAutoreleasePool, NSPoint, NSRect, NSSize};
+use cocoa::foundation::{NSAutoreleasePool, NSPoint, NSRect, NSSize, NSString};
 use objc::runtime::{Class, Object, Sel};
 use objc::{class, declare::ClassDecl, msg_send, sel, sel_impl};
 // Import helpers from the library crate (tests use the same code)
@@ -785,6 +785,7 @@ unsafe fn register_custom_view_class_and_create_view(window: id, width: f64, hei
 }
 
 // AppKit timer (reliable even after panels / UI mode changes)
+// Uses NSRunLoopCommonModes so the timer keeps firing during modal menus
 unsafe fn create_timer(target: id, selector: Sel, interval: f64) -> id {
     let prev: id = *(*target).get_ivar::<id>("_updateTimer");
     if prev != nil {
@@ -792,14 +793,20 @@ unsafe fn create_timer(target: id, selector: Sel, interval: f64) -> id {
         (*target).set_ivar::<id>("_updateTimer", nil);
     }
     let timer_class = Class::get("NSTimer").unwrap();
+    // Create timer without auto-scheduling
     let timer: id = msg_send![
         timer_class,
-        scheduledTimerWithTimeInterval: interval
+        timerWithTimeInterval: interval
         target: target
         selector: selector
         userInfo: nil
         repeats: YES
     ];
+    // Add to run loop with CommonModes (keeps running during menus)
+    let run_loop: id = msg_send![class!(NSRunLoop), currentRunLoop];
+    let common_modes = NSString::alloc(nil).init_str("kCFRunLoopCommonModes");
+    let _: () = msg_send![run_loop, addTimer: timer forMode: common_modes];
+
     (*target).set_ivar::<id>("_updateTimer", timer);
     timer
 }

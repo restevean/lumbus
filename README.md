@@ -173,7 +173,7 @@ Implemented with **Carbon HotKeys** (no beep) and a local key monitor for extra 
 
 ## 🧪 Troubleshooting
 
-- **Shortcuts beep or don’t trigger:** Use **Ctrl+A**, **⌘+,**, **⌘+;**, or **Ctrl+Shift+Q**. Other apps may intercept overlapping shortcuts—adjust their settings if necessary.
+- **Shortcuts beep or don’t trigger:** Use **Ctrl+A**, **⌘+,**, **⌘+;**, or **Ctrl+Shift+X**. Other apps may intercept overlapping shortcuts—adjust their settings if necessary.
 - **Overlay not following the cursor:** Ensure **Input Monitoring** and/or **Accessibility** are enabled for your binary (or for your IDE if launching from it).
 - **Hex field layout:** It sits to the right of the “Hex” label; tweak the constants if you change window width.
 
@@ -191,7 +191,8 @@ src/
 │   ├── coretext.rs      # CoreText (glyph rendering)
 │   ├── coregraphics.rs  # CoreGraphics/CoreFoundation
 │   ├── accessibility.rs # Accessibility permissions
-│   └── cocoa_utils.rs   # NSString, display_id, mouse position helpers
+│   ├── cocoa_utils.rs   # NSString, display_id, mouse position helpers
+│   └── types.rs         # Type aliases (ViewId, WindowId, etc.)
 │
 ├── model/               # Pure domain logic (testable, no FFI)
 │   ├── constants.rs     # Default values, pref keys, limits
@@ -205,10 +206,13 @@ src/
 │   └── keyboard_monitors.rs # Local Ctrl+A monitor
 │
 ├── ui/
+│   ├── overlay/         # Overlay drawing
+│   │   └── drawing.rs   # draw_circle, draw_letter, DrawParams
 │   ├── settings/        # Settings window
 │   │   └── window.rs    # open/close settings, controls
-│   └── dialogs/         # Dialog windows
-│       └── quit_dialog.rs   # Quit confirmation
+│   ├── dialogs/         # Dialog windows
+│   │   └── quit_dialog.rs   # Quit confirmation
+│   └── status_bar.rs    # Menu bar icon and dropdown menu
 │
 └── app/                 # Shared application helpers
     └── helpers.rs       # apply_to_all_views, sync_visual_prefs

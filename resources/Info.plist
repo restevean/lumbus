@@ -13,13 +13,13 @@
     <string>com.restevean.lumbus</string>
 
     <key>CFBundleVersion</key>
-    <string>1</string>
+    <string>3</string>
 
     <key>CFBundleShortVersionString</key>
-    <string>0.1.0</string>
+    <string>0.2.1</string>
 
     <key>CFBundleExecutable</key>
-    <string>mouse_highlighter</string>
+    <string>Lumbus</string>
 
     <key>CFBundlePackageType</key>
     <string>APPL</string>
@@ -51,7 +51,7 @@
 
     <!-- Privacy/Permission Descriptions -->
     <key>NSAccessibilityUsageDescription</key>
-    <string>Mouse Highlighter needs Accessibility access to display the cursor overlay and respond to global hotkeys.</string>
+    <string>Lumbus needs Accessibility access to display the cursor overlay and respond to global hotkeys.</string>
 
     <!-- Architecture Support -->
     <key>LSArchitecturePriority</key>
