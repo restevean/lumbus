@@ -489,8 +489,11 @@ unsafe fn register_custom_view_class_and_create_view(window: id, width: f64, hei
         }
 
         extern "C" fn status_bar_quit(_this: &mut Object, _cmd: Sel, _sender: id) {
-            // Publish RequestQuit event - dispatcher will handle it
-            publish(AppEvent::RequestQuit);
+            // Quit directly without confirmation dialog
+            unsafe {
+                let app: id = msg_send![class!(NSApplication), sharedApplication];
+                let _: () = msg_send![app, terminate: nil];
+            }
         }
 
         // Change language (0=en,1=es), update labels and Hex field layout

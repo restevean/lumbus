@@ -101,14 +101,14 @@ unsafe fn create_status_menu(view: id) -> id {
     let separator2: id = msg_send![class!(NSMenuItem), separatorItem];
     let _: () = msg_send![menu, addItem: separator2];
 
-    // Quit item
+    // Quit item (no shortcut - direct quit without confirmation)
     let quit_title = tr_key("Quit", es);
     let quit_item: id = msg_send![class!(NSMenuItem), alloc];
     let quit_item: id = msg_send![
         quit_item,
         initWithTitle: nsstring(&quit_title)
         action: sel!(statusBarQuit:)
-        keyEquivalent: nsstring("q")
+        keyEquivalent: nsstring("")
     ];
     let _: () = msg_send![quit_item, setTarget: view];
     let _: () = msg_send![menu, addItem: quit_item];
