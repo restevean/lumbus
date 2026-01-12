@@ -13,8 +13,9 @@
 //! The dispatcher acts as the central coordinator, translating
 //! high-level events into concrete macOS actions.
 
-use cocoa::base::id;
-use objc::{sel, sel_impl};
+use cocoa::appkit::NSApp;
+use cocoa::base::{id, nil};
+use objc::{msg_send, sel, sel_impl};
 
 use mouse_highlighter::events::{drain_events, AppEvent};
 
@@ -86,6 +87,12 @@ unsafe fn dispatch_single_event(
             confirm_quit_fn(view);
         }
 
+        AppEvent::ShowAbout => {
+            // Show the standard macOS About panel
+            let app: id = NSApp();
+            let _: () = msg_send![app, orderFrontStandardAboutPanel: nil];
+        }
+
         AppEvent::SettingsClosed | AppEvent::QuitCancelled | AppEvent::ReinstallHotkeys => {
             // These events require hotkey reinstallation
             reinstall_hotkeys_fn(view);
@@ -114,5 +121,6 @@ mod tests {
         assert!(!AppEvent::ToggleOverlay.requires_hotkey_reinstall());
         assert!(!AppEvent::OpenSettings.requires_hotkey_reinstall());
         assert!(!AppEvent::RequestQuit.requires_hotkey_reinstall());
+        assert!(!AppEvent::ShowAbout.requires_hotkey_reinstall());
     }
 }

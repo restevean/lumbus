@@ -83,6 +83,14 @@ else
     echo "Warning: No icon found at resources/icons/AppIcon.icns"
 fi
 
+# Step 6b: Copy status bar icon
+if [ -f "$PROJECT_ROOT/resources/icons/source32x32.png" ]; then
+    echo ">>> Copying status bar icon..."
+    cp "$PROJECT_ROOT/resources/icons/source32x32.png" "$RESOURCES_DIR/StatusBarIcon.png"
+else
+    echo "Warning: No status bar icon found at resources/icons/source32x32.png"
+fi
+
 # Step 7: Create PkgInfo
 echo ">>> Creating PkgInfo..."
 echo -n "APPLmhlt" > "$CONTENTS_DIR/PkgInfo"

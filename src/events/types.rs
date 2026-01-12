@@ -20,6 +20,9 @@ pub enum AppEvent {
     /// Request application quit with confirmation dialog (Ctrl+Shift+X)
     RequestQuit,
 
+    /// Show About dialog
+    ShowAbout,
+
     // === UI Lifecycle Events ===
     /// Settings window was closed by user
     SettingsClosed,
@@ -50,6 +53,7 @@ impl AppEvent {
             AppEvent::ToggleOverlay => "Toggle overlay visibility",
             AppEvent::OpenSettings => "Open settings window",
             AppEvent::RequestQuit => "Request quit with confirmation",
+            AppEvent::ShowAbout => "Show about dialog",
             AppEvent::SettingsClosed => "Settings window closed",
             AppEvent::QuitCancelled => "Quit cancelled by user",
             AppEvent::ReinstallHotkeys => "Reinstall hotkeys",
@@ -73,6 +77,7 @@ mod tests {
         assert!(!AppEvent::ToggleOverlay.requires_hotkey_reinstall());
         assert!(!AppEvent::OpenSettings.requires_hotkey_reinstall());
         assert!(!AppEvent::RequestQuit.requires_hotkey_reinstall());
+        assert!(!AppEvent::ShowAbout.requires_hotkey_reinstall());
     }
 
     #[test]
@@ -101,6 +106,7 @@ mod tests {
             AppEvent::ToggleOverlay,
             AppEvent::OpenSettings,
             AppEvent::RequestQuit,
+            AppEvent::ShowAbout,
             AppEvent::SettingsClosed,
             AppEvent::QuitCancelled,
             AppEvent::ReinstallHotkeys,

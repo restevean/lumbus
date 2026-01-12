@@ -38,7 +38,10 @@ use crate::input::{
     install_local_ctrl_a_monitor, install_mouse_monitors,
 };
 // UI components
-use crate::ui::{confirm_and_maybe_quit, open_settings_window, close_settings_window};
+use crate::ui::{
+    confirm_and_maybe_quit, open_settings_window, close_settings_window,
+    install_status_bar, update_status_bar_language,
+};
 // Event dispatcher
 use crate::handlers::dispatch_events;
 
@@ -96,6 +99,9 @@ fn main() {
         // Defensive re-install of hotkeys on system events
         start_hotkey_keepalive(host_view);
         install_wakeup_space_observers(host_view, hotkey_event_handler);
+
+        // Status bar item in menu bar
+        install_status_bar(host_view);
 
         app.run();
     }
@@ -470,6 +476,23 @@ unsafe fn register_custom_view_class_and_create_view(window: id, width: f64, hei
             close_settings_window(view);
         }
 
+        // ===== Status bar menu actions =====
+
+        extern "C" fn status_bar_settings(_this: &mut Object, _cmd: Sel, _sender: id) {
+            // Publish OpenSettings event - dispatcher will handle it
+            publish(AppEvent::OpenSettings);
+        }
+
+        extern "C" fn status_bar_about(_this: &mut Object, _cmd: Sel, _sender: id) {
+            // Publish ShowAbout event - dispatcher will handle it
+            publish(AppEvent::ShowAbout);
+        }
+
+        extern "C" fn status_bar_quit(_this: &mut Object, _cmd: Sel, _sender: id) {
+            // Publish RequestQuit event - dispatcher will handle it
+            publish(AppEvent::RequestQuit);
+        }
+
         // Change language (0=en,1=es), update labels and Hex field layout
         extern "C" fn lang_changed(this: &mut Object, _cmd: Sel, sender: id) {
             unsafe {
@@ -560,6 +583,9 @@ unsafe fn register_custom_view_class_and_create_view(window: id, width: f64, hei
                 if btn != nil {
                     let _: () = msg_send![btn, setTitle: nsstring(tr_key("Close", es).as_ref())];
                 }
+
+                // Update status bar menu language
+                update_status_bar_language(this as *const _ as id);
             }
         }
 
@@ -739,6 +765,21 @@ unsafe fn register_custom_view_class_and_create_view(window: id, width: f64, hei
             sel!(closeSettings:),
             close_settings as extern "C" fn(&mut Object, Sel, id),
         );
+
+        // Status bar menu actions
+        decl.add_method(
+            sel!(statusBarSettings:),
+            status_bar_settings as extern "C" fn(&mut Object, Sel, id),
+        );
+        decl.add_method(
+            sel!(statusBarAbout:),
+            status_bar_about as extern "C" fn(&mut Object, Sel, id),
+        );
+        decl.add_method(
+            sel!(statusBarQuit:),
+            status_bar_quit as extern "C" fn(&mut Object, Sel, id),
+        );
+
         decl.add_method(sel!(langChanged:), lang_changed as extern "C" fn(&mut Object, Sel, id));
         decl.add_method(
             sel!(controlTextDidChange:),
