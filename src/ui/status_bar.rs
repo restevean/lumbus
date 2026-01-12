@@ -46,8 +46,8 @@ pub unsafe fn install_status_bar(view: id) {
         let icon: id = msg_send![icon, initWithContentsOfFile: icon_path];
 
         if icon != nil {
-            // Set size for menu bar (18x18 is standard)
-            let _: () = msg_send![icon, setSize: NSSize::new(18.0, 18.0)];
+            // Set size for menu bar (22x22 is the maximum recommended)
+            let _: () = msg_send![icon, setSize: NSSize::new(22.0, 22.0)];
             // Make it template so it adapts to light/dark mode
             let _: () = msg_send![icon, setTemplate: YES];
             let _: () = msg_send![button, setImage: icon];
