@@ -1,4 +1,4 @@
-# Mouse Highlighter (macOS)
+# Lumbus (macOS)
 
 Highlight the mouse pointer across **all** macOS displays with a configurable circle. Optionally show a bold **L** (left click) or **R** (right click) to visualise clicks—great for **presentations**, **screen recordings**, and **remote support**. The overlay stays on top without stealing focus or causing the system beep. 🔨🤖🔧
 
@@ -64,7 +64,7 @@ block = "0.1"
 
 ### Option 1: Download pre-built app (recommended)
 
-Download `Mouse Highlighter.app` from [Releases](https://github.com/restevean/mouse_hightlighter/releases), then drag it to `/Applications`.
+Download `Lumbus.app` from [Releases](https://github.com/restevean/mouse_hightlighter/releases), then drag it to `/Applications`.
 
 ### Option 2: Build from source
 
