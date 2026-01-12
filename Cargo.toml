@@ -5,7 +5,7 @@ authors = ["restevean <restevean@prtonmail.com>"]
 edition = "2021"
 license = "Apache-2.0"
 description = "Highlight the mouse pointer with a configurable circle on macOS"
-repository = "https://github.com/restevean/mouse_highlighter"
+repository = "https://github.com/restevean/lumbus"
 keywords = ["macos", "mouse", "cursor", "highlighter", "presentation"]
 categories = ["gui"]
 

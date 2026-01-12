@@ -4,7 +4,7 @@ set -e
 # Configuration
 APP_NAME="Lumbus"
 BUNDLE_NAME="Lumbus.app"
-BINARY_NAME="mouse_highlighter"
+BINARY_NAME="lumbus"
 
 # Paths
 PROJECT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -84,11 +84,11 @@ else
 fi
 
 # Step 6b: Copy status bar icon
-if [ -f "$PROJECT_ROOT/resources/icons/source32x32.png" ]; then
+if [ -f "$PROJECT_ROOT/resources/icons/StatusBarIcon.png" ]; then
     echo ">>> Copying status bar icon..."
-    cp "$PROJECT_ROOT/resources/icons/source32x32.png" "$RESOURCES_DIR/StatusBarIcon.png"
+    cp "$PROJECT_ROOT/resources/icons/StatusBarIcon.png" "$RESOURCES_DIR/StatusBarIcon.png"
 else
-    echo "Warning: No status bar icon found at resources/icons/source32x32.png"
+    echo "Warning: No status bar icon found at resources/icons/StatusBarIcon.png"
 fi
 
 # Step 7: Create PkgInfo
@@ -100,7 +100,7 @@ if [ "$SIGN_APP" = true ]; then
     echo ">>> Code signing with identity: $SIGN_IDENTITY"
     codesign --force --deep --sign "$SIGN_IDENTITY" \
         --options runtime \
-        --entitlements "$PROJECT_ROOT/resources/MouseHighlighter.entitlements" \
+        --entitlements "$PROJECT_ROOT/resources/Lumbus.entitlements" \
         "$APP_DIR"
 
     echo ">>> Verifying signature..."

@@ -9,7 +9,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**Mouse Highlighter** is a macOS-native application written in Rust that highlights the mouse pointer across all displays with a configurable circle and click indicators (L/R). Built using Cocoa FFI bindings (`cocoa`, `objc`, `block` crates) and low-level Carbon/CoreText/CoreGraphics APIs.
+**Lumbus** is a macOS-native application written in Rust that highlights the mouse pointer across all displays with a configurable circle and click indicators (L/R). Built using Cocoa FFI bindings (`cocoa`, `objc`, `block` crates) and low-level Carbon/CoreText/CoreGraphics APIs.
 
 This is a **presentation/screen recording tool**, not a system utility—it creates transparent overlay windows that track the cursor without stealing focus.
 

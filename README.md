@@ -64,14 +64,14 @@ block = "0.1"
 
 ### Option 1: Download pre-built app (recommended)
 
-Download `Lumbus.app` from [Releases](https://github.com/restevean/mouse_hightlighter/releases), then drag it to `/Applications`.
+Download `Lumbus.app` from [Releases](https://github.com/restevean/lumbus/releases), then drag it to `/Applications`.
 
 ### Option 2: Build from source
 
 ```bash
 # Clone the repository
-git clone https://github.com/restevean/mouse_hightlighter.git
-cd mouse_hightlighter
+git clone https://github.com/restevean/lumbus.git
+cd lumbus
 
 # Build the .app bundle
 make bundle

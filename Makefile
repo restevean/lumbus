@@ -1,13 +1,13 @@
-# Mouse Highlighter - Build Configuration
+# Lumbus - Build Configuration
 .PHONY: all build release debug bundle clean install test icons dmg
 
 # Default target
 all: release
 
 # Configuration
-APP_NAME = Mouse Highlighter
-BUNDLE_NAME = Mouse Highlighter.app
-BINARY_NAME = mouse_highlighter
+APP_NAME = Lumbus
+BUNDLE_NAME = Lumbus.app
+BINARY_NAME = lumbus
 
 # Paths
 BUILD_DIR = target/release
