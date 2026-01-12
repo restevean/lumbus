@@ -41,6 +41,7 @@ use crate::input::{
 use crate::ui::{
     confirm_and_maybe_quit, open_settings_window, close_settings_window,
     install_status_bar, update_status_bar_language,
+    DrawParams, ClickLetter, draw_circle, draw_letter,
 };
 // Event dispatcher
 use crate::handlers::dispatch_events;
@@ -613,113 +614,25 @@ unsafe fn register_custom_view_class_and_create_view(window: id, width: f64, hei
                 let win_pt = win_rect.origin;
                 let view_pt: NSPoint = msg_send![this, convertPoint: win_pt fromView: nil];
 
-                let radius = *this.get_ivar::<f64>("_radius");
-                let border_width = *this.get_ivar::<f64>("_borderWidth");
-                let r = *this.get_ivar::<f64>("_strokeR");
-                let g = *this.get_ivar::<f64>("_strokeG");
-                let b = *this.get_ivar::<f64>("_strokeB");
-                let a = *this.get_ivar::<f64>("_strokeA");
-                let fill_t = *this.get_ivar::<f64>("_fillTransparencyPct");
                 let mode = *this.get_ivar::<i32>("_displayMode");
 
-                let ns_color = Class::get("NSColor").unwrap();
+                // Build drawing parameters from view ivars
+                let params = DrawParams {
+                    center: view_pt,
+                    radius: *this.get_ivar::<f64>("_radius"),
+                    border_width: *this.get_ivar::<f64>("_borderWidth"),
+                    stroke_r: *this.get_ivar::<f64>("_strokeR"),
+                    stroke_g: *this.get_ivar::<f64>("_strokeG"),
+                    stroke_b: *this.get_ivar::<f64>("_strokeB"),
+                    stroke_a: *this.get_ivar::<f64>("_strokeA"),
+                    fill_transparency: *this.get_ivar::<f64>("_fillTransparencyPct"),
+                };
 
-                if mode == 0 {
-                    // Circle
-                    let rect = NSRect::new(
-                        NSPoint::new(view_pt.x - radius, view_pt.y - radius),
-                        NSSize::new(radius * 2.0, radius * 2.0),
-                    );
-                    let ns_bezier = Class::get("NSBezierPath").unwrap();
-                    let circle: id = msg_send![ns_bezier, bezierPathWithOvalInRect: rect];
-
-                    // Fill
-                    let fill_alpha = a * (1.0 - clamp(fill_t, 0.0, 100.0) / 100.0);
-                    if fill_alpha > 0.0 {
-                        let fill: id = msg_send![
-                            ns_color,
-                            colorWithCalibratedRed: r
-                            green: g
-                            blue: b
-                            alpha: fill_alpha
-                        ];
-                        let _: () = msg_send![fill, set];
-                        let _: () = msg_send![circle, fill];
-                    }
-                    // Stroke
-                    let stroke: id =
-                        msg_send![ns_color, colorWithCalibratedRed: r green: g blue: b alpha: a];
-                    let _: () = msg_send![stroke, set];
-                    let _: () = msg_send![circle, setLineWidth: border_width];
-                    let _: () = msg_send![circle, stroke];
-                    return;
+                match mode {
+                    0 => draw_circle(&params),
+                    1 => draw_letter(&params, ClickLetter::Left),
+                    _ => draw_letter(&params, ClickLetter::Right),
                 }
-
-                // Letter L/R
-                let target_letter_height = 3.0 * radius; // 1.5 × diameter
-                let font_class = Class::get("NSFont").unwrap();
-                let font: id = msg_send![font_class, boldSystemFontOfSize: target_letter_height];
-
-                let font_name: id = msg_send![font, fontName];
-                let ct_font: CTFontRef =
-                    CTFontCreateWithName(font_name as *const _, target_letter_height, std::ptr::null());
-
-                let ch_u16: u16 = if mode == 1 { 'L' as u16 } else { 'R' as u16 };
-                let mut glyph: u16 = 0;
-                let mapped = CTFontGetGlyphsForCharacters(
-                    ct_font,
-                    &ch_u16 as *const u16,
-                    &mut glyph as *mut u16,
-                    1,
-                );
-                if !mapped || glyph == 0 {
-                    CFRelease(ct_font as *const _);
-                    return;
-                }
-                let cg_path: CGPathRef = CTFontCreatePathForGlyph(ct_font, glyph, std::ptr::null());
-                if cg_path.is_null() {
-                    CFRelease(ct_font as *const _);
-                    return;
-                }
-
-                let ns_bezier = Class::get("NSBezierPath").unwrap();
-                let path: id = msg_send![ns_bezier, bezierPathWithCGPath: cg_path];
-
-                let pbounds: NSRect = msg_send![path, bounds];
-                let mid_x = pbounds.origin.x + pbounds.size.width / 2.0;
-                let mid_y = pbounds.origin.y + pbounds.size.height / 2.0;
-
-                let ns_affine = Class::get("NSAffineTransform").unwrap();
-                let transform: id = msg_send![ns_affine, transform];
-                let dx = view_pt.x - mid_x;
-                let dy = view_pt.y - mid_y;
-                let _: () = msg_send![transform, translateXBy: dx yBy: dy];
-                let _: () = msg_send![path, transformUsingAffineTransform: transform];
-
-                let _: () = msg_send![path, setLineJoinStyle: 1u64 /* round */];
-
-                // Fill exactly like the circle
-                let fill_alpha = a * (1.0 - clamp(fill_t, 0.0, 100.0) / 100.0);
-                if fill_alpha > 0.0 {
-                    let fill: id = msg_send![
-                        ns_color,
-                        colorWithCalibratedRed: r
-                        green: g
-                        blue: b
-                        alpha: fill_alpha
-                    ];
-                    let _: () = msg_send![fill, set];
-                    let _: () = msg_send![path, fill];
-                }
-                // Stroke
-                let stroke: id =
-                    msg_send![ns_color, colorWithCalibratedRed: r green: g blue: b alpha: a];
-                let _: () = msg_send![stroke, set];
-                let _: () = msg_send![path, setLineWidth: border_width];
-                let _: () = msg_send![path, stroke];
-
-                CGPathRelease(cg_path);
-                CFRelease(ct_font as *const _);
             }
         }
 

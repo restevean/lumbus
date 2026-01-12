@@ -8,6 +8,7 @@ pub mod coretext;
 pub mod coregraphics;
 pub mod accessibility;
 pub mod cocoa_utils;
+pub mod types;
 
 // Re-exports for convenient access
 pub use carbon::*;
@@ -15,3 +16,4 @@ pub use coretext::*;
 pub use coregraphics::*;
 pub use accessibility::*;
 pub use cocoa_utils::*;
+pub use types::*;
