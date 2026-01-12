@@ -2,8 +2,8 @@
 set -e
 
 # Configuration
-APP_NAME="Mouse Highlighter"
-BUNDLE_NAME="Mouse Highlighter.app"
+APP_NAME="Lumbus"
+BUNDLE_NAME="Lumbus.app"
 BINARY_NAME="mouse_highlighter"
 
 # Paths

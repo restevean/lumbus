@@ -229,7 +229,7 @@ src/
 
 ## 📄 Licence
 
-MIT (or your preferred licence). Add a `LICENSE` file.
+Apache License 2.0. See [LICENSE](LICENSE) file.
 
 ------
 
