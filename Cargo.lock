@@ -159,7 +159,7 @@ checksum = "561d97a539a36e26a9a5fad1ea11a3039a67714694aaa379433e580854bc3dc5"
 
 [[package]]
 name = "lumbus"
-version = "0.2.1"
+version = "0.3.0"
 dependencies = [
  "block",
  "cocoa",
