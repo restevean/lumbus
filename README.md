@@ -2,7 +2,7 @@
 
 Highlight the mouse pointer across **all** macOS displays with a configurable circle. Optionally show a bold **L** (left click) or **R** (right click) to visualise clicks—great for **presentations**, **screen recordings**, and **remote support**. The overlay stays on top without stealing focus or causing the system beep. 🔨🤖🔧
 
-> ⚠️ This software was created via vibe coding and is not affiliated with Apple or any other company. Use at your own risk.
+> ⚠️ This software is not affiliated with Apple or any other company. Use at your own risk.
 
 ---
 
