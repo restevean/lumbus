@@ -4,16 +4,36 @@ version = "0.3.0"
 authors = ["restevean <restevean@protonmail.com>"]
 edition = "2021"
 license = "Apache-2.0"
-description = "Highlight the mouse pointer with a configurable circle on macOS"
+description = "Highlight the mouse pointer with a configurable circle"
 repository = "https://github.com/restevean/lumbus"
-keywords = ["macos", "mouse", "cursor", "highlighter", "presentation"]
+keywords = ["mouse", "cursor", "highlighter", "presentation", "screen-recording"]
 categories = ["gui"]
 
 [dependencies]
-cocoa = "0.25"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# macOS dependencies
+[target.'cfg(target_os = "macos")'.dependencies]
+cocoa = "0.26"
 objc = "0.2"
 block = "0.1"
 core-graphics = "0.24"
+
+# Windows dependencies
+[target.'cfg(target_os = "windows")'.dependencies]
+windows = { version = "0.58", features = [
+    "Win32_Foundation",
+    "Win32_System_LibraryLoader",
+    "Win32_UI_WindowsAndMessaging",
+    "Win32_UI_Input_KeyboardAndMouse",
+    "Win32_Graphics_Direct2D",
+    "Win32_Graphics_Direct2D_Common",
+    "Win32_Graphics_DirectWrite",
+    "Win32_Graphics_Gdi",
+    "Win32_UI_Shell",
+] }
+directories = "5.0"
 
 # Release profile optimizations
 [profile.release]
