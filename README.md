@@ -29,7 +29,9 @@ Highlight the mouse pointer across **all** macOS displays with a configurable ci
     - `Ctrl` + `A` → **Toggle overlay visibility**
     - `⌘` + `,` → **Open Settings**
     - `⌘` + `;` → **Open Settings** (alternate)
+    - `⌘` + `Shift` + `H` → **Show Help** (keyboard shortcuts)
     - `Ctrl` + `Shift` + `X` → **Quit** (with confirmation)
+- **Help overlay** — Press `⌘+Shift+H` to show all keyboard shortcuts in a centered overlay
 - **Persistence** via `NSUserDefaults` (restored on launch)
 
 ---
@@ -62,9 +64,11 @@ block = "0.1"
 
 ## 📥 Installation
 
-### Option 1: Download pre-built app (recommended)
+### Option 1: Download DMG installer (recommended)
 
-Download `Lumbus.app` from [Releases](https://github.com/restevean/lumbus/releases), then drag it to `/Applications`.
+Download the latest `Lumbus-x.x.x.dmg` from [Releases](https://github.com/restevean/lumbus/releases), open it, and drag `Lumbus.app` to your Applications folder.
+
+> ⚠️ **First launch**: Since the app is not signed with an Apple Developer ID, macOS will show a warning. Right-click the app → Open → Open to bypass Gatekeeper.
 
 ### Option 2: Build from source
 
@@ -148,10 +152,13 @@ make install
 
 ## ⌨️ Global Shortcuts
 
-- `Ctrl` + `A` → Toggle overlay
-- `⌘` + `,` → Open Settings
-- `⌘` + `;` → Open Settings (alternate)
-- `Ctrl` + `Shift` + `X` → **Quit** (with confirmation; **Esc** cancels)
+| Shortcut | Action |
+|----------|--------|
+| `Ctrl` + `A` | Toggle overlay |
+| `⌘` + `,` | Open Settings |
+| `⌘` + `;` | Open Settings (alternate) |
+| `⌘` + `Shift` + `H` | Show Help |
+| `Ctrl` + `Shift` + `X` | Quit (with confirmation) |
 
 Implemented with **Carbon HotKeys** (no beep) and a local key monitor for extra reliability while windows are key.
 
@@ -211,7 +218,8 @@ src/
 │   ├── settings/        # Settings window
 │   │   └── window.rs    # open/close settings, controls
 │   ├── dialogs/         # Dialog windows
-│   │   └── quit_dialog.rs   # Quit confirmation
+│   │   ├── quit_dialog.rs   # Quit confirmation
+│   │   └── help_overlay.rs  # Help overlay with keyboard shortcuts
 │   └── status_bar.rs    # Menu bar icon and dropdown menu
 │
 └── app/                 # Shared application helpers
@@ -224,10 +232,7 @@ src/
 
 ## 🛣️ Roadmap
 
-- Option to show **only** the circle (no letters)
-- Short “flash” on click instead of letters
-- Presets for colour/size
-- Entry/exit animations
+No planned features at this time. Feel free to open an issue with suggestions!
 
 ------
 
