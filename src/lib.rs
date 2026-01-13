@@ -105,6 +105,28 @@ pub fn tr_key(key: &str, es: bool) -> Cow<'static, str> {
         ("Cancel", true) => Cow::Borrowed("Cancelar"),
         ("Cancel", false) => Cow::Borrowed("Cancel"),
 
+        // Help overlay
+        ("Help", true) => Cow::Borrowed("Ayuda"),
+        ("Help", false) => Cow::Borrowed("Help"),
+
+        ("Keyboard Shortcuts", true) => Cow::Borrowed("Atajos de teclado"),
+        ("Keyboard Shortcuts", false) => Cow::Borrowed("Keyboard Shortcuts"),
+
+        ("Toggle overlay", true) => Cow::Borrowed("Mostrar/ocultar resaltado"),
+        ("Toggle overlay", false) => Cow::Borrowed("Toggle overlay"),
+
+        ("Open settings", true) => Cow::Borrowed("Abrir configuración"),
+        ("Open settings", false) => Cow::Borrowed("Open settings"),
+
+        ("Show help", true) => Cow::Borrowed("Mostrar ayuda"),
+        ("Show help", false) => Cow::Borrowed("Show help"),
+
+        ("Quit app", true) => Cow::Borrowed("Salir de la app"),
+        ("Quit app", false) => Cow::Borrowed("Quit app"),
+
+        ("Press any key to close", true) => Cow::Borrowed("Pulsa cualquier tecla para cerrar"),
+        ("Press any key to close", false) => Cow::Borrowed("Press any key to close"),
+
         _ => Cow::Owned(key.to_string()),
     }
 }

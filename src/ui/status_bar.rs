@@ -2,6 +2,7 @@
 //!
 //! Creates a clickable icon in the macOS menu bar with options:
 //! - Settings (Ajustes)
+//! - Help (Ayuda)
 //! - About (Acerca de...)
 //! - Quit (Salir)
 
@@ -80,6 +81,20 @@ unsafe fn create_status_menu(view: id) -> id {
     ];
     let _: () = msg_send![settings_item, setTarget: view];
     let _: () = msg_send![menu, addItem: settings_item];
+
+    // Help item (⌘+Shift+H)
+    let help_title = tr_key("Help", es);
+    let help_item: id = msg_send![class!(NSMenuItem), alloc];
+    let help_item: id = msg_send![
+        help_item,
+        initWithTitle: nsstring(&help_title)
+        action: sel!(statusBarHelp:)
+        keyEquivalent: nsstring("H")
+    ];
+    // NSEventModifierFlagCommand (1 << 20) + NSEventModifierFlagShift (1 << 17)
+    let _: () = msg_send![help_item, setKeyEquivalentModifierMask: (1u64 << 20) | (1u64 << 17)];
+    let _: () = msg_send![help_item, setTarget: view];
+    let _: () = msg_send![menu, addItem: help_item];
 
     // Separator
     let separator: id = msg_send![class!(NSMenuItem), separatorItem];

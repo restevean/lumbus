@@ -114,3 +114,28 @@ fn tr_key_localisation_en_es() {
     assert_eq!(tr_key("UnknownKey", false).as_ref(), "UnknownKey");
     assert_eq!(tr_key("UnknownKey", true).as_ref(), "UnknownKey");
 }
+
+#[test]
+fn tr_key_help_overlay_localisation() {
+    // Help overlay translations
+    assert_eq!(tr_key("Help", false).as_ref(), "Help");
+    assert_eq!(tr_key("Help", true).as_ref(), "Ayuda");
+
+    assert_eq!(tr_key("Keyboard Shortcuts", false).as_ref(), "Keyboard Shortcuts");
+    assert_eq!(tr_key("Keyboard Shortcuts", true).as_ref(), "Atajos de teclado");
+
+    assert_eq!(tr_key("Toggle overlay", false).as_ref(), "Toggle overlay");
+    assert_eq!(tr_key("Toggle overlay", true).as_ref(), "Mostrar/ocultar resaltado");
+
+    assert_eq!(tr_key("Open settings", false).as_ref(), "Open settings");
+    assert_eq!(tr_key("Open settings", true).as_ref(), "Abrir configuración");
+
+    assert_eq!(tr_key("Show help", false).as_ref(), "Show help");
+    assert_eq!(tr_key("Show help", true).as_ref(), "Mostrar ayuda");
+
+    assert_eq!(tr_key("Quit app", false).as_ref(), "Quit app");
+    assert_eq!(tr_key("Quit app", true).as_ref(), "Salir de la app");
+
+    assert_eq!(tr_key("Press any key to close", false).as_ref(), "Press any key to close");
+    assert_eq!(tr_key("Press any key to close", true).as_ref(), "Pulsa cualquier tecla para cerrar");
+}

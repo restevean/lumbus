@@ -195,6 +195,7 @@ unsafe fn register_custom_view_class_and_create_view(window: id, width: f64, hei
         decl.add_ivar::<*mut std::ffi::c_void>("_hkToggle");
         decl.add_ivar::<*mut std::ffi::c_void>("_hkComma");
         decl.add_ivar::<*mut std::ffi::c_void>("_hkSemi");
+        decl.add_ivar::<*mut std::ffi::c_void>("_hkHelp");
         decl.add_ivar::<*mut std::ffi::c_void>("_hkQuit");
 
         // Keep-alive timer for hotkeys
@@ -489,6 +490,11 @@ unsafe fn register_custom_view_class_and_create_view(window: id, width: f64, hei
             publish(AppEvent::ShowAbout);
         }
 
+        extern "C" fn status_bar_help(_this: &mut Object, _cmd: Sel, _sender: id) {
+            // Publish ShowHelp event - dispatcher will handle it
+            publish(AppEvent::ShowHelp);
+        }
+
         extern "C" fn status_bar_quit(_this: &mut Object, _cmd: Sel, _sender: id) {
             // Quit directly without confirmation dialog
             unsafe {
@@ -688,6 +694,10 @@ unsafe fn register_custom_view_class_and_create_view(window: id, width: f64, hei
             status_bar_settings as extern "C" fn(&mut Object, Sel, id),
         );
         decl.add_method(
+            sel!(statusBarHelp:),
+            status_bar_help as extern "C" fn(&mut Object, Sel, id),
+        );
+        decl.add_method(
             sel!(statusBarAbout:),
             status_bar_about as extern "C" fn(&mut Object, Sel, id),
         );
@@ -733,6 +743,7 @@ unsafe fn register_custom_view_class_and_create_view(window: id, width: f64, hei
     (*view).set_ivar::<*mut std::ffi::c_void>("_hkToggle", std::ptr::null_mut());
     (*view).set_ivar::<*mut std::ffi::c_void>("_hkComma", std::ptr::null_mut());
     (*view).set_ivar::<*mut std::ffi::c_void>("_hkSemi", std::ptr::null_mut());
+    (*view).set_ivar::<*mut std::ffi::c_void>("_hkHelp", std::ptr::null_mut());
     (*view).set_ivar::<*mut std::ffi::c_void>("_hkQuit", std::ptr::null_mut());
 
     // Keep-alive timer ref
@@ -861,6 +872,9 @@ extern "C" fn hotkey_event_handler(
                     }
                     HKID_SETTINGS_COMMA | HKID_SETTINGS_SEMI => {
                         publish(AppEvent::OpenSettings);
+                    }
+                    HKID_HELP => {
+                        publish(AppEvent::ShowHelp);
                     }
                     HKID_QUIT => {
                         publish(AppEvent::RequestQuit);

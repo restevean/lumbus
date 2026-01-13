@@ -23,12 +23,18 @@ pub enum AppEvent {
     /// Show About dialog
     ShowAbout,
 
+    /// Show help overlay with keyboard shortcuts (Cmd+?)
+    ShowHelp,
+
     // === UI Lifecycle Events ===
     /// Settings window was closed by user
     SettingsClosed,
 
     /// Quit dialog was cancelled (user chose not to quit)
     QuitCancelled,
+
+    /// Help overlay was closed
+    HelpClosed,
 
     // === System Events ===
     /// Hotkeys need to be reinstalled (after sleep/wake, space change, etc.)
@@ -43,7 +49,10 @@ impl AppEvent {
     pub fn requires_hotkey_reinstall(&self) -> bool {
         matches!(
             self,
-            AppEvent::SettingsClosed | AppEvent::QuitCancelled | AppEvent::ReinstallHotkeys
+            AppEvent::SettingsClosed
+                | AppEvent::QuitCancelled
+                | AppEvent::HelpClosed
+                | AppEvent::ReinstallHotkeys
         )
     }
 
@@ -54,8 +63,10 @@ impl AppEvent {
             AppEvent::OpenSettings => "Open settings window",
             AppEvent::RequestQuit => "Request quit with confirmation",
             AppEvent::ShowAbout => "Show about dialog",
+            AppEvent::ShowHelp => "Show help overlay",
             AppEvent::SettingsClosed => "Settings window closed",
             AppEvent::QuitCancelled => "Quit cancelled by user",
+            AppEvent::HelpClosed => "Help overlay closed",
             AppEvent::ReinstallHotkeys => "Reinstall hotkeys",
         }
     }
@@ -69,6 +80,7 @@ mod tests {
     fn test_hotkey_reinstall_required_for_ui_close_events() {
         assert!(AppEvent::SettingsClosed.requires_hotkey_reinstall());
         assert!(AppEvent::QuitCancelled.requires_hotkey_reinstall());
+        assert!(AppEvent::HelpClosed.requires_hotkey_reinstall());
         assert!(AppEvent::ReinstallHotkeys.requires_hotkey_reinstall());
     }
 
@@ -78,6 +90,7 @@ mod tests {
         assert!(!AppEvent::OpenSettings.requires_hotkey_reinstall());
         assert!(!AppEvent::RequestQuit.requires_hotkey_reinstall());
         assert!(!AppEvent::ShowAbout.requires_hotkey_reinstall());
+        assert!(!AppEvent::ShowHelp.requires_hotkey_reinstall());
     }
 
     #[test]
@@ -107,8 +120,10 @@ mod tests {
             AppEvent::OpenSettings,
             AppEvent::RequestQuit,
             AppEvent::ShowAbout,
+            AppEvent::ShowHelp,
             AppEvent::SettingsClosed,
             AppEvent::QuitCancelled,
+            AppEvent::HelpClosed,
             AppEvent::ReinstallHotkeys,
         ];
 

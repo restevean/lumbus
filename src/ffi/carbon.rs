@@ -45,6 +45,7 @@ pub const KC_A: u32 = 0;
 pub const KC_X: u32 = 7;
 pub const KC_SEMICOLON: u32 = 41;
 pub const KC_COMMA: u32 = 43;
+pub const KC_H: u32 = 4;        // H key for Help hotkey
 
 // Hotkey signature: 'mhlt'
 pub const SIG_MHLT: u32 = 0x6D68_6C74;
@@ -54,6 +55,7 @@ pub const HKID_TOGGLE: u32 = 1;
 pub const HKID_SETTINGS_COMMA: u32 = 2;
 pub const HKID_SETTINGS_SEMI: u32 = 3;
 pub const HKID_QUIT: u32 = 4;
+pub const HKID_HELP: u32 = 5;         // Cmd+Shift+H
 
 // === FFI Declarations ===
 

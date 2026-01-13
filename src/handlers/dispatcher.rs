@@ -17,6 +17,7 @@ use cocoa::appkit::NSApp;
 use cocoa::base::{id, nil};
 use objc::{msg_send, sel, sel_impl};
 
+use crate::ui::show_help_overlay;
 use lumbus::events::{drain_events, AppEvent};
 
 /// Callback type for reinstalling hotkeys.
@@ -93,7 +94,15 @@ unsafe fn dispatch_single_event(
             let _: () = msg_send![app, orderFrontStandardAboutPanel: nil];
         }
 
-        AppEvent::SettingsClosed | AppEvent::QuitCancelled | AppEvent::ReinstallHotkeys => {
+        AppEvent::ShowHelp => {
+            // Show help overlay with keyboard shortcuts
+            show_help_overlay(view);
+        }
+
+        AppEvent::SettingsClosed
+        | AppEvent::QuitCancelled
+        | AppEvent::HelpClosed
+        | AppEvent::ReinstallHotkeys => {
             // These events require hotkey reinstallation
             reinstall_hotkeys_fn(view);
         }
@@ -117,10 +126,12 @@ mod tests {
         // Verify that the events that should trigger reinstall are correct
         assert!(AppEvent::SettingsClosed.requires_hotkey_reinstall());
         assert!(AppEvent::QuitCancelled.requires_hotkey_reinstall());
+        assert!(AppEvent::HelpClosed.requires_hotkey_reinstall());
         assert!(AppEvent::ReinstallHotkeys.requires_hotkey_reinstall());
         assert!(!AppEvent::ToggleOverlay.requires_hotkey_reinstall());
         assert!(!AppEvent::OpenSettings.requires_hotkey_reinstall());
         assert!(!AppEvent::RequestQuit.requires_hotkey_reinstall());
         assert!(!AppEvent::ShowAbout.requires_hotkey_reinstall());
+        assert!(!AppEvent::ShowHelp.requires_hotkey_reinstall());
     }
 }
