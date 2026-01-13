@@ -190,8 +190,16 @@ Implemented with **Carbon HotKeys** (no beep) and a local key monitor for extra 
 
 ```
 src/
-├── main.rs              # Entry point + overlay view registration (~900 lines)
+├── main.rs              # Entry point + overlay view registration
 ├── lib.rs               # Pure helpers (clamp, color_to_hex, parse_hex_color, tr_key)
+│
+├── events/              # Event bus system
+│   ├── bus.rs           # EventBus implementation
+│   ├── global.rs        # Global publish/subscribe functions
+│   └── types.rs         # AppEvent enum definitions
+│
+├── handlers/            # Event handlers
+│   └── dispatcher.rs    # Main event dispatcher
 │
 ├── ffi/                 # FFI bindings encapsulated
 │   ├── carbon.rs        # Carbon Event Manager (hotkeys)
@@ -226,7 +234,7 @@ src/
     └── helpers.rs       # apply_to_all_views, sync_visual_prefs
 ```
 
-**Tests:** `tests/helpers.rs` (13 tests) + `tests/model_tests.rs` (27 tests)
+**Tests:** 64 unit tests across `tests/` and inline modules
 
 ------
 
