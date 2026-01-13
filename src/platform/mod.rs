@@ -7,4 +7,5 @@
 pub mod macos;
 
 #[cfg(target_os = "macos")]
+#[allow(unused_imports)]
 pub use macos::*;
