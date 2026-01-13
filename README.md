@@ -193,45 +193,34 @@ src/
 ├── main.rs              # Entry point + overlay view registration
 ├── lib.rs               # Pure helpers (clamp, color_to_hex, parse_hex_color, tr_key)
 │
-├── events/              # Event bus system
+├── events/              # Event bus system (in lib.rs, platform-agnostic)
 │   ├── bus.rs           # EventBus implementation
 │   ├── global.rs        # Global publish/subscribe functions
 │   └── types.rs         # AppEvent enum definitions
 │
-├── handlers/            # Event handlers
-│   └── dispatcher.rs    # Main event dispatcher
-│
-├── ffi/                 # FFI bindings encapsulated
-│   ├── carbon.rs        # Carbon Event Manager (hotkeys)
-│   ├── coretext.rs      # CoreText (glyph rendering)
-│   ├── coregraphics.rs  # CoreGraphics/CoreFoundation
-│   ├── accessibility.rs # Accessibility permissions
-│   ├── cocoa_utils.rs   # NSString, display_id, mouse position helpers
-│   └── types.rs         # Type aliases (ViewId, WindowId, etc.)
-│
-├── model/               # Pure domain logic (testable, no FFI)
+├── model/               # Pure domain logic (in lib.rs, platform-agnostic)
 │   ├── constants.rs     # Default values, pref keys, limits
 │   ├── app_state.rs     # OverlayState struct with validation
 │   └── preferences.rs   # NSUserDefaults load/save
 │
-├── input/               # Input handling
-│   ├── hotkeys.rs       # Carbon hotkey install/uninstall
-│   ├── observers.rs     # Wake/space/termination observers
-│   ├── mouse_monitors.rs    # Global mouse event monitors
-│   └── keyboard_monitors.rs # Local Ctrl+A monitor
+├── handlers/            # Event handlers (platform-agnostic logic)
+│   └── dispatcher.rs    # Main event dispatcher
 │
-├── ui/
-│   ├── overlay/         # Overlay drawing
-│   │   └── drawing.rs   # draw_circle, draw_letter, DrawParams
-│   ├── settings/        # Settings window
-│   │   └── window.rs    # open/close settings, controls
-│   ├── dialogs/         # Dialog windows
-│   │   ├── quit_dialog.rs   # Quit confirmation
-│   │   └── help_overlay.rs  # Help overlay with keyboard shortcuts
-│   └── status_bar.rs    # Menu bar icon and dropdown menu
-│
-└── app/                 # Shared application helpers
-    └── helpers.rs       # apply_to_all_views, sync_visual_prefs
+└── platform/            # Platform-specific implementations
+    └── macos/
+        ├── ffi/         # FFI bindings (Carbon, CoreText, CoreGraphics, Cocoa)
+        │   ├── carbon.rs, coretext.rs, coregraphics.rs
+        │   ├── accessibility.rs, cocoa_utils.rs, types.rs
+        ├── input/       # Input handling (hotkeys, monitors, observers)
+        │   ├── hotkeys.rs, mouse_monitors.rs
+        │   ├── keyboard_monitors.rs, observers.rs
+        ├── ui/          # UI components
+        │   ├── overlay/drawing.rs
+        │   ├── settings/window.rs
+        │   ├── dialogs/quit_dialog.rs, help_overlay.rs
+        │   └── status_bar.rs
+        └── app/         # macOS app helpers
+            └── helpers.rs
 ```
 
 **Tests:** 64 unit tests across `tests/` and inline modules

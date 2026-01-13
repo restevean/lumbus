@@ -9,8 +9,8 @@ use cocoa::foundation::{NSPoint, NSRect, NSSize};
 use objc::runtime::Class;
 use objc::{class, msg_send, sel, sel_impl};
 
-use crate::app::{apply_to_all_views, lang_is_es};
-use crate::ffi::{nsstring, overlay_window_level};
+use crate::platform::macos::app::{apply_to_all_views, lang_is_es};
+use crate::platform::macos::ffi::{nsstring, overlay_window_level};
 use lumbus::events::{publish, AppEvent};
 use lumbus::{color_to_hex, tr_key};
 

@@ -17,7 +17,7 @@ use cocoa::appkit::NSApp;
 use cocoa::base::{id, nil};
 use objc::{msg_send, sel, sel_impl};
 
-use crate::ui::show_help_overlay;
+use crate::platform::macos::ui::show_help_overlay;
 use lumbus::events::{drain_events, AppEvent};
 
 /// Callback type for reinstalling hotkeys.

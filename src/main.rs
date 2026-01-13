@@ -1,10 +1,9 @@
 #![allow(unexpected_cfgs)] // Silence cfg warnings inside objc/cocoa macros
 
-mod app;
-mod ffi;
 mod handlers;
-mod input;
-mod ui;
+mod platform;
+
+use platform::macos::{app, ffi, input, ui};
 
 use cocoa::appkit::{
     NSApp, NSApplication, NSApplicationActivationPolicy, NSBackingStoreType, NSColor, NSWindow,
@@ -27,18 +26,18 @@ use lumbus::model::{
 };
 use std::ffi::CStr;
 
-// FFI bindings from local module
-use crate::ffi::*;
+// FFI bindings from platform module
+use ffi::*;
 // Global helpers (apply_to_all_views, etc.)
-use crate::app::*;
+use app::*;
 // Input handling (hotkeys, observers, monitors)
-use crate::input::{
+use input::{
     install_hotkeys, reinstall_hotkeys,
     install_termination_observer, start_hotkey_keepalive, install_wakeup_space_observers,
     install_local_ctrl_a_monitor, install_mouse_monitors,
 };
 // UI components
-use crate::ui::{
+use ui::{
     confirm_and_maybe_quit, open_settings_window, close_settings_window,
     install_status_bar, update_status_bar_language,
     DrawParams, ClickLetter, draw_circle, draw_letter,

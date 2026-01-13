@@ -7,7 +7,7 @@ use block::ConcreteBlock;
 use cocoa::base::{id, nil};
 use objc::{class, msg_send, sel, sel_impl};
 
-use crate::input::hotkeys::{uninstall_hotkeys, reinstall_hotkeys, HotkeyHandler};
+use super::hotkeys::{uninstall_hotkeys, reinstall_hotkeys, HotkeyHandler};
 
 /// Install an observer that cleans up Carbon resources when app terminates.
 pub unsafe fn install_termination_observer(view: id, handler: HotkeyHandler) {

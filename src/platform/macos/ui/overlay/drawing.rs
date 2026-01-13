@@ -9,7 +9,7 @@ use cocoa::foundation::{NSPoint, NSRect, NSSize};
 use objc::{msg_send, sel, sel_impl};
 use objc::runtime::Class;
 
-use crate::ffi::{
+use crate::platform::macos::ffi::{
     CTFontRef, CGPathRef,
     CTFontCreateWithName, CTFontGetGlyphsForCharacters, CTFontCreatePathForGlyph,
     CGPathRelease, CFRelease,

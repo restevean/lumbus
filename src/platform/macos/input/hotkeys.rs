@@ -8,7 +8,7 @@
 
 use cocoa::base::id;
 
-use crate::ffi::{
+use crate::platform::macos::ffi::{
     EventHotKeyID, EventHotKeyRef, EventHandlerRef, EventTypeSpec,
     GetApplicationEventTarget, InstallEventHandler, RegisterEventHotKey,
     RemoveEventHandler, UnregisterEventHotKey,
@@ -21,8 +21,8 @@ use crate::ffi::{
 
 /// Type alias for the hotkey event handler function signature.
 pub type HotkeyHandler = extern "C" fn(
-    crate::ffi::EventHandlerCallRef,
-    crate::ffi::EventRef,
+    crate::platform::macos::ffi::EventHandlerCallRef,
+    crate::platform::macos::ffi::EventRef,
     *mut std::ffi::c_void,
 ) -> i32;
 

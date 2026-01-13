@@ -36,29 +36,28 @@ cargo test -- --nocapture
 
 ### Core Components
 
-**`src/main.rs`** (~2000+ lines)
-- Single-file application containing all macOS FFI and application logic
-- FFI bindings: Carbon (hotkeys), CoreText (glyph rendering), CoreGraphics, CoreFoundation, ApplicationServices
-- Key structures:
-  - `CustomView`: NSView subclass that draws the circle/letters and handles all state
-  - Overlay windows: One transparent, borderless `NSWindow` per display (always-on-top)
-  - Settings window: Live-synced sliders, read-only numeric fields, editable Hex color field
-  - Global hotkey handlers using Carbon Event Manager
-  - Global mouse monitors (`NSEvent::addGlobalMonitorForEventsMatchingMask`)
-  - Local key monitors for in-window keyboard shortcuts
+**`src/main.rs`**
+- Application entry point and `CustomView` NSView subclass registration
+- Hotkey event handler dispatch
+- Main run loop with event bus polling
 
-**`src/lib.rs`**
-- Pure helper functions (no FFI dependencies)
-- Functions: `clamp`, `color_to_hex`, `parse_hex_color`, `tr_key` (localisation)
-- Designed to be testable without macOS-specific dependencies
+**`src/lib.rs`** (platform-agnostic)
+- Pure helper functions: `clamp`, `color_to_hex`, `parse_hex_color`, `tr_key`
+- Event bus system (`events/`) for decoupled communication
+- Model layer (`model/`) with app state and preferences
 
-**`tests/helpers.rs`**
-- Unit tests for all pure helpers from `lib.rs`
-- Tests cover: clamping, hex color conversion, parsing, round-trip conversions, localisation
+**`src/platform/macos/`** (macOS-specific)
+- `ffi/`: FFI bindings for Carbon, CoreText, CoreGraphics, Cocoa
+- `input/`: Hotkey registration, mouse monitors, system observers
+- `ui/`: Overlay drawing, settings window, dialogs, status bar
+- `app/`: Helper functions for view management
+
+**`src/handlers/`** (platform-agnostic logic)
+- Event dispatcher that routes `AppEvent`s to appropriate handlers
 
 ### Architecture Patterns
 
-1. **FFI-heavy single binary**: All Cocoa/Carbon/CoreText FFI is in `main.rs`. No Objective-C `.m` files.
+1. **Modular platform separation**: Platform-specific code in `platform/macos/`, shared logic in `lib.rs` and `handlers/`.
 
 2. **State management**: All application state lives in `CustomView` instance variables via Rust static `Box::into_raw` pattern. Accessed through `msg_send!` to Objective-C runtime.
 

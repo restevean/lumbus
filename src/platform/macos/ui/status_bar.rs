@@ -10,8 +10,8 @@ use cocoa::base::{id, nil, YES};
 use cocoa::foundation::{NSSize, NSString};
 use objc::{class, msg_send, sel, sel_impl};
 
-use crate::app::lang_is_es;
-use crate::ffi::nsstring;
+use crate::platform::macos::app::lang_is_es;
+use crate::platform::macos::ffi::nsstring;
 use lumbus::tr_key;
 
 /// Global reference to the status item (must be kept alive)
