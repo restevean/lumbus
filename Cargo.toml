@@ -1,7 +1,7 @@
 [package]
 name = "lumbus"
 version = "0.2.1"
-authors = ["restevean <restevean@prtonmail.com>"]
+authors = ["restevean <restevean@protonmail.com>"]
 edition = "2021"
 license = "Apache-2.0"
 description = "Highlight the mouse pointer with a configurable circle on macOS"
