@@ -68,7 +68,7 @@ fi
 echo -e "${YELLOW}[4/4] Creating DMG installer...${NC}"
 create-dmg \
     --volname "$APP_NAME" \
-    --volicon "$DMG_ICON" \
+    --volicon "$ICON_FILE" \
     --background "$DMG_BACKGROUND" \
     --window-pos 200 120 \
     --window-size 600 400 \
@@ -78,6 +78,10 @@ create-dmg \
     --app-drop-link 440 160 \
     "$DMG_OUTPUT" \
     "$APP_BUNDLE"
+
+# Step 5: Set DMG file icon
+echo -e "${YELLOW}[5/5] Setting DMG file icon...${NC}"
+fileicon set "$DMG_OUTPUT" "$ICON_FILE"
 
 echo ""
 echo -e "${GREEN}=== Build Complete ===${NC}"
