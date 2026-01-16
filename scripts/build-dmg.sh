@@ -25,6 +25,7 @@ DMG_OUTPUT="$PROJECT_ROOT/dist/$DMG_NAME.dmg"
 
 # Resources
 ICON_FILE="$PROJECT_ROOT/resources/icons/AppIcon.icns"
+DMG_ICON="$PROJECT_ROOT/resources/icons/Lumbus_drive.icns"
 STATUS_BAR_ICON="$PROJECT_ROOT/resources/icons/StatusBarIcon.png"
 DMG_BACKGROUND="$PROJECT_ROOT/resources/dmg_background.png"
 INFO_PLIST="$PROJECT_ROOT/resources/Info.plist"
@@ -67,7 +68,7 @@ fi
 echo -e "${YELLOW}[4/4] Creating DMG installer...${NC}"
 create-dmg \
     --volname "$APP_NAME" \
-    --volicon "$ICON_FILE" \
+    --volicon "$DMG_ICON" \
     --background "$DMG_BACKGROUND" \
     --window-pos 200 120 \
     --window-size 600 400 \
