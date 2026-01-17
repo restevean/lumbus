@@ -79,13 +79,16 @@ pub unsafe fn prefs_set_int(key: &str, val: i32) {
 /// Must be called from main thread with valid autorelease pool.
 pub unsafe fn load_state() -> OverlayState {
     let mut state = OverlayState {
-        radius: prefs_get_double(PREF_RADIUS, DEFAULT_DIAMETER / 2.0),
+        radius: prefs_get_double(PREF_RADIUS, DEFAULT_RADIUS),
         border_width: prefs_get_double(PREF_BORDER, DEFAULT_BORDER_WIDTH),
         stroke_r: prefs_get_double(PREF_STROKE_R, DEFAULT_COLOR.0),
         stroke_g: prefs_get_double(PREF_STROKE_G, DEFAULT_COLOR.1),
         stroke_b: prefs_get_double(PREF_STROKE_B, DEFAULT_COLOR.2),
         stroke_a: prefs_get_double(PREF_STROKE_A, DEFAULT_COLOR.3),
-        fill_transparency_pct: prefs_get_double(PREF_FILL_TRANSPARENCY, DEFAULT_FILL_TRANSPARENCY_PCT),
+        fill_transparency_pct: prefs_get_double(
+            PREF_FILL_TRANSPARENCY,
+            DEFAULT_FILL_TRANSPARENCY_PCT,
+        ),
         lang: prefs_get_int(PREF_LANG, LANG_EN),
         overlay_enabled: true,
         display_mode: DISPLAY_MODE_CIRCLE,

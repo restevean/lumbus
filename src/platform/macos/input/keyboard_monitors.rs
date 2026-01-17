@@ -7,7 +7,6 @@ use block::ConcreteBlock;
 use cocoa::base::{id, nil};
 use objc::{class, msg_send, sel, sel_impl};
 
-
 /// Install a local monitor for Ctrl+A key combination.
 ///
 /// This serves as a backup for the Carbon hotkey in case it gets dropped.
@@ -38,7 +37,7 @@ pub unsafe fn install_local_ctrl_a_monitor(view: id) {
         }
         event
     })
-        .copy();
+    .copy();
 
     let mon: id = msg_send![
         class!(NSEvent),

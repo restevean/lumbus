@@ -33,7 +33,10 @@ fn overlay_state_default_stroke_color() {
 #[test]
 fn overlay_state_default_fill_transparency() {
     let state = OverlayState::default();
-    assert!(approx_eq(state.fill_transparency_pct, DEFAULT_FILL_TRANSPARENCY_PCT));
+    assert!(approx_eq(
+        state.fill_transparency_pct,
+        DEFAULT_FILL_TRANSPARENCY_PCT
+    ));
 }
 
 #[test]

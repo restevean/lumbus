@@ -52,8 +52,7 @@ pub fn open_settings_window(view: id) {
 
         let es = lang_is_es(view);
 
-        let style = NSWindowStyleMask::NSTitledWindowMask
-            | NSWindowStyleMask::NSClosableWindowMask;
+        let style = NSWindowStyleMask::NSTitledWindowMask | NSWindowStyleMask::NSClosableWindowMask;
         let w = 520.0;
         let h = 330.0;
         let settings = NSWindow::alloc(nil).initWithContentRect_styleMask_backing_defer_(
@@ -90,9 +89,14 @@ pub fn open_settings_window(view: id) {
 
         let screen_frame: NSRect = msg_send![target_screen, frame];
         let settings_frame: NSRect = msg_send![settings, frame];
-        let centered_x = screen_frame.origin.x + (screen_frame.size.width - settings_frame.size.width) / 2.0;
-        let centered_y = screen_frame.origin.y + (screen_frame.size.height - settings_frame.size.height) / 2.0;
-        let centered_origin = NSPoint { x: centered_x, y: centered_y };
+        let centered_x =
+            screen_frame.origin.x + (screen_frame.size.width - settings_frame.size.width) / 2.0;
+        let centered_y =
+            screen_frame.origin.y + (screen_frame.size.height - settings_frame.size.height) / 2.0;
+        let centered_origin = NSPoint {
+            x: centered_x,
+            y: centered_y,
+        };
         let _: () = msg_send![settings, setFrameOrigin: centered_origin];
 
         let content: id = msg_send![settings, contentView];
@@ -124,8 +128,7 @@ pub fn open_settings_window(view: id) {
         // Helper: value as a non-interactive label
         let mk_value_label = |x, y, w_lbl, h_lbl, val: &str| -> id {
             let tf: id = msg_send![class!(NSTextField), alloc];
-            let tf: id =
-                msg_send![tf, initWithFrame: NSRect::new(NSPoint::new(x, y), NSSize::new(w_lbl, h_lbl))];
+            let tf: id = msg_send![tf, initWithFrame: NSRect::new(NSPoint::new(x, y), NSSize::new(w_lbl, h_lbl))];
             let _: () = msg_send![tf, setBezeled: NO];
             let _: () = msg_send![tf, setDrawsBackground: NO];
             let _: () = msg_send![tf, setEditable: NO];
@@ -141,8 +144,10 @@ pub fn open_settings_window(view: id) {
             popup_lang,
             initWithFrame: NSRect::new(NSPoint::new(160.0, h - 44.0), NSSize::new(160.0, 24.0))
         ];
-        let _: () = msg_send![popup_lang, addItemWithTitle: nsstring(tr_key("English", es).as_ref())];
-        let _: () = msg_send![popup_lang, addItemWithTitle: nsstring(tr_key("Spanish", es).as_ref())];
+        let _: () =
+            msg_send![popup_lang, addItemWithTitle: nsstring(tr_key("English", es).as_ref())];
+        let _: () =
+            msg_send![popup_lang, addItemWithTitle: nsstring(tr_key("Spanish", es).as_ref())];
         let _: () = msg_send![popup_lang, selectItemAtIndex: (if cur_lang == 1 { 1 } else { 0 })];
         let _: () = msg_send![popup_lang, setTarget: view];
         let _: () = msg_send![popup_lang, setAction: sel!(langChanged:)];
@@ -153,7 +158,11 @@ pub fn open_settings_window(view: id) {
         let label_color = mk_label(20.0, h - 180.0, tr_key("Color", es).as_ref());
         let label_hex = mk_label(220.0, h - 180.0, tr_key("Hex", es).as_ref());
         let _: () = msg_send![label_hex, sizeToFit];
-        let label_fill_t = mk_label(20.0, h - 230.0, tr_key("Fill Transparency (%)", es).as_ref());
+        let label_fill_t = mk_label(
+            20.0,
+            h - 230.0,
+            tr_key("Fill Transparency (%)", es).as_ref(),
+        );
 
         // Value labels (non-interactive) + sliders (NO tick marks, still snapping in code)
         // Radius

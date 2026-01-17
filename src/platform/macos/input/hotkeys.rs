@@ -9,14 +9,11 @@
 use cocoa::base::id;
 
 use crate::platform::macos::ffi::{
-    EventHotKeyID, EventHotKeyRef, EventHandlerRef, EventTypeSpec,
-    GetApplicationEventTarget, InstallEventHandler, RegisterEventHotKey,
-    RemoveEventHandler, UnregisterEventHotKey,
-    K_EVENT_CLASS_KEYBOARD, K_EVENT_HOTKEY_PRESSED,
-    KC_A, KC_COMMA, KC_SEMICOLON, KC_X, KC_H,
-    CMD_KEY, CONTROL_KEY, SHIFT_KEY,
-    HKID_TOGGLE, HKID_SETTINGS_COMMA, HKID_SETTINGS_SEMI, HKID_QUIT, HKID_HELP,
-    SIG_MHLT, NO_ERR,
+    EventHandlerRef, EventHotKeyID, EventHotKeyRef, EventTypeSpec, GetApplicationEventTarget,
+    InstallEventHandler, RegisterEventHotKey, RemoveEventHandler, UnregisterEventHotKey, CMD_KEY,
+    CONTROL_KEY, HKID_HELP, HKID_QUIT, HKID_SETTINGS_COMMA, HKID_SETTINGS_SEMI, HKID_TOGGLE, KC_A,
+    KC_COMMA, KC_H, KC_SEMICOLON, KC_X, K_EVENT_CLASS_KEYBOARD, K_EVENT_HOTKEY_PRESSED, NO_ERR,
+    SHIFT_KEY, SIG_MHLT,
 };
 
 /// Type alias for the hotkey event handler function signature.

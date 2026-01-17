@@ -1,4 +1,4 @@
-#![allow(unexpected_cfgs)] // Silence cfg warnings inside objc/cocoa macros
+#![allow(unexpected_cfgs, deprecated)] // Silence cfg warnings and cocoa deprecation warnings
 
 mod handlers;
 mod platform;
@@ -19,10 +19,10 @@ use lumbus::{clamp, color_to_hex, parse_hex_color, tr_key};
 use lumbus::events::{init_event_bus, publish, AppEvent};
 // Import model constants and preferences
 use lumbus::model::{
-    DEFAULT_DIAMETER, DEFAULT_BORDER_WIDTH, DEFAULT_COLOR, DEFAULT_FILL_TRANSPARENCY_PCT,
-    PREF_RADIUS, PREF_BORDER, PREF_STROKE_R, PREF_STROKE_G, PREF_STROKE_B, PREF_STROKE_A,
-    PREF_FILL_TRANSPARENCY, PREF_LANG,
-    prefs_get_double, prefs_set_double, prefs_get_int, prefs_set_int,
+    prefs_get_double, prefs_get_int, prefs_set_double, prefs_set_int, DEFAULT_BORDER_WIDTH,
+    DEFAULT_COLOR, DEFAULT_FILL_TRANSPARENCY_PCT, DEFAULT_RADIUS, PREF_BORDER,
+    PREF_FILL_TRANSPARENCY, PREF_LANG, PREF_RADIUS, PREF_STROKE_A, PREF_STROKE_B, PREF_STROKE_G,
+    PREF_STROKE_R,
 };
 use std::ffi::CStr;
 
@@ -32,15 +32,14 @@ use ffi::*;
 use app::*;
 // Input handling (hotkeys, observers, monitors)
 use input::{
-    install_hotkeys, reinstall_hotkeys,
-    install_termination_observer, start_hotkey_keepalive, install_wakeup_space_observers,
-    install_local_ctrl_a_monitor, install_mouse_monitors,
+    install_hotkeys, install_local_ctrl_a_monitor, install_mouse_monitors,
+    install_termination_observer, install_wakeup_space_observers, reinstall_hotkeys,
+    start_hotkey_keepalive,
 };
 // UI components
 use ui::{
-    confirm_and_maybe_quit, open_settings_window, close_settings_window,
-    install_status_bar, update_status_bar_language,
-    DrawParams, ClickLetter, draw_circle, draw_letter,
+    close_settings_window, confirm_and_maybe_quit, draw_circle, draw_letter, install_status_bar,
+    open_settings_window, update_status_bar_language, ClickLetter, DrawParams,
 };
 // Event dispatcher
 use crate::handlers::dispatch_events;
@@ -109,7 +108,7 @@ fn main() {
 
 /// Load preferences into a view
 unsafe fn load_preferences_into_view(view: id) {
-    let radius = prefs_get_double(PREF_RADIUS, DEFAULT_DIAMETER / 2.0);
+    let radius = prefs_get_double(PREF_RADIUS, DEFAULT_RADIUS);
     let border = prefs_get_double(PREF_BORDER, DEFAULT_BORDER_WIDTH);
     let r = prefs_get_double(PREF_STROKE_R, DEFAULT_COLOR.0);
     let g = prefs_get_double(PREF_STROKE_G, DEFAULT_COLOR.1);
@@ -360,8 +359,10 @@ unsafe fn register_custom_view_class_and_create_view(window: id, width: f64, hei
                 }
 
                 prefs_set_double(PREF_RADIUS, v);
-                apply_to_all_views(|vv| { (*vv).set_ivar::<f64>("_radius", v) });
-                apply_to_all_views(|vv| { let _: () = msg_send![vv, setNeedsDisplay: YES]; });
+                apply_to_all_views(|vv| (*vv).set_ivar::<f64>("_radius", v));
+                apply_to_all_views(|vv| {
+                    let _: () = msg_send![vv, setNeedsDisplay: YES];
+                });
             }
         }
         // These are no-ops now (text fields became labels)
@@ -377,8 +378,10 @@ unsafe fn register_custom_view_class_and_create_view(window: id, width: f64, hei
                 }
 
                 prefs_set_double(PREF_BORDER, v);
-                apply_to_all_views(|vv| { (*vv).set_ivar::<f64>("_borderWidth", v) });
-                apply_to_all_views(|vv| { let _: () = msg_send![vv, setNeedsDisplay: YES]; });
+                apply_to_all_views(|vv| (*vv).set_ivar::<f64>("_borderWidth", v));
+                apply_to_all_views(|vv| {
+                    let _: () = msg_send![vv, setNeedsDisplay: YES];
+                });
             }
         }
         extern "C" fn set_border_from_field(_this: &mut Object, _cmd: Sel, _sender: id) {}
@@ -394,11 +397,14 @@ unsafe fn register_custom_view_class_and_create_view(window: id, width: f64, hei
                 }
 
                 prefs_set_double(PREF_FILL_TRANSPARENCY, v);
-                apply_to_all_views(|vv| { (*vv).set_ivar::<f64>("_fillTransparencyPct", v) });
-                apply_to_all_views(|vv| { let _: () = msg_send![vv, setNeedsDisplay: YES]; });
+                apply_to_all_views(|vv| (*vv).set_ivar::<f64>("_fillTransparencyPct", v));
+                apply_to_all_views(|vv| {
+                    let _: () = msg_send![vv, setNeedsDisplay: YES];
+                });
             }
         }
-        extern "C" fn set_fill_transparency_from_field(_this: &mut Object, _cmd: Sel, _sender: id) {}
+        extern "C" fn set_fill_transparency_from_field(_this: &mut Object, _cmd: Sel, _sender: id) {
+        }
         extern "C" fn color_changed(this: &mut Object, _cmd: Sel, sender: id) {
             unsafe {
                 let color: id = msg_send![sender, color];
@@ -424,7 +430,9 @@ unsafe fn register_custom_view_class_and_create_view(window: id, width: f64, hei
                     let s = color_to_hex(r, g, b, a);
                     let _: () = msg_send![hex_field, setStringValue: nsstring(&s)];
                 }
-                apply_to_all_views(|vv| { let _: () = msg_send![vv, setNeedsDisplay: YES]; });
+                apply_to_all_views(|vv| {
+                    let _: () = msg_send![vv, setNeedsDisplay: YES];
+                });
             }
         }
         extern "C" fn hex_changed(this: &mut Object, _cmd: Sel, sender: id) {
@@ -460,7 +468,9 @@ unsafe fn register_custom_view_class_and_create_view(window: id, width: f64, hei
                         }
                         let norm = color_to_hex(r, g, b, a);
                         let _: () = msg_send![sender, setStringValue: nsstring(&norm)];
-                        apply_to_all_views(|vv| { let _: () = msg_send![vv, setNeedsDisplay: YES]; });
+                        apply_to_all_views(|vv| {
+                            let _: () = msg_send![vv, setNeedsDisplay: YES];
+                        });
                     } else {
                         let r = *this.get_ivar::<f64>("_strokeR");
                         let g = *this.get_ivar::<f64>("_strokeG");
@@ -509,7 +519,7 @@ unsafe fn register_custom_view_class_and_create_view(window: id, width: f64, hei
                 let new_lang = if idx == 1 { 1 } else { 0 };
 
                 prefs_set_int(PREF_LANG, new_lang);
-                apply_to_all_views(|v| { (*v).set_ivar::<i32>("_lang", new_lang) });
+                apply_to_all_views(|v| (*v).set_ivar::<i32>("_lang", new_lang));
 
                 let es = new_lang == 1;
 
@@ -659,7 +669,10 @@ unsafe fn register_custom_view_class_and_create_view(window: id, width: f64, hei
             hotkey_keepalive as extern "C" fn(&mut Object, Sel),
         );
 
-        decl.add_method(sel!(setRadius:), set_radius as extern "C" fn(&mut Object, Sel, id));
+        decl.add_method(
+            sel!(setRadius:),
+            set_radius as extern "C" fn(&mut Object, Sel, id),
+        );
         decl.add_method(
             sel!(setRadiusFromField:),
             set_radius_from_field as extern "C" fn(&mut Object, Sel, id),
@@ -680,8 +693,14 @@ unsafe fn register_custom_view_class_and_create_view(window: id, width: f64, hei
             sel!(setFillTransparencyFromField:),
             set_fill_transparency_from_field as extern "C" fn(&mut Object, Sel, id),
         );
-        decl.add_method(sel!(colorChanged:), color_changed as extern "C" fn(&mut Object, Sel, id));
-        decl.add_method(sel!(hexChanged:), hex_changed as extern "C" fn(&mut Object, Sel, id));
+        decl.add_method(
+            sel!(colorChanged:),
+            color_changed as extern "C" fn(&mut Object, Sel, id),
+        );
+        decl.add_method(
+            sel!(hexChanged:),
+            hex_changed as extern "C" fn(&mut Object, Sel, id),
+        );
         decl.add_method(
             sel!(closeSettings:),
             close_settings as extern "C" fn(&mut Object, Sel, id),
@@ -705,12 +724,18 @@ unsafe fn register_custom_view_class_and_create_view(window: id, width: f64, hei
             status_bar_quit as extern "C" fn(&mut Object, Sel, id),
         );
 
-        decl.add_method(sel!(langChanged:), lang_changed as extern "C" fn(&mut Object, Sel, id));
+        decl.add_method(
+            sel!(langChanged:),
+            lang_changed as extern "C" fn(&mut Object, Sel, id),
+        );
         decl.add_method(
             sel!(controlTextDidChange:),
             control_text_did_change as extern "C" fn(&mut Object, Sel, id),
         );
-        decl.add_method(sel!(drawRect:), draw_rect as extern "C" fn(&Object, Sel, NSRect));
+        decl.add_method(
+            sel!(drawRect:),
+            draw_rect as extern "C" fn(&Object, Sel, NSRect),
+        );
 
         decl.register()
     };
@@ -729,7 +754,7 @@ unsafe fn register_custom_view_class_and_create_view(window: id, width: f64, hei
     (*view).set_ivar::<u32>("_ownDisplayID", 0);
 
     // Visual defaults (overridden by prefs + sync)
-    (*view).set_ivar::<f64>("_radius", DEFAULT_DIAMETER / 2.0);
+    (*view).set_ivar::<f64>("_radius", DEFAULT_RADIUS);
     (*view).set_ivar::<f64>("_borderWidth", DEFAULT_BORDER_WIDTH);
     (*view).set_ivar::<f64>("_strokeR", DEFAULT_COLOR.0);
     (*view).set_ivar::<f64>("_strokeG", DEFAULT_COLOR.1);
@@ -853,7 +878,10 @@ extern "C" fn hotkey_event_handler(
         if GetEventClass(event) == K_EVENT_CLASS_KEYBOARD
             && GetEventKind(event) == K_EVENT_HOTKEY_PRESSED
         {
-            let mut hot_id = EventHotKeyID { signature: 0, id: 0 };
+            let mut hot_id = EventHotKeyID {
+                signature: 0,
+                id: 0,
+            };
             let status = GetEventParameter(
                 event,
                 K_EVENT_PARAM_DIRECT_OBJECT,
@@ -885,5 +913,3 @@ extern "C" fn hotkey_event_handler(
         NO_ERR
     }
 }
-
-

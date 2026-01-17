@@ -1,4 +1,4 @@
-#![allow(unexpected_cfgs)] // Silence cfg warnings from objc macros
+#![allow(unexpected_cfgs, deprecated)] // Silence cfg warnings and cocoa deprecation warnings
 
 //! Pure helpers used by the app. Keep this file free of macOS FFI so tests
 //! can run as normal integration tests.

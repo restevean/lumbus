@@ -100,7 +100,11 @@ pub fn confirm_and_maybe_quit(view: id) {
         let _: () = msg_send![content, addSubview: bg_box];
 
         // Title label
-        let title_text = if es { "¿Salir de la aplicación?" } else { "Quit the app?" };
+        let title_text = if es {
+            "¿Salir de la aplicación?"
+        } else {
+            "Quit the app?"
+        };
         let title_label: id = msg_send![class!(NSTextField), alloc];
         let title_label: id = msg_send![title_label, initWithFrame: NSRect::new(
             NSPoint::new(20.0, dialog_h - 45.0),
@@ -119,7 +123,11 @@ pub fn confirm_and_maybe_quit(view: id) {
         let _: () = msg_send![content, addSubview: title_label];
 
         // Message label
-        let msg_text = if es { "Se cerrará la app" } else { "The app will close" };
+        let msg_text = if es {
+            "Se cerrará la app"
+        } else {
+            "The app will close"
+        };
         let msg_label: id = msg_send![class!(NSTextField), alloc];
         let msg_label: id = msg_send![msg_label, initWithFrame: NSRect::new(
             NSPoint::new(20.0, dialog_h - 75.0),
@@ -200,7 +208,8 @@ pub fn confirm_and_maybe_quit(view: id) {
         let key_block = ConcreteBlock::new(move |event: id| -> id {
             let keycode: u16 = msg_send![event, keyCode];
             match keycode {
-                36 => { // Enter/Return - activate focused button
+                36 => {
+                    // Enter/Return - activate focused button
                     let current_focus = *focus_ptr;
                     if current_focus == 0 {
                         *flag_ptr = 1; // Quit
@@ -211,18 +220,26 @@ pub fn confirm_and_maybe_quit(view: id) {
                     let _: () = msg_send![app, stopModal];
                     return nil;
                 }
-                53 => { // Escape - always cancel
+                53 => {
+                    // Escape - always cancel
                     *flag_ptr = 2; // Cancel
                     let app = NSApp();
                     let _: () = msg_send![app, stopModal];
                     return nil;
                 }
-                48 | 123 | 124 => { // Tab, Left arrow, Right arrow - change focus
+                48 | 123 | 124 => {
+                    // Tab, Left arrow, Right arrow - change focus
                     let current_focus = *focus_ptr;
                     let new_focus = match keycode {
                         123 => 1, // Left arrow -> Cancel (left button)
                         124 => 0, // Right arrow -> Quit (right button)
-                        _ => if current_focus == 0 { 1 } else { 0 }, // Tab toggles
+                        _ => {
+                            if current_focus == 0 {
+                                1
+                            } else {
+                                0
+                            }
+                        } // Tab toggles
                     };
 
                     // Only update if focus actually changed
@@ -231,7 +248,8 @@ pub fn confirm_and_maybe_quit(view: id) {
 
                         // Get colors for focus switching
                         let blue: id = msg_send![class!(NSColor), systemBlueColor];
-                        let dark_gray: id = NSColor::colorWithSRGBRed_green_blue_alpha_(nil, 0.35, 0.35, 0.35, 1.0);
+                        let dark_gray: id =
+                            NSColor::colorWithSRGBRed_green_blue_alpha_(nil, 0.35, 0.35, 0.35, 1.0);
                         let blue_cg: *const std::ffi::c_void = msg_send![blue, CGColor];
                         let gray_cg: *const std::ffi::c_void = msg_send![dark_gray, CGColor];
 
@@ -251,7 +269,8 @@ pub fn confirm_and_maybe_quit(view: id) {
                 _ => {}
             }
             event
-        }).copy();
+        })
+        .copy();
         let key_mon: id = msg_send![
             class!(NSEvent),
             addLocalMonitorForEventsMatchingMask: KEY_DOWN_MASK
@@ -265,8 +284,10 @@ pub fn confirm_and_maybe_quit(view: id) {
             let loc: NSPoint = msg_send![event, locationInWindow];
             // Check if click is on quit button
             let quit_frame: NSRect = msg_send![quit_btn_copy, frame];
-            if loc.x >= quit_frame.origin.x && loc.x <= quit_frame.origin.x + quit_frame.size.width
-                && loc.y >= quit_frame.origin.y && loc.y <= quit_frame.origin.y + quit_frame.size.height
+            if loc.x >= quit_frame.origin.x
+                && loc.x <= quit_frame.origin.x + quit_frame.size.width
+                && loc.y >= quit_frame.origin.y
+                && loc.y <= quit_frame.origin.y + quit_frame.size.height
             {
                 *flag_ptr2 = 1; // Quit
                 let app = NSApp();
@@ -275,8 +296,10 @@ pub fn confirm_and_maybe_quit(view: id) {
             }
             // Check if click is on cancel button
             let cancel_frame: NSRect = msg_send![cancel_btn_copy, frame];
-            if loc.x >= cancel_frame.origin.x && loc.x <= cancel_frame.origin.x + cancel_frame.size.width
-                && loc.y >= cancel_frame.origin.y && loc.y <= cancel_frame.origin.y + cancel_frame.size.height
+            if loc.x >= cancel_frame.origin.x
+                && loc.x <= cancel_frame.origin.x + cancel_frame.size.width
+                && loc.y >= cancel_frame.origin.y
+                && loc.y <= cancel_frame.origin.y + cancel_frame.size.height
             {
                 *flag_ptr2 = 2; // Cancel
                 let app = NSApp();
@@ -284,7 +307,8 @@ pub fn confirm_and_maybe_quit(view: id) {
                 return nil;
             }
             event
-        }).copy();
+        })
+        .copy();
         let click_mon: id = msg_send![
             class!(NSEvent),
             addLocalMonitorForEventsMatchingMask: LEFT_DOWN_MASK

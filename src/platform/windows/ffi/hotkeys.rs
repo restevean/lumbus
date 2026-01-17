@@ -1,8 +1,6 @@
 //! Hotkey constants and registration helpers for Windows.
 
-use windows::Win32::UI::Input::KeyboardAndMouse::{
-    MOD_CONTROL, MOD_SHIFT, HOT_KEY_MODIFIERS,
-};
+use windows::Win32::UI::Input::KeyboardAndMouse::{HOT_KEY_MODIFIERS, MOD_CONTROL, MOD_SHIFT};
 
 /// Virtual key code for 'A'.
 pub const VK_A: u32 = 0x41;
