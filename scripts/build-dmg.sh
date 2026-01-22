@@ -83,6 +83,11 @@ cp "$INFO_PLIST" "$APP_BUNDLE/Contents/Info.plist"
 cp "$ICON_FILE" "$APP_BUNDLE/Contents/Resources/AppIcon.icns"
 cp "$STATUS_BAR_ICON" "$APP_BUNDLE/Contents/Resources/StatusBarIcon.png"
 
+# Copy Credits.rtf (for About panel)
+if [ -f "$PROJECT_ROOT/resources/Credits.rtf" ]; then
+    cp "$PROJECT_ROOT/resources/Credits.rtf" "$APP_BUNDLE/Contents/Resources/"
+fi
+
 # Set executable permissions
 chmod +x "$APP_BUNDLE/Contents/MacOS/$APP_NAME"
 
