@@ -53,7 +53,8 @@ fn parse_hex_rgba() {
 
 #[test]
 fn parse_hex_trims_and_ignores_whitespace() {
-    let (r, g, b, a) = parse_hex_color("  ff00FF80  ").expect("valid with whitespace and mixed case");
+    let (r, g, b, a) =
+        parse_hex_color("  ff00FF80  ").expect("valid with whitespace and mixed case");
     assert!(approx_eq(r, 1.0));
     assert!(approx_eq(g, 0.0));
     assert!(approx_eq(b, 1.0));
@@ -87,12 +88,7 @@ fn roundtrip_rgb_exact_when_opaque() {
 
 #[test]
 fn roundtrip_rgba_including_alpha() {
-    let rgba = (
-        17.0 / 255.0,
-        34.0 / 255.0,
-        51.0 / 255.0,
-        204.0 / 255.0,
-    );
+    let rgba = (17.0 / 255.0, 34.0 / 255.0, 51.0 / 255.0, 204.0 / 255.0);
     let hex = color_to_hex(rgba.0, rgba.1, rgba.2, rgba.3);
     assert_eq!(hex, "#112233CC");
     let (r2, g2, b2, a2) = parse_hex_color(&hex).unwrap();
@@ -121,14 +117,26 @@ fn tr_key_help_overlay_localisation() {
     assert_eq!(tr_key("Help", false).as_ref(), "Help");
     assert_eq!(tr_key("Help", true).as_ref(), "Ayuda");
 
-    assert_eq!(tr_key("Keyboard Shortcuts", false).as_ref(), "Keyboard Shortcuts");
-    assert_eq!(tr_key("Keyboard Shortcuts", true).as_ref(), "Atajos de teclado");
+    assert_eq!(
+        tr_key("Keyboard Shortcuts", false).as_ref(),
+        "Keyboard Shortcuts"
+    );
+    assert_eq!(
+        tr_key("Keyboard Shortcuts", true).as_ref(),
+        "Atajos de teclado"
+    );
 
     assert_eq!(tr_key("Toggle overlay", false).as_ref(), "Toggle overlay");
-    assert_eq!(tr_key("Toggle overlay", true).as_ref(), "Mostrar/ocultar resaltado");
+    assert_eq!(
+        tr_key("Toggle overlay", true).as_ref(),
+        "Mostrar/ocultar resaltado"
+    );
 
     assert_eq!(tr_key("Open settings", false).as_ref(), "Open settings");
-    assert_eq!(tr_key("Open settings", true).as_ref(), "Abrir configuración");
+    assert_eq!(
+        tr_key("Open settings", true).as_ref(),
+        "Abrir configuración"
+    );
 
     assert_eq!(tr_key("Show help", false).as_ref(), "Show help");
     assert_eq!(tr_key("Show help", true).as_ref(), "Mostrar ayuda");
@@ -136,6 +144,12 @@ fn tr_key_help_overlay_localisation() {
     assert_eq!(tr_key("Quit app", false).as_ref(), "Quit app");
     assert_eq!(tr_key("Quit app", true).as_ref(), "Salir de la app");
 
-    assert_eq!(tr_key("Press any key to close", false).as_ref(), "Press any key to close");
-    assert_eq!(tr_key("Press any key to close", true).as_ref(), "Pulsa cualquier tecla para cerrar");
+    assert_eq!(
+        tr_key("Press any key to close", false).as_ref(),
+        "Press any key to close"
+    );
+    assert_eq!(
+        tr_key("Press any key to close", true).as_ref(),
+        "Pulsa cualquier tecla para cerrar"
+    );
 }

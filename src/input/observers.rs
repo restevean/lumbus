@@ -7,7 +7,7 @@ use block::ConcreteBlock;
 use cocoa::base::{id, nil};
 use objc::{class, msg_send, sel, sel_impl};
 
-use crate::input::hotkeys::{uninstall_hotkeys, reinstall_hotkeys, HotkeyHandler};
+use crate::input::hotkeys::{reinstall_hotkeys, uninstall_hotkeys, HotkeyHandler};
 
 /// Install an observer that cleans up Carbon resources when app terminates.
 pub unsafe fn install_termination_observer(view: id, handler: HotkeyHandler) {
@@ -16,12 +16,10 @@ pub unsafe fn install_termination_observer(view: id, handler: HotkeyHandler) {
 
     // Use handler indirectly to avoid capturing it
     let _ = handler; // We only use uninstall_hotkeys in termination
-    let block = ConcreteBlock::new(move |_note: id| {
-        unsafe {
-            uninstall_hotkeys(view);
-        }
+    let block = ConcreteBlock::new(move |_note: id| unsafe {
+        uninstall_hotkeys(view);
     })
-        .copy();
+    .copy();
 
     let name: id = msg_send![
         class!(NSString),
@@ -69,13 +67,13 @@ pub unsafe fn install_wakeup_space_observers(view: id, handler: HotkeyHandler) {
 
     // Helper to add an observer for a given notification name (C string)
     let add_obs = |name_cstr: &std::ffi::CStr| {
-        let name: id =
-            msg_send![class!(NSString), stringWithUTF8String: name_cstr.as_ptr()];
+        let name: id = msg_send![class!(NSString), stringWithUTF8String: name_cstr.as_ptr()];
         let block = ConcreteBlock::new(move |_note: id| unsafe {
             reinstall_hotkeys(view, handler);
         })
-            .copy();
-        let _: id = msg_send![nc, addObserverForName: name object: nil queue: nil usingBlock: &*block];
+        .copy();
+        let _: id =
+            msg_send![nc, addObserverForName: name object: nil queue: nil usingBlock: &*block];
     };
 
     // Wake from sleep

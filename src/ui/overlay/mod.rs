@@ -4,4 +4,4 @@
 
 pub mod drawing;
 
-pub use drawing::{DrawParams, ClickLetter, draw_circle, draw_letter};
+pub use drawing::{draw_circle, draw_letter, ClickLetter, DrawParams};

@@ -85,7 +85,10 @@ pub unsafe fn load_state() -> OverlayState {
         stroke_g: prefs_get_double(PREF_STROKE_G, DEFAULT_COLOR.1),
         stroke_b: prefs_get_double(PREF_STROKE_B, DEFAULT_COLOR.2),
         stroke_a: prefs_get_double(PREF_STROKE_A, DEFAULT_COLOR.3),
-        fill_transparency_pct: prefs_get_double(PREF_FILL_TRANSPARENCY, DEFAULT_FILL_TRANSPARENCY_PCT),
+        fill_transparency_pct: prefs_get_double(
+            PREF_FILL_TRANSPARENCY,
+            DEFAULT_FILL_TRANSPARENCY_PCT,
+        ),
         lang: prefs_get_int(PREF_LANG, LANG_EN),
         overlay_enabled: true,
         display_mode: DISPLAY_MODE_CIRCLE,

@@ -4,8 +4,8 @@
 //! for accessibility permissions on macOS.
 
 use super::coregraphics::{
-    CFDictionaryCreate, CFRelease, kCFBooleanTrue,
-    kCFTypeDictionaryKeyCallBacks, kCFTypeDictionaryValueCallBacks,
+    kCFBooleanTrue, kCFTypeDictionaryKeyCallBacks, kCFTypeDictionaryValueCallBacks,
+    CFDictionaryCreate, CFRelease,
 };
 
 // === FFI Declarations ===
@@ -27,10 +27,10 @@ pub unsafe fn ensure_accessibility_prompt() {
     let values = [kCFBooleanTrue];
 
     let dict = CFDictionaryCreate(
-        std::ptr::null(),  // default allocator
+        std::ptr::null(), // default allocator
         keys.as_ptr() as *const _,
         values.as_ptr() as *const _,
-        1,  // one key-value pair
+        1, // one key-value pair
         kCFTypeDictionaryKeyCallBacks,
         kCFTypeDictionaryValueCallBacks,
     );

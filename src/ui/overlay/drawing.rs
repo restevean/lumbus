@@ -6,13 +6,12 @@
 
 use cocoa::base::id;
 use cocoa::foundation::{NSPoint, NSRect, NSSize};
-use objc::{msg_send, sel, sel_impl};
 use objc::runtime::Class;
+use objc::{msg_send, sel, sel_impl};
 
 use crate::ffi::{
-    CTFontRef, CGPathRef,
-    CTFontCreateWithName, CTFontGetGlyphsForCharacters, CTFontCreatePathForGlyph,
-    CGPathRelease, CFRelease,
+    CFRelease, CGPathRef, CGPathRelease, CTFontCreatePathForGlyph, CTFontCreateWithName,
+    CTFontGetGlyphsForCharacters, CTFontRef,
 };
 use lumbus::clamp;
 
@@ -58,7 +57,10 @@ pub unsafe fn draw_circle(params: &DrawParams) {
     let ns_bezier = Class::get("NSBezierPath").unwrap();
 
     let rect = NSRect::new(
-        NSPoint::new(params.center.x - params.radius, params.center.y - params.radius),
+        NSPoint::new(
+            params.center.x - params.radius,
+            params.center.y - params.radius,
+        ),
         NSSize::new(params.radius * 2.0, params.radius * 2.0),
     );
 
@@ -139,12 +141,8 @@ pub unsafe fn draw_letter(params: &DrawParams, letter: ClickLetter) {
     let ch_u16: u16 = letter.as_char() as u16;
     let mut glyph: u16 = 0;
 
-    let mapped = CTFontGetGlyphsForCharacters(
-        ct_font,
-        &ch_u16 as *const u16,
-        &mut glyph as *mut u16,
-        1,
-    );
+    let mapped =
+        CTFontGetGlyphsForCharacters(ct_font, &ch_u16 as *const u16, &mut glyph as *mut u16, 1);
 
     if !mapped || glyph == 0 {
         CFRelease(ct_font as *const _);

@@ -3,8 +3,8 @@
 //! This module defines the overlay state structure that can be
 //! serialized to/from NSUserDefaults.
 
-use crate::clamp;
 use super::constants::*;
+use crate::clamp;
 
 /// Complete overlay state, serializable to/from NSUserDefaults.
 #[derive(Debug, Clone, PartialEq)]
@@ -53,7 +53,11 @@ impl OverlayState {
     pub fn validate(&mut self) {
         self.radius = clamp(self.radius, MIN_RADIUS, MAX_RADIUS);
         self.border_width = clamp(self.border_width, MIN_BORDER, MAX_BORDER);
-        self.fill_transparency_pct = clamp(self.fill_transparency_pct, MIN_TRANSPARENCY, MAX_TRANSPARENCY);
+        self.fill_transparency_pct = clamp(
+            self.fill_transparency_pct,
+            MIN_TRANSPARENCY,
+            MAX_TRANSPARENCY,
+        );
         self.stroke_r = clamp(self.stroke_r, 0.0, 1.0);
         self.stroke_g = clamp(self.stroke_g, 0.0, 1.0);
         self.stroke_b = clamp(self.stroke_b, 0.0, 1.0);

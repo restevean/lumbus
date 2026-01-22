@@ -24,10 +24,22 @@ struct HotkeyEntry {
 
 /// All hotkeys to display in the help overlay.
 const HOTKEYS: &[HotkeyEntry] = &[
-    HotkeyEntry { keys: "Ctrl + A", description_key: "Toggle overlay" },
-    HotkeyEntry { keys: "\u{2318} + ,", description_key: "Open settings" },
-    HotkeyEntry { keys: "\u{2318} + Shift + H", description_key: "Show help" },
-    HotkeyEntry { keys: "Ctrl + Shift + X", description_key: "Quit app" },
+    HotkeyEntry {
+        keys: "Ctrl + A",
+        description_key: "Toggle overlay",
+    },
+    HotkeyEntry {
+        keys: "\u{2318} + ,",
+        description_key: "Open settings",
+    },
+    HotkeyEntry {
+        keys: "\u{2318} + Shift + H",
+        description_key: "Show help",
+    },
+    HotkeyEntry {
+        keys: "Ctrl + Shift + X",
+        description_key: "Quit app",
+    },
 ];
 
 /// Show the help overlay with keyboard shortcuts.
@@ -145,7 +157,8 @@ pub fn show_help_overlay(view: id) {
         let desc_w: f64 = 170.0;
 
         let regular_font: id = msg_send![class!(NSFont), systemFontOfSize: 14.0f64];
-        let light_gray: id = NSColor::colorWithSRGBRed_green_blue_alpha_(nil, 0.75, 0.75, 0.75, 1.0);
+        let light_gray: id =
+            NSColor::colorWithSRGBRed_green_blue_alpha_(nil, 0.75, 0.75, 0.75, 1.0);
 
         for (i, entry) in HOTKEYS.iter().enumerate() {
             let y = start_y - (i as f64 * row_height);
@@ -216,7 +229,8 @@ pub fn show_help_overlay(view: id) {
             let app = NSApp();
             let _: () = msg_send![app, stopModal];
             nil
-        }).copy();
+        })
+        .copy();
         let key_mon: id = msg_send![
             class!(NSEvent),
             addLocalMonitorForEventsMatchingMask: KEY_DOWN_MASK
@@ -231,7 +245,8 @@ pub fn show_help_overlay(view: id) {
             let app = NSApp();
             let _: () = msg_send![app, stopModal];
             nil
-        }).copy();
+        })
+        .copy();
         let click_mon: id = msg_send![
             class!(NSEvent),
             addLocalMonitorForEventsMatchingMask: LEFT_DOWN_MASK
