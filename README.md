@@ -14,8 +14,8 @@ Highlight the mouse pointer across **all** macOS displays with a configurable ci
 - **Smooth pointer tracking** (~60 FPS using Cocoa screen coordinates).
 - **Click indicators**
     - Default: **circle** at the cursor.
-    - **Left mouse down** → bold **L**.
-    - **Right mouse down** → bold **R**.
+    - **Left mouse down** → bold **I** (Spanish) / **L** (English).
+    - **Right mouse down** → bold **D** (Spanish) / **R** (English).
     - Letters use the **same border width** and **same fill transparency** as the circle.
 - **Live configuration**
     - **Circle radius (px)** — via slider (snap in steps of **5**)
@@ -38,7 +38,7 @@ Highlight the mouse pointer across **all** macOS displays with a configurable ci
 ## 🖼️ Visuals
 
 - **Circle:** configurable stroke colour/width; fill uses the same colour with configurable alpha.
-- **L/R letters:** CoreText (glyph → CGPath → NSBezierPath), same stroke and fill alpha as the circle, centred on the cursor, height ≈ `1.5 × circle diameter`.
+- **I/D letters (Spanish) / L/R (English):** CoreText (glyph → CGPath → NSBezierPath), same stroke and fill alpha as the circle, centred on the cursor, height ≈ `1.5 × circle diameter`.
 
 ---
 
@@ -119,8 +119,8 @@ make install
 
 5. Click behaviour:
 
-    - **Left down** → shows **L**
-    - **Right down** → shows **R**
+    - **Left down** → shows **I** (Spanish) / **L** (English)
+    - **Right down** → shows **D** (Spanish) / **R** (English)
     - On release → reverts to **circle**
 
 6. Quit with **Ctrl + Shift + X**.

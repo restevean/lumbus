@@ -643,10 +643,11 @@ unsafe fn register_custom_view_class_and_create_view(window: id, width: f64, hei
                     fill_transparency: *this.get_ivar::<f64>("_fillTransparencyPct"),
                 };
 
+                let es = *this.get_ivar::<i32>("_lang") == 1;
                 match mode {
                     0 => draw_circle(&params),
-                    1 => draw_letter(&params, ClickLetter::Left),
-                    _ => draw_letter(&params, ClickLetter::Right),
+                    1 => draw_letter(&params, ClickLetter::Left, es),
+                    _ => draw_letter(&params, ClickLetter::Right, es),
                 }
             }
         }

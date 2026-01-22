@@ -103,24 +103,33 @@ pub enum ClickLetter {
 }
 
 impl ClickLetter {
-    /// Get the character to render.
-    fn as_char(self) -> char {
-        match self {
-            ClickLetter::Left => 'L',
-            ClickLetter::Right => 'R',
+    /// Get the character to render based on language.
+    ///
+    /// - English (es=false): "L" for left, "R" for right
+    /// - Spanish (es=true): "I" for izquierdo, "D" for derecho
+    fn as_char(self, es: bool) -> char {
+        match (self, es) {
+            (ClickLetter::Left, false) => 'L',
+            (ClickLetter::Left, true) => 'I',
+            (ClickLetter::Right, false) => 'R',
+            (ClickLetter::Right, true) => 'D',
         }
     }
 }
 
-/// Draw a letter (L or R) at the specified position.
+/// Draw a letter (L/R or I/D) at the specified position.
 ///
 /// Uses CoreText for glyph rendering, producing high-quality
 /// vector letters that scale with the radius setting.
 ///
+/// The letter displayed depends on the language:
+/// - English (es=false): "L" for left click, "R" for right click
+/// - Spanish (es=true): "I" for left click (izquierdo), "D" for right click (derecho)
+///
 /// # Safety
 ///
 /// Must be called from the main thread within a valid drawing context.
-pub unsafe fn draw_letter(params: &DrawParams, letter: ClickLetter) {
+pub unsafe fn draw_letter(params: &DrawParams, letter: ClickLetter, es: bool) {
     let ns_color = Class::get("NSColor").unwrap();
     let ns_bezier = Class::get("NSBezierPath").unwrap();
     let ns_affine = Class::get("NSAffineTransform").unwrap();
@@ -138,7 +147,7 @@ pub unsafe fn draw_letter(params: &DrawParams, letter: ClickLetter) {
         std::ptr::null(),
     );
 
-    let ch_u16: u16 = letter.as_char() as u16;
+    let ch_u16: u16 = letter.as_char(es) as u16;
     let mut glyph: u16 = 0;
 
     let mapped =
@@ -252,7 +261,11 @@ mod tests {
 
     #[test]
     fn test_click_letter_as_char() {
-        assert_eq!(ClickLetter::Left.as_char(), 'L');
-        assert_eq!(ClickLetter::Right.as_char(), 'R');
+        // English
+        assert_eq!(ClickLetter::Left.as_char(false), 'L');
+        assert_eq!(ClickLetter::Right.as_char(false), 'R');
+        // Spanish
+        assert_eq!(ClickLetter::Left.as_char(true), 'I');
+        assert_eq!(ClickLetter::Right.as_char(true), 'D');
     }
 }
