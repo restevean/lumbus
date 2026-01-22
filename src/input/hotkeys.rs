@@ -9,14 +9,10 @@
 use cocoa::base::id;
 
 use crate::ffi::{
-    EventHotKeyID, EventHotKeyRef, EventHandlerRef, EventTypeSpec,
-    GetApplicationEventTarget, InstallEventHandler, RegisterEventHotKey,
-    RemoveEventHandler, UnregisterEventHotKey,
-    K_EVENT_CLASS_KEYBOARD, K_EVENT_HOTKEY_PRESSED,
-    KC_A, KC_COMMA, KC_SEMICOLON, KC_X, KC_H,
-    CMD_KEY, CONTROL_KEY, SHIFT_KEY,
-    HKID_TOGGLE, HKID_SETTINGS_COMMA, HKID_SETTINGS_SEMI, HKID_QUIT, HKID_HELP,
-    SIG_MHLT, NO_ERR,
+    EventHandlerRef, EventHotKeyID, EventHotKeyRef, EventTypeSpec, GetApplicationEventTarget,
+    InstallEventHandler, RegisterEventHotKey, RemoveEventHandler, UnregisterEventHotKey, CMD_KEY,
+    CONTROL_KEY, HKID_HELP, HKID_QUIT, HKID_SETTINGS_COMMA, HKID_TOGGLE, KC_A, KC_COMMA, KC_H,
+    KC_X, K_EVENT_CLASS_KEYBOARD, K_EVENT_HOTKEY_PRESSED, NO_ERR, SHIFT_KEY, SIG_MHLT,
 };
 
 /// Type alias for the hotkey event handler function signature.
@@ -31,7 +27,6 @@ pub type HotkeyHandler = extern "C" fn(
 /// Registers:
 /// - Ctrl+A: Toggle overlay
 /// - ⌘+,: Open Settings
-/// - ⌘+;: Open Settings (ISO keyboards)
 /// - ⌘+Shift+H: Show Help
 /// - Ctrl+Shift+X: Quit confirmation
 ///
@@ -86,9 +81,8 @@ pub unsafe fn install_hotkeys(view: id, handler: HotkeyHandler) {
 
     // Ctrl + A (toggle)
     register_hotkey!(KC_A, CONTROL_KEY, HKID_TOGGLE, "_hkToggle");
-    // ⌘ + ,  and ⌘ + ; → Settings
+    // ⌘ + , → Settings
     register_hotkey!(KC_COMMA, CMD_KEY, HKID_SETTINGS_COMMA, "_hkComma");
-    register_hotkey!(KC_SEMICOLON, CMD_KEY, HKID_SETTINGS_SEMI, "_hkSemi");
     // ⌘ + Shift + H → Help
     register_hotkey!(KC_H, CMD_KEY | SHIFT_KEY, HKID_HELP, "_hkHelp");
     // Ctrl + Shift + X → Quit confirmation
@@ -102,7 +96,6 @@ pub unsafe fn install_hotkeys(view: id, handler: HotkeyHandler) {
 pub unsafe fn uninstall_hotkeys(view: id) {
     let hk_toggle: *mut std::ffi::c_void = *(*view).get_ivar("_hkToggle");
     let hk_comma: *mut std::ffi::c_void = *(*view).get_ivar("_hkComma");
-    let hk_semi: *mut std::ffi::c_void = *(*view).get_ivar("_hkSemi");
     let hk_help: *mut std::ffi::c_void = *(*view).get_ivar("_hkHelp");
     let hk_quit: *mut std::ffi::c_void = *(*view).get_ivar("_hkQuit");
     let hk_handler: *mut std::ffi::c_void = *(*view).get_ivar("_hkHandler");
@@ -114,10 +107,6 @@ pub unsafe fn uninstall_hotkeys(view: id) {
     if !hk_comma.is_null() {
         let _ = UnregisterEventHotKey(hk_comma);
         (*view).set_ivar::<*mut std::ffi::c_void>("_hkComma", std::ptr::null_mut());
-    }
-    if !hk_semi.is_null() {
-        let _ = UnregisterEventHotKey(hk_semi);
-        (*view).set_ivar::<*mut std::ffi::c_void>("_hkSemi", std::ptr::null_mut());
     }
     if !hk_help.is_null() {
         let _ = UnregisterEventHotKey(hk_help);

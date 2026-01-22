@@ -14,7 +14,7 @@
 //! high-level events into concrete macOS actions.
 
 use cocoa::appkit::NSApp;
-use cocoa::base::{id, nil};
+use cocoa::base::{id, nil, YES};
 use objc::{msg_send, sel, sel_impl};
 
 use crate::ui::show_help_overlay;
@@ -89,8 +89,9 @@ unsafe fn dispatch_single_event(
         }
 
         AppEvent::ShowAbout => {
-            // Show the standard macOS About panel
+            // Activate app and show the standard macOS About panel
             let app: id = NSApp();
+            let _: () = msg_send![app, activateIgnoringOtherApps: YES];
             let _: () = msg_send![app, orderFrontStandardAboutPanel: nil];
         }
 

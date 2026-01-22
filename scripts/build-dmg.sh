@@ -25,6 +25,8 @@ DMG_OUTPUT="$PROJECT_ROOT/dist/$DMG_NAME.dmg"
 
 # Resources
 ICON_FILE="$PROJECT_ROOT/resources/icons/AppIcon.icns"
+DMG_FILE_ICON_PNG="$PROJECT_ROOT/resources/icons/image03.png"
+VOLUME_ICON_PNG="$PROJECT_ROOT/resources/icons/mounted.png"
 STATUS_BAR_ICON="$PROJECT_ROOT/resources/icons/StatusBarIcon.png"
 DMG_BACKGROUND="$PROJECT_ROOT/resources/dmg_background.png"
 INFO_PLIST="$PROJECT_ROOT/resources/Info.plist"
@@ -32,12 +34,41 @@ INFO_PLIST="$PROJECT_ROOT/resources/Info.plist"
 # Create dist directory
 mkdir -p "$PROJECT_ROOT/dist"
 
-# Step 1: Build release
-echo -e "${YELLOW}[1/4] Compiling release build...${NC}"
+# Function to generate .icns from PNG
+generate_icns() {
+    local src_png="$1"
+    local out_icns="$2"
+    local iconset_dir="${out_icns%.icns}.iconset"
+    
+    rm -rf "$iconset_dir"
+    mkdir -p "$iconset_dir"
+    
+    for size in 16 32 128 256 512; do
+        sips -z $size $size "$src_png" --out "$iconset_dir/icon_${size}x${size}.png" >/dev/null 2>&1
+        double=$((size * 2))
+        sips -z $double $double "$src_png" --out "$iconset_dir/icon_${size}x${size}@2x.png" >/dev/null 2>&1
+    done
+    
+    iconutil -c icns "$iconset_dir" -o "$out_icns"
+    rm -rf "$iconset_dir"
+}
+
+# Step 1: Generate icons from PNG sources
+echo -e "${YELLOW}[1/6] Generating icons...${NC}"
+DMG_FILE_ICON_ICNS="$PROJECT_ROOT/resources/icons/image03.icns"
+VOLUME_ICON_ICNS="$PROJECT_ROOT/resources/icons/mounted.icns"
+
+generate_icns "$DMG_FILE_ICON_PNG" "$DMG_FILE_ICON_ICNS"
+echo -e "${GREEN}   Generated: $DMG_FILE_ICON_ICNS${NC}"
+generate_icns "$VOLUME_ICON_PNG" "$VOLUME_ICON_ICNS"
+echo -e "${GREEN}   Generated: $VOLUME_ICON_ICNS${NC}"
+
+# Step 2: Build release
+echo -e "${YELLOW}[2/6] Compiling release build...${NC}"
 cargo build --release
 
-# Step 2: Create .app bundle
-echo -e "${YELLOW}[2/4] Creating app bundle...${NC}"
+# Step 3: Create .app bundle
+echo -e "${YELLOW}[3/6] Creating app bundle...${NC}"
 rm -rf "$APP_BUNDLE"
 mkdir -p "$APP_BUNDLE/Contents/MacOS"
 mkdir -p "$APP_BUNDLE/Contents/Resources"
@@ -57,17 +88,17 @@ chmod +x "$APP_BUNDLE/Contents/MacOS/$APP_NAME"
 
 echo -e "${GREEN}   Created: $APP_BUNDLE${NC}"
 
-# Step 3: Remove old DMG if exists
+# Step 4: Remove old DMG if exists
 if [ -f "$DMG_OUTPUT" ]; then
-    echo -e "${YELLOW}[3/4] Removing old DMG...${NC}"
+    echo -e "${YELLOW}[4/6] Removing old DMG...${NC}"
     rm -f "$DMG_OUTPUT"
 fi
 
-# Step 4: Create DMG
-echo -e "${YELLOW}[4/4] Creating DMG installer...${NC}"
+# Step 5: Create DMG
+echo -e "${YELLOW}[5/6] Creating DMG installer...${NC}"
 create-dmg \
     --volname "$APP_NAME" \
-    --volicon "$ICON_FILE" \
+    --volicon "$VOLUME_ICON_ICNS" \
     --background "$DMG_BACKGROUND" \
     --window-pos 200 120 \
     --window-size 600 400 \
@@ -77,6 +108,10 @@ create-dmg \
     --app-drop-link 440 160 \
     "$DMG_OUTPUT" \
     "$APP_BUNDLE"
+
+# Step 6: Set DMG file icon
+echo -e "${YELLOW}[6/6] Setting DMG file icon...${NC}"
+fileicon set "$DMG_OUTPUT" "$DMG_FILE_ICON_ICNS"
 
 echo ""
 echo -e "${GREEN}=== Build Complete ===${NC}"

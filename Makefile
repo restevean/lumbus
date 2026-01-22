@@ -72,7 +72,7 @@ endif
 
 # Create DMG for distribution
 dmg: bundle
-	$(SCRIPTS_DIR)/create-dmg.sh
+	$(SCRIPTS_DIR)/build-dmg.sh
 
 # === Cleanup ===
 

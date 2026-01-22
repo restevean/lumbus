@@ -28,7 +28,6 @@ Highlight the mouse pointer across **all** macOS displays with a configurable ci
 - **Global hotkeys (no beep)**
     - `Ctrl` + `A` → **Toggle overlay visibility**
     - `⌘` + `,` → **Open Settings**
-    - `⌘` + `;` → **Open Settings** (alternate)
     - `⌘` + `Shift` + `H` → **Show Help** (keyboard shortcuts)
     - `Ctrl` + `Shift` + `X` → **Quit** (with confirmation)
 - **Help overlay** — Press `⌘+Shift+H` to show all keyboard shortcuts in a centered overlay
@@ -110,7 +109,7 @@ make install
 
 2. Toggle overlay with **Ctrl + A** (works while the app is running; it doesn’t need to be frontmost).
 
-3. Open **Settings** with **⌘ + ,** or **⌘ + ;**.
+3. Open **Settings** with **⌘ + ,**.
 
 4. Adjust **radius**, **border**, **colour** (picker or Hex), and **fill transparency**.
 
@@ -156,7 +155,6 @@ make install
 |----------|--------|
 | `Ctrl` + `A` | Toggle overlay |
 | `⌘` + `,` | Open Settings |
-| `⌘` + `;` | Open Settings (alternate) |
 | `⌘` + `Shift` + `H` | Show Help |
 | `Ctrl` + `Shift` + `X` | Quit (with confirmation) |
 
@@ -180,7 +178,7 @@ Implemented with **Carbon HotKeys** (no beep) and a local key monitor for extra 
 
 ## 🧪 Troubleshooting
 
-- **Shortcuts beep or don’t trigger:** Use **Ctrl+A**, **⌘+,**, **⌘+;**, or **Ctrl+Shift+X**. Other apps may intercept overlapping shortcuts—adjust their settings if necessary.
+- **Shortcuts beep or don’t trigger:** Use **Ctrl+A**, **⌘+,**, or **Ctrl+Shift+X**. Other apps may intercept overlapping shortcuts—adjust their settings if necessary.
 - **Overlay not following the cursor:** Ensure **Input Monitoring** and/or **Accessibility** are enabled for your binary (or for your IDE if launching from it).
 - **Hex field layout:** It sits to the right of the “Hex” label; tweak the constants if you change window width.
 
@@ -253,4 +251,4 @@ Apache License 2.0. See [LICENSE](LICENSE) file.
 ## 🙌 Acknowledgments
 
 Built with `cocoa`, `objc`, `block`, and a sprinkle of Core* frameworks via FFI.
-Tested on macOS with **ANSI** and **ISO** keyboards (`⌘+,` and `⌘+;` cover both). ✔️
+Tested on macOS. Works with ANSI and ISO keyboards. ✔️

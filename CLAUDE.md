@@ -77,7 +77,8 @@ cargo test -- --nocapture
 
 ### Hotkeys (Carbon Event Manager)
 - **Ctrl+A**: Toggle overlay visibility
-- **⌘+,** / **⌘+;**: Open Settings (ANSI/ISO keyboard support)
+- **⌘+,**: Open Settings
+- **⌘+Shift+H**: Show Help
 - **Ctrl+Shift+X**: Quit with confirmation
 
 Hotkeys use Carbon API (not NSEvent global monitors) to avoid triggering system beep. Handler installed on `GetApplicationEventTarget()`.
@@ -114,7 +115,6 @@ Grant these to the app (or to RustRover/IDE if running from development environm
 ## Known Constraints
 
 - macOS 10.13+ required (uses modern Cocoa/CoreGraphics APIs)
-- ANSI/ISO keyboard support via dual hotkeys (⌘+, and ⌘+;)
 - No CLI arguments; all configuration via GUI
 - No external config files; all state in NSUserDefaults
 - No support for Windows/Linux (pure macOS Cocoa)

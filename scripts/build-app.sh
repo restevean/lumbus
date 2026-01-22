@@ -91,6 +91,12 @@ else
     echo "Warning: No status bar icon found at resources/icons/StatusBarIcon.png"
 fi
 
+# Step 6c: Copy Credits.rtf (for About panel)
+if [ -f "$PROJECT_ROOT/resources/Credits.rtf" ]; then
+    echo ">>> Copying Credits.rtf..."
+    cp "$PROJECT_ROOT/resources/Credits.rtf" "$RESOURCES_DIR/"
+fi
+
 # Step 7: Create PkgInfo
 echo ">>> Creating PkgInfo..."
 echo -n "APPLmhlt" > "$CONTENTS_DIR/PkgInfo"
