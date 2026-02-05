@@ -13,9 +13,7 @@
 //! The dispatcher acts as the central coordinator, translating
 //! high-level events into concrete macOS actions.
 
-use cocoa::appkit::NSApp;
-use cocoa::base::{id, nil, YES};
-use objc::{msg_send, sel, sel_impl};
+use lumbus::ffi::bridge::{id, msg_send, nil, NSApp, YES};
 
 use crate::ui::show_help_overlay;
 use lumbus::events::{drain_events, AppEvent};
@@ -75,7 +73,7 @@ unsafe fn dispatch_single_event(
     match event {
         AppEvent::ToggleOverlay => {
             // Toggle overlay visibility via the view's method
-            let _: () = objc::msg_send![view, requestToggle];
+            let _: () = msg_send![view, requestToggle];
         }
 
         AppEvent::OpenSettings => {

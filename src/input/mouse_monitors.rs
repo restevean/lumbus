@@ -3,9 +3,8 @@
 //! This module handles global mouse events to show L/R indicators
 //! when clicking and to track mouse movement.
 
-use block::ConcreteBlock;
-use cocoa::base::{id, YES};
-use objc::{class, msg_send, sel, sel_impl};
+use block2::RcBlock;
+use lumbus::ffi::bridge::{get_class, id, msg_send, nil, sel, ObjectExt, NO, YES};
 
 use crate::app::apply_to_all_views;
 
@@ -25,68 +24,63 @@ pub unsafe fn install_mouse_monitors(view: id) {
     const RIGHT_UP_MASK: u64 = 1 << 4;
     const MOUSE_MOVED_MASK: u64 = 1 << 6;
 
-    let cls = class!(NSEvent);
+    let cls = get_class("NSEvent");
 
     // LEFT DOWN -> L mode
-    let h1 = ConcreteBlock::new(move |_e: id| unsafe {
-        apply_to_all_views(|v| *(*v).get_mut_ivar::<i32>("_displayMode") = 1);
+    let h1 = RcBlock::new(move |_e: id| unsafe {
+        apply_to_all_views(|v| *(*v).load_ivar_mut::<i32>("_displayMode") = 1);
         apply_to_all_views(|v| {
             let _: () = msg_send![v, setNeedsDisplay: YES];
         });
-    })
-    .copy();
+    });
     let mon_ld: id =
-        msg_send![cls, addGlobalMonitorForEventsMatchingMask: LEFT_DOWN_MASK handler: &*h1];
-    (*view).set_ivar::<id>("_monLeftDown", mon_ld);
+        msg_send![cls, addGlobalMonitorForEventsMatchingMask: LEFT_DOWN_MASK, handler: &*h1];
+    (*view).store_ivar::<id>("_monLeftDown", mon_ld);
 
     // LEFT UP -> circle
-    let h2 = ConcreteBlock::new(move |_e: id| unsafe {
-        apply_to_all_views(|v| *(*v).get_mut_ivar::<i32>("_displayMode") = 0);
+    let h2 = RcBlock::new(move |_e: id| unsafe {
+        apply_to_all_views(|v| *(*v).load_ivar_mut::<i32>("_displayMode") = 0);
         apply_to_all_views(|v| {
             let _: () = msg_send![v, setNeedsDisplay: YES];
         });
-    })
-    .copy();
+    });
     let mon_lu: id =
-        msg_send![cls, addGlobalMonitorForEventsMatchingMask: LEFT_UP_MASK handler: &*h2];
-    (*view).set_ivar::<id>("_monLeftUp", mon_lu);
+        msg_send![cls, addGlobalMonitorForEventsMatchingMask: LEFT_UP_MASK, handler: &*h2];
+    (*view).store_ivar::<id>("_monLeftUp", mon_lu);
 
     // RIGHT DOWN -> R mode
-    let h3 = ConcreteBlock::new(move |_e: id| unsafe {
-        apply_to_all_views(|v| *(*v).get_mut_ivar::<i32>("_displayMode") = 2);
+    let h3 = RcBlock::new(move |_e: id| unsafe {
+        apply_to_all_views(|v| *(*v).load_ivar_mut::<i32>("_displayMode") = 2);
         apply_to_all_views(|v| {
             let _: () = msg_send![v, setNeedsDisplay: YES];
         });
-    })
-    .copy();
+    });
     let mon_rd: id =
-        msg_send![cls, addGlobalMonitorForEventsMatchingMask: RIGHT_DOWN_MASK handler: &*h3];
-    (*view).set_ivar::<id>("_monRightDown", mon_rd);
+        msg_send![cls, addGlobalMonitorForEventsMatchingMask: RIGHT_DOWN_MASK, handler: &*h3];
+    (*view).store_ivar::<id>("_monRightDown", mon_rd);
 
     // RIGHT UP -> circle
-    let h4 = ConcreteBlock::new(move |_e: id| unsafe {
-        apply_to_all_views(|v| *(*v).get_mut_ivar::<i32>("_displayMode") = 0);
+    let h4 = RcBlock::new(move |_e: id| unsafe {
+        apply_to_all_views(|v| *(*v).load_ivar_mut::<i32>("_displayMode") = 0);
         apply_to_all_views(|v| {
             let _: () = msg_send![v, setNeedsDisplay: YES];
         });
-    })
-    .copy();
+    });
     let mon_ru: id =
-        msg_send![cls, addGlobalMonitorForEventsMatchingMask: RIGHT_UP_MASK handler: &*h4];
-    (*view).set_ivar::<id>("_monRightUp", mon_ru);
+        msg_send![cls, addGlobalMonitorForEventsMatchingMask: RIGHT_UP_MASK, handler: &*h4];
+    (*view).store_ivar::<id>("_monRightUp", mon_ru);
 
     // mouseMoved → schedule update on the main thread
     let host = view;
-    let hmove = ConcreteBlock::new(move |_e: id| unsafe {
+    let hmove = RcBlock::new(move |_e: id| unsafe {
         let _: () = msg_send![
             host,
-            performSelectorOnMainThread: sel!(update_cursor_multi)
-            withObject: cocoa::base::nil
-            waitUntilDone: cocoa::base::NO
+            performSelectorOnMainThread: sel!(update_cursor_multi),
+            withObject: nil,
+            waitUntilDone: NO
         ];
-    })
-    .copy();
+    });
     let mon_move: id =
-        msg_send![cls, addGlobalMonitorForEventsMatchingMask: MOUSE_MOVED_MASK handler: &*hmove];
-    (*view).set_ivar::<id>("_monMove", mon_move);
+        msg_send![cls, addGlobalMonitorForEventsMatchingMask: MOUSE_MOVED_MASK, handler: &*hmove];
+    (*view).store_ivar::<id>("_monMove", mon_move);
 }

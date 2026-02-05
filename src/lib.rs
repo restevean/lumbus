@@ -1,10 +1,19 @@
 #![allow(unexpected_cfgs)] // Silence cfg warnings from objc macros
 
-//! Pure helpers used by the app. Keep this file free of macOS FFI so tests
-//! can run as normal integration tests.
+//! Lumbus - Mouse pointer highlighter for macOS.
+//!
+//! This library contains:
+//! - Pure helpers (clamp, color conversion, i18n)
+//! - Event system
+//! - Model/state management
+//! - FFI bindings (macOS only)
 
 pub mod events;
 pub mod model;
+
+// FFI module only available on macOS
+#[cfg(target_os = "macos")]
+pub mod ffi;
 
 use std::borrow::Cow;
 

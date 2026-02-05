@@ -3,33 +3,19 @@
 //! This module provides functions to load and save overlay state
 //! to macOS NSUserDefaults.
 
-use cocoa::base::{id, nil};
-use objc::{class, msg_send, sel, sel_impl};
+#[cfg(target_os = "macos")]
+use crate::ffi::bridge::{get_class, id, msg_send, nil, nsstring_id};
 
 use super::app_state::OverlayState;
 use super::constants::*;
-
-// We need nsstring from our ffi module, but model shouldn't depend on ffi
-// So we duplicate the minimal nsstring implementation here
-use std::ffi::CString;
-
-/// Create NSString* from &str.
-///
-/// # Safety
-/// Caller must ensure the returned id is used within a valid autorelease pool.
-unsafe fn nsstring(s: &str) -> id {
-    let cstr = CString::new(s).unwrap();
-    let ns: id = msg_send![class!(NSString), stringWithUTF8String: cstr.as_ptr()];
-    ns
-}
 
 /// Reads a double from NSUserDefaults, returns default if not set.
 ///
 /// # Safety
 /// Must be called from main thread with valid autorelease pool.
 pub unsafe fn prefs_get_double(key: &str, default: f64) -> f64 {
-    let ud: id = msg_send![class!(NSUserDefaults), standardUserDefaults];
-    let k = nsstring(key);
+    let ud: id = msg_send![get_class("NSUserDefaults"), standardUserDefaults];
+    let k = nsstring_id(key);
     let obj: id = msg_send![ud, objectForKey: k];
     if obj == nil {
         default
@@ -43,9 +29,9 @@ pub unsafe fn prefs_get_double(key: &str, default: f64) -> f64 {
 /// # Safety
 /// Must be called from main thread with valid autorelease pool.
 pub unsafe fn prefs_set_double(key: &str, val: f64) {
-    let ud: id = msg_send![class!(NSUserDefaults), standardUserDefaults];
-    let k = nsstring(key);
-    let _: () = msg_send![ud, setDouble: val forKey: k];
+    let ud: id = msg_send![get_class("NSUserDefaults"), standardUserDefaults];
+    let k = nsstring_id(key);
+    let _: () = msg_send![ud, setDouble: val, forKey: k];
 }
 
 /// Reads an integer from NSUserDefaults, returns default if not set.
@@ -53,8 +39,8 @@ pub unsafe fn prefs_set_double(key: &str, val: f64) {
 /// # Safety
 /// Must be called from main thread with valid autorelease pool.
 pub unsafe fn prefs_get_int(key: &str, default: i32) -> i32 {
-    let ud: id = msg_send![class!(NSUserDefaults), standardUserDefaults];
-    let k = nsstring(key);
+    let ud: id = msg_send![get_class("NSUserDefaults"), standardUserDefaults];
+    let k = nsstring_id(key);
     let obj: id = msg_send![ud, objectForKey: k];
     if obj == nil {
         default
@@ -68,9 +54,9 @@ pub unsafe fn prefs_get_int(key: &str, default: i32) -> i32 {
 /// # Safety
 /// Must be called from main thread with valid autorelease pool.
 pub unsafe fn prefs_set_int(key: &str, val: i32) {
-    let ud: id = msg_send![class!(NSUserDefaults), standardUserDefaults];
-    let k = nsstring(key);
-    let _: () = msg_send![ud, setInteger: val forKey: k];
+    let ud: id = msg_send![get_class("NSUserDefaults"), standardUserDefaults];
+    let k = nsstring_id(key);
+    let _: () = msg_send![ud, setInteger: val, forKey: k];
 }
 
 /// Loads complete state from NSUserDefaults.

@@ -4,16 +4,13 @@
 //! draw_rect method. While still using unsafe FFI calls to Cocoa, the
 //! logic is isolated and easier to understand/maintain.
 
-use cocoa::base::id;
-use cocoa::foundation::{NSPoint, NSRect, NSSize};
-use objc::runtime::Class;
-use objc::{msg_send, sel, sel_impl};
+use lumbus::ffi::bridge::{get_class, id, msg_send, NSPoint, NSRect, NSSize};
 
-use crate::ffi::{
+use lumbus::clamp;
+use lumbus::ffi::{
     CFRelease, CGPathRef, CGPathRelease, CTFontCreatePathForGlyph, CTFontCreateWithName,
     CTFontGetGlyphsForCharacters, CTFontRef,
 };
-use lumbus::clamp;
 
 /// Drawing parameters extracted from view ivars.
 ///
@@ -53,8 +50,8 @@ impl DrawParams {
 ///
 /// Must be called from the main thread within a valid drawing context.
 pub unsafe fn draw_circle(params: &DrawParams) {
-    let ns_color = Class::get("NSColor").unwrap();
-    let ns_bezier = Class::get("NSBezierPath").unwrap();
+    let ns_color = get_class("NSColor");
+    let ns_bezier = get_class("NSBezierPath");
 
     let rect = NSRect::new(
         NSPoint::new(
@@ -71,9 +68,9 @@ pub unsafe fn draw_circle(params: &DrawParams) {
     if fill_alpha > 0.0 {
         let fill: id = msg_send![
             ns_color,
-            colorWithCalibratedRed: params.stroke_r
-            green: params.stroke_g
-            blue: params.stroke_b
+            colorWithCalibratedRed: params.stroke_r,
+            green: params.stroke_g,
+            blue: params.stroke_b,
             alpha: fill_alpha
         ];
         let _: () = msg_send![fill, set];
@@ -83,9 +80,9 @@ pub unsafe fn draw_circle(params: &DrawParams) {
     // Stroke
     let stroke: id = msg_send![
         ns_color,
-        colorWithCalibratedRed: params.stroke_r
-        green: params.stroke_g
-        blue: params.stroke_b
+        colorWithCalibratedRed: params.stroke_r,
+        green: params.stroke_g,
+        blue: params.stroke_b,
         alpha: params.stroke_a
     ];
     let _: () = msg_send![stroke, set];
@@ -130,12 +127,12 @@ impl ClickLetter {
 ///
 /// Must be called from the main thread within a valid drawing context.
 pub unsafe fn draw_letter(params: &DrawParams, letter: ClickLetter, es: bool) {
-    let ns_color = Class::get("NSColor").unwrap();
-    let ns_bezier = Class::get("NSBezierPath").unwrap();
-    let ns_affine = Class::get("NSAffineTransform").unwrap();
-    let font_class = Class::get("NSFont").unwrap();
+    let ns_color = get_class("NSColor");
+    let ns_bezier = get_class("NSBezierPath");
+    let ns_affine = get_class("NSAffineTransform");
+    let font_class = get_class("NSFont");
 
-    // Letter height = 1.5 × diameter (3 × radius)
+    // Letter height = 1.5 x diameter (3 x radius)
     let target_letter_height = 3.0 * params.radius;
 
     let font: id = msg_send![font_class, boldSystemFontOfSize: target_letter_height];
@@ -174,7 +171,7 @@ pub unsafe fn draw_letter(params: &DrawParams, letter: ClickLetter, es: bool) {
     let transform: id = msg_send![ns_affine, transform];
     let dx = params.center.x - mid_x;
     let dy = params.center.y - mid_y;
-    let _: () = msg_send![transform, translateXBy: dx yBy: dy];
+    let _: () = msg_send![transform, translateXBy: dx, yBy: dy];
     let _: () = msg_send![path, transformUsingAffineTransform: transform];
 
     // Round line joins for smoother appearance
@@ -185,9 +182,9 @@ pub unsafe fn draw_letter(params: &DrawParams, letter: ClickLetter, es: bool) {
     if fill_alpha > 0.0 {
         let fill: id = msg_send![
             ns_color,
-            colorWithCalibratedRed: params.stroke_r
-            green: params.stroke_g
-            blue: params.stroke_b
+            colorWithCalibratedRed: params.stroke_r,
+            green: params.stroke_g,
+            blue: params.stroke_b,
             alpha: fill_alpha
         ];
         let _: () = msg_send![fill, set];
@@ -197,9 +194,9 @@ pub unsafe fn draw_letter(params: &DrawParams, letter: ClickLetter, es: bool) {
     // Stroke
     let stroke: id = msg_send![
         ns_color,
-        colorWithCalibratedRed: params.stroke_r
-        green: params.stroke_g
-        blue: params.stroke_b
+        colorWithCalibratedRed: params.stroke_r,
+        green: params.stroke_g,
+        blue: params.stroke_b,
         alpha: params.stroke_a
     ];
     let _: () = msg_send![stroke, set];

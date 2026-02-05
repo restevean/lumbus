@@ -2,15 +2,15 @@
 //!
 //! Custom borderless dialog that can appear over fullscreen apps.
 
-use block::ConcreteBlock;
-use cocoa::appkit::{NSApp, NSBackingStoreType, NSColor, NSWindow, NSWindowStyleMask};
-use cocoa::base::{id, nil, NO, YES};
-use cocoa::foundation::{NSPoint, NSRect, NSSize};
-use objc::{class, msg_send, sel, sel_impl};
+use block2::RcBlock;
+use lumbus::ffi::bridge::{
+    get_bool_ivar, get_class, id, msg_send, nil, nsstring_id, sel, set_bool_ivar, NSApp, NSPoint,
+    NSRect, NSSize, NO, YES,
+};
 
 use crate::app::{apply_to_all_views, lang_is_es};
-use crate::ffi::{nsstring, overlay_window_level};
 use lumbus::events::{publish, AppEvent};
+use lumbus::ffi::overlay_window_level;
 use lumbus::tr_key;
 
 /// Show a quit confirmation dialog.
@@ -24,13 +24,14 @@ use lumbus::tr_key;
 ///
 /// # Safety
 /// Must be called from main thread.
+#[allow(unused_unsafe)]
 pub fn confirm_and_maybe_quit(view: id) {
     unsafe {
         // Save current overlay state and hide circle during dialog
-        let was_enabled = *(*view).get_ivar::<bool>("_overlayEnabled");
+        let was_enabled = get_bool_ivar(view, "_overlayEnabled");
         apply_to_all_views(|v| {
-            *(*v).get_mut_ivar::<bool>("_overlayEnabled") = false;
-            *(*v).get_mut_ivar::<bool>("_visible") = false;
+            set_bool_ivar(v, "_overlayEnabled", false);
+            set_bool_ivar(v, "_visible", false);
             let _: () = msg_send![v, setNeedsDisplay: YES];
         });
 
@@ -41,16 +42,19 @@ pub fn confirm_and_maybe_quit(view: id) {
         let dialog_h: f64 = 140.0;
 
         // Create BORDERLESS window (key to appearing over fullscreen apps)
-        let dialog: id = NSWindow::alloc(nil).initWithContentRect_styleMask_backing_defer_(
-            NSRect::new(NSPoint::new(0.0, 0.0), NSSize::new(dialog_w, dialog_h)),
-            NSWindowStyleMask::NSBorderlessWindowMask,
-            NSBackingStoreType::NSBackingStoreBuffered,
-            NO,
-        );
+        let dialog: id = msg_send![get_class("NSWindow"), alloc];
+        let dialog: id = msg_send![
+            dialog,
+            initWithContentRect: NSRect::new(NSPoint::new(0.0, 0.0), NSSize::new(dialog_w, dialog_h)),
+            styleMask: 0u64,
+            backing: 2u64,  // NSBackingStoreBuffered
+            defer: NO
+        ];
 
         // Configure window like overlay windows
+        let clear_color: id = msg_send![get_class("NSColor"), clearColor];
         let _: () = msg_send![dialog, setOpaque: NO];
-        let _: () = msg_send![dialog, setBackgroundColor: NSColor::clearColor(nil)];
+        let _: () = msg_send![dialog, setBackgroundColor: clear_color];
         let _: () = msg_send![dialog, setLevel: overlay_window_level()];
         // CanJoinAllSpaces (1) + Stationary (16) + FullScreenAuxiliary (256) = 273
         let _: () = msg_send![dialog, setCollectionBehavior: 273u64];
@@ -58,10 +62,10 @@ pub fn confirm_and_maybe_quit(view: id) {
         let _: () = msg_send![dialog, setIgnoresMouseEvents: NO];
 
         // Find screen where cursor is
-        let mouse_loc: NSPoint = msg_send![class!(NSEvent), mouseLocation];
-        let screens: id = msg_send![class!(NSScreen), screens];
+        let mouse_loc: NSPoint = msg_send![get_class("NSEvent"), mouseLocation];
+        let screens: id = msg_send![get_class("NSScreen"), screens];
         let screen_count: usize = msg_send![screens, count];
-        let mut target_screen: id = msg_send![class!(NSScreen), mainScreen];
+        let mut target_screen: id = msg_send![get_class("NSScreen"), mainScreen];
 
         for i in 0..screen_count {
             let scr: id = msg_send![screens, objectAtIndex: i];
@@ -86,7 +90,7 @@ pub fn confirm_and_maybe_quit(view: id) {
         let content: id = msg_send![dialog, contentView];
 
         // Background box (dark semi-transparent with rounded corners)
-        let bg_box: id = msg_send![class!(NSBox), alloc];
+        let bg_box: id = msg_send![get_class("NSBox"), alloc];
         let bg_box: id = msg_send![bg_box, initWithFrame: NSRect::new(
             NSPoint::new(0.0, 0.0),
             NSSize::new(dialog_w, dialog_h)
@@ -94,9 +98,14 @@ pub fn confirm_and_maybe_quit(view: id) {
         let _: () = msg_send![bg_box, setBoxType: 4i64]; // NSBoxCustom
         let _: () = msg_send![bg_box, setBorderType: 0i64]; // NSNoBorder
         let _: () = msg_send![bg_box, setCornerRadius: 12.0f64];
-        let _: () = msg_send![bg_box, setFillColor: NSColor::colorWithSRGBRed_green_blue_alpha_(
-            nil, 0.15, 0.15, 0.15, 0.95
-        )];
+        let bg_color: id = msg_send![
+            get_class("NSColor"),
+            colorWithSRGBRed: 0.15f64,
+            green: 0.15f64,
+            blue: 0.15f64,
+            alpha: 0.95f64
+        ];
+        let _: () = msg_send![bg_box, setFillColor: bg_color];
         let _: () = msg_send![content, addSubview: bg_box];
 
         // Title label
@@ -105,20 +114,20 @@ pub fn confirm_and_maybe_quit(view: id) {
         } else {
             "Quit the app?"
         };
-        let title_label: id = msg_send![class!(NSTextField), alloc];
+        let title_label: id = msg_send![get_class("NSTextField"), alloc];
         let title_label: id = msg_send![title_label, initWithFrame: NSRect::new(
             NSPoint::new(20.0, dialog_h - 45.0),
             NSSize::new(dialog_w - 40.0, 30.0)
         )];
-        let _: () = msg_send![title_label, setStringValue: nsstring(title_text)];
+        let _: () = msg_send![title_label, setStringValue: nsstring_id(title_text)];
         let _: () = msg_send![title_label, setBezeled: NO];
         let _: () = msg_send![title_label, setDrawsBackground: NO];
         let _: () = msg_send![title_label, setEditable: NO];
         let _: () = msg_send![title_label, setSelectable: NO];
-        let white_color: id = msg_send![class!(NSColor), whiteColor];
+        let white_color: id = msg_send![get_class("NSColor"), whiteColor];
         let _: () = msg_send![title_label, setTextColor: white_color];
         let _: () = msg_send![title_label, setAlignment: 1i64]; // NSTextAlignmentCenter
-        let bold_font: id = msg_send![class!(NSFont), boldSystemFontOfSize: 16.0f64];
+        let bold_font: id = msg_send![get_class("NSFont"), boldSystemFontOfSize: 16.0f64];
         let _: () = msg_send![title_label, setFont: bold_font];
         let _: () = msg_send![content, addSubview: title_label];
 
@@ -128,19 +137,24 @@ pub fn confirm_and_maybe_quit(view: id) {
         } else {
             "The app will close"
         };
-        let msg_label: id = msg_send![class!(NSTextField), alloc];
+        let msg_label: id = msg_send![get_class("NSTextField"), alloc];
         let msg_label: id = msg_send![msg_label, initWithFrame: NSRect::new(
             NSPoint::new(20.0, dialog_h - 75.0),
             NSSize::new(dialog_w - 40.0, 20.0)
         )];
-        let _: () = msg_send![msg_label, setStringValue: nsstring(msg_text)];
+        let _: () = msg_send![msg_label, setStringValue: nsstring_id(msg_text)];
         let _: () = msg_send![msg_label, setBezeled: NO];
         let _: () = msg_send![msg_label, setDrawsBackground: NO];
         let _: () = msg_send![msg_label, setEditable: NO];
         let _: () = msg_send![msg_label, setSelectable: NO];
-        let _: () = msg_send![msg_label, setTextColor: NSColor::colorWithSRGBRed_green_blue_alpha_(
-            nil, 0.8, 0.8, 0.8, 1.0
-        )];
+        let msg_color: id = msg_send![
+            get_class("NSColor"),
+            colorWithSRGBRed: 0.8f64,
+            green: 0.8f64,
+            blue: 0.8f64,
+            alpha: 1.0f64
+        ];
+        let _: () = msg_send![msg_label, setTextColor: msg_color];
         let _: () = msg_send![msg_label, setAlignment: 1i64]; // NSTextAlignmentCenter
         let _: () = msg_send![content, addSubview: msg_label];
 
@@ -157,34 +171,40 @@ pub fn confirm_and_maybe_quit(view: id) {
         let quit_title = tr_key("Quit", es);
 
         // Cancel button (left) - not focused initially (gray)
-        let cancel_btn: id = msg_send![class!(NSButton), alloc];
+        let cancel_btn: id = msg_send![get_class("NSButton"), alloc];
         let cancel_btn: id = msg_send![cancel_btn, initWithFrame: NSRect::new(
             NSPoint::new(btn_start_x, btn_y),
             NSSize::new(btn_w, btn_h)
         )];
-        let _: () = msg_send![cancel_btn, setTitle: nsstring(&cancel_title)];
+        let _: () = msg_send![cancel_btn, setTitle: nsstring_id(&cancel_title)];
         let _: () = msg_send![cancel_btn, setBordered: NO]; // Remove border
-        let _: () = msg_send![cancel_btn, setKeyEquivalent: nsstring("\x1b")]; // Escape
+        let _: () = msg_send![cancel_btn, setKeyEquivalent: nsstring_id("\x1b")]; // Escape
         let _: () = msg_send![cancel_btn, setWantsLayer: YES];
         let cancel_layer: id = msg_send![cancel_btn, layer];
         // Darker gray for unfocused button
-        let dark_gray: id = NSColor::colorWithSRGBRed_green_blue_alpha_(nil, 0.35, 0.35, 0.35, 1.0);
+        let dark_gray: id = msg_send![
+            get_class("NSColor"),
+            colorWithSRGBRed: 0.35f64,
+            green: 0.35f64,
+            blue: 0.35f64,
+            alpha: 1.0f64
+        ];
         let dark_gray_cg: *const std::ffi::c_void = msg_send![dark_gray, CGColor];
         let _: () = msg_send![cancel_layer, setBackgroundColor: dark_gray_cg];
         let _: () = msg_send![cancel_layer, setCornerRadius: 6.0f64];
         let _: () = msg_send![content, addSubview: cancel_btn];
 
         // Quit button (right) - focused initially (blue)
-        let quit_btn: id = msg_send![class!(NSButton), alloc];
+        let quit_btn: id = msg_send![get_class("NSButton"), alloc];
         let quit_btn: id = msg_send![quit_btn, initWithFrame: NSRect::new(
             NSPoint::new(btn_start_x + btn_w + btn_spacing, btn_y),
             NSSize::new(btn_w, btn_h)
         )];
-        let _: () = msg_send![quit_btn, setTitle: nsstring(&quit_title)];
+        let _: () = msg_send![quit_btn, setTitle: nsstring_id(&quit_title)];
         let _: () = msg_send![quit_btn, setBordered: NO]; // Remove border
         let _: () = msg_send![quit_btn, setWantsLayer: YES];
         let quit_layer: id = msg_send![quit_btn, layer];
-        let blue_cg: id = msg_send![class!(NSColor), systemBlueColor];
+        let blue_cg: id = msg_send![get_class("NSColor"), systemBlueColor];
         let blue_cgcolor: *const std::ffi::c_void = msg_send![blue_cg, CGColor];
         let _: () = msg_send![quit_layer, setBackgroundColor: blue_cgcolor];
         let _: () = msg_send![quit_layer, setCornerRadius: 6.0f64];
@@ -205,125 +225,134 @@ pub fn confirm_and_maybe_quit(view: id) {
         const KEY_DOWN_MASK: u64 = 1 << 10;
         let flag_ptr = response_flag;
         let focus_ptr = focus_state;
-        let key_block = ConcreteBlock::new(move |event: id| -> id {
-            let keycode: u16 = msg_send![event, keyCode];
-            match keycode {
-                36 => {
-                    // Enter/Return - activate focused button
-                    let current_focus = *focus_ptr;
-                    if current_focus == 0 {
-                        *flag_ptr = 1; // Quit
-                    } else {
-                        *flag_ptr = 2; // Cancel
-                    }
-                    let app = NSApp();
-                    let _: () = msg_send![app, stopModal];
-                    return nil;
-                }
-                53 => {
-                    // Escape - always cancel
-                    *flag_ptr = 2; // Cancel
-                    let app = NSApp();
-                    let _: () = msg_send![app, stopModal];
-                    return nil;
-                }
-                48 | 123 | 124 => {
-                    // Tab, Left arrow, Right arrow - change focus
-                    let current_focus = *focus_ptr;
-                    let new_focus = match keycode {
-                        123 => 1, // Left arrow -> Cancel (left button)
-                        124 => 0, // Right arrow -> Quit (right button)
-                        _ => {
-                            if current_focus == 0 {
-                                1
-                            } else {
-                                0
-                            }
-                        } // Tab toggles
-                    };
-
-                    // Only update if focus actually changed
-                    if new_focus != current_focus {
-                        *focus_ptr = new_focus;
-
-                        // Get colors for focus switching
-                        let blue: id = msg_send![class!(NSColor), systemBlueColor];
-                        let dark_gray: id =
-                            NSColor::colorWithSRGBRed_green_blue_alpha_(nil, 0.35, 0.35, 0.35, 1.0);
-                        let blue_cg: *const std::ffi::c_void = msg_send![blue, CGColor];
-                        let gray_cg: *const std::ffi::c_void = msg_send![dark_gray, CGColor];
-
-                        // Update layer background colors
-                        if new_focus == 0 {
-                            // Focus on Quit (blue), Cancel gray
-                            let _: () = msg_send![quit_layer_ref, setBackgroundColor: blue_cg];
-                            let _: () = msg_send![cancel_layer_ref, setBackgroundColor: gray_cg];
+        let key_block = RcBlock::new(move |event: id| -> id {
+            unsafe {
+                let keycode: u16 = msg_send![event, keyCode];
+                match keycode {
+                    36 => {
+                        // Enter/Return - activate focused button
+                        let current_focus = *focus_ptr;
+                        if current_focus == 0 {
+                            *flag_ptr = 1; // Quit
                         } else {
-                            // Focus on Cancel (blue), Quit gray
-                            let _: () = msg_send![quit_layer_ref, setBackgroundColor: gray_cg];
-                            let _: () = msg_send![cancel_layer_ref, setBackgroundColor: blue_cg];
+                            *flag_ptr = 2; // Cancel
                         }
+                        let app: id = NSApp();
+                        let _: () = msg_send![app, stopModal];
+                        return nil;
                     }
-                    return nil;
+                    53 => {
+                        // Escape - always cancel
+                        *flag_ptr = 2; // Cancel
+                        let app: id = NSApp();
+                        let _: () = msg_send![app, stopModal];
+                        return nil;
+                    }
+                    48 | 123 | 124 => {
+                        // Tab, Left arrow, Right arrow - change focus
+                        let current_focus = *focus_ptr;
+                        let new_focus = match keycode {
+                            123 => 1, // Left arrow -> Cancel (left button)
+                            124 => 0, // Right arrow -> Quit (right button)
+                            _ => {
+                                if current_focus == 0 {
+                                    1
+                                } else {
+                                    0
+                                }
+                            } // Tab toggles
+                        };
+
+                        // Only update if focus actually changed
+                        if new_focus != current_focus {
+                            *focus_ptr = new_focus;
+
+                            // Get colors for focus switching
+                            let blue: id = msg_send![get_class("NSColor"), systemBlueColor];
+                            let dark_gray: id = msg_send![
+                                get_class("NSColor"),
+                                colorWithSRGBRed: 0.35f64,
+                                green: 0.35f64,
+                                blue: 0.35f64,
+                                alpha: 1.0f64
+                            ];
+                            let blue_cg: *const std::ffi::c_void = msg_send![blue, CGColor];
+                            let gray_cg: *const std::ffi::c_void = msg_send![dark_gray, CGColor];
+
+                            // Update layer background colors
+                            if new_focus == 0 {
+                                // Focus on Quit (blue), Cancel gray
+                                let _: () = msg_send![quit_layer_ref, setBackgroundColor: blue_cg];
+                                let _: () =
+                                    msg_send![cancel_layer_ref, setBackgroundColor: gray_cg];
+                            } else {
+                                // Focus on Cancel (blue), Quit gray
+                                let _: () = msg_send![quit_layer_ref, setBackgroundColor: gray_cg];
+                                let _: () =
+                                    msg_send![cancel_layer_ref, setBackgroundColor: blue_cg];
+                            }
+                        }
+                        return nil;
+                    }
+                    _ => {}
                 }
-                _ => {}
             }
             event
-        })
-        .copy();
+        });
         let key_mon: id = msg_send![
-            class!(NSEvent),
-            addLocalMonitorForEventsMatchingMask: KEY_DOWN_MASK
+            get_class("NSEvent"),
+            addLocalMonitorForEventsMatchingMask: KEY_DOWN_MASK,
             handler: &*key_block
         ];
 
         // Mouse click handler for buttons
         const LEFT_DOWN_MASK: u64 = 1 << 1;
         let flag_ptr2 = response_flag;
-        let click_block = ConcreteBlock::new(move |event: id| -> id {
-            let loc: NSPoint = msg_send![event, locationInWindow];
-            // Check if click is on quit button
-            let quit_frame: NSRect = msg_send![quit_btn_copy, frame];
-            if loc.x >= quit_frame.origin.x
-                && loc.x <= quit_frame.origin.x + quit_frame.size.width
-                && loc.y >= quit_frame.origin.y
-                && loc.y <= quit_frame.origin.y + quit_frame.size.height
-            {
-                *flag_ptr2 = 1; // Quit
-                let app = NSApp();
-                let _: () = msg_send![app, stopModal];
-                return nil;
-            }
-            // Check if click is on cancel button
-            let cancel_frame: NSRect = msg_send![cancel_btn_copy, frame];
-            if loc.x >= cancel_frame.origin.x
-                && loc.x <= cancel_frame.origin.x + cancel_frame.size.width
-                && loc.y >= cancel_frame.origin.y
-                && loc.y <= cancel_frame.origin.y + cancel_frame.size.height
-            {
-                *flag_ptr2 = 2; // Cancel
-                let app = NSApp();
-                let _: () = msg_send![app, stopModal];
-                return nil;
+        let click_block = RcBlock::new(move |event: id| -> id {
+            unsafe {
+                let loc: NSPoint = msg_send![event, locationInWindow];
+                // Check if click is on quit button
+                let quit_frame: NSRect = msg_send![quit_btn_copy, frame];
+                if loc.x >= quit_frame.origin.x
+                    && loc.x <= quit_frame.origin.x + quit_frame.size.width
+                    && loc.y >= quit_frame.origin.y
+                    && loc.y <= quit_frame.origin.y + quit_frame.size.height
+                {
+                    *flag_ptr2 = 1; // Quit
+                    let app: id = NSApp();
+                    let _: () = msg_send![app, stopModal];
+                    return nil;
+                }
+                // Check if click is on cancel button
+                let cancel_frame: NSRect = msg_send![cancel_btn_copy, frame];
+                if loc.x >= cancel_frame.origin.x
+                    && loc.x <= cancel_frame.origin.x + cancel_frame.size.width
+                    && loc.y >= cancel_frame.origin.y
+                    && loc.y <= cancel_frame.origin.y + cancel_frame.size.height
+                {
+                    *flag_ptr2 = 2; // Cancel
+                    let app: id = NSApp();
+                    let _: () = msg_send![app, stopModal];
+                    return nil;
+                }
             }
             event
-        })
-        .copy();
+        });
         let click_mon: id = msg_send![
-            class!(NSEvent),
-            addLocalMonitorForEventsMatchingMask: LEFT_DOWN_MASK
+            get_class("NSEvent"),
+            addLocalMonitorForEventsMatchingMask: LEFT_DOWN_MASK,
             handler: &*click_block
         ];
 
         // Show dialog and run modal
-        let app = NSApp();
+        let app: id = NSApp();
         let _: () = msg_send![app, activateIgnoringOtherApps: YES];
         let _: () = msg_send![dialog, makeKeyAndOrderFront: nil];
         let _: () = msg_send![app, runModalForWindow: dialog];
 
         // Clean up monitors
-        let _: () = msg_send![class!(NSEvent), removeMonitor: key_mon];
-        let _: () = msg_send![class!(NSEvent), removeMonitor: click_mon];
+        let _: () = msg_send![get_class("NSEvent"), removeMonitor: key_mon];
+        let _: () = msg_send![get_class("NSEvent"), removeMonitor: click_mon];
 
         // Read response and clean up
         let response = *response_flag;
@@ -343,12 +372,12 @@ pub fn confirm_and_maybe_quit(view: id) {
         // Cancel: restore overlay if it was enabled
         if was_enabled {
             apply_to_all_views(|v| {
-                *(*v).get_mut_ivar::<bool>("_overlayEnabled") = true;
+                set_bool_ivar(v, "_overlayEnabled", true);
             });
             let _: () = msg_send![
                 view,
-                performSelectorOnMainThread: sel!(update_cursor_multi)
-                withObject: nil
+                performSelectorOnMainThread: sel!(update_cursor_multi),
+                withObject: nil,
                 waitUntilDone: NO
             ];
         }

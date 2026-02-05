@@ -3,16 +3,15 @@
 //! This module provides keyboard monitoring that doesn't rely on Carbon,
 //! serving as a backup for the Ctrl+A toggle functionality.
 
-use block::ConcreteBlock;
-use cocoa::base::{id, nil};
-use objc::{class, msg_send, sel, sel_impl};
+use block2::RcBlock;
+use lumbus::ffi::bridge::{get_class, id, msg_send, nil, sel, ObjectExt, NO};
 
 /// Install a local monitor for Ctrl+A key combination.
 ///
 /// This serves as a backup for the Carbon hotkey in case it gets dropped.
 /// Local monitors work when the app has focus (e.g., settings window is open).
 pub unsafe fn install_local_ctrl_a_monitor(view: id) {
-    let existing: id = *(*view).get_ivar::<id>("_localKeyMonitor");
+    let existing: id = *(*view).load_ivar::<id>("_localKeyMonitor");
     if existing != nil {
         return;
     }
@@ -22,27 +21,26 @@ pub unsafe fn install_local_ctrl_a_monitor(view: id) {
     const KEYCODE_A: u16 = 0;
 
     let host = view;
-    let block = ConcreteBlock::new(move |event: id| {
+    let block = RcBlock::new(move |event: id| -> id {
         unsafe {
             let keycode: u16 = msg_send![event, keyCode];
             let flags: u64 = msg_send![event, modifierFlags];
             if keycode == KEYCODE_A && (flags & CTRL_FLAG) != 0 {
                 let _: () = msg_send![
                     host,
-                    performSelectorOnMainThread: sel!(requestToggle)
-                    withObject: nil
-                    waitUntilDone: cocoa::base::NO
+                    performSelectorOnMainThread: sel!(requestToggle),
+                    withObject: nil,
+                    waitUntilDone: NO
                 ];
             }
         }
         event
-    })
-    .copy();
+    });
 
     let mon: id = msg_send![
-        class!(NSEvent),
-        addLocalMonitorForEventsMatchingMask: KEY_DOWN_MASK
+        get_class("NSEvent"),
+        addLocalMonitorForEventsMatchingMask: KEY_DOWN_MASK,
         handler: &*block
     ];
-    (*view).set_ivar::<id>("_localKeyMonitor", mon);
+    (*view).store_ivar::<id>("_localKeyMonitor", mon);
 }

@@ -3,10 +3,13 @@
 //! This module provides helper functions for common Cocoa operations
 //! like NSString conversion, mouse position, and display ID retrieval.
 
-use cocoa::base::{id, nil};
-use cocoa::foundation::NSPoint;
-use objc::{class, msg_send, sel, sel_impl};
-use std::ffi::CString;
+use objc2::msg_send;
+use objc2::rc::Retained;
+use objc2::runtime::AnyObject;
+use objc2_app_kit::NSEvent;
+use objc2_foundation::NSString;
+
+use super::types::{Id, NIL};
 
 /// Window level slightly above context menus and Dock.
 pub fn nspop_up_menu_window_level() -> i64 {
@@ -20,21 +23,25 @@ pub fn overlay_window_level() -> i64 {
 
 /// Global mouse position in Cocoa coordinates (origin bottom-left).
 pub fn get_mouse_position_cocoa() -> (f64, f64) {
-    unsafe {
-        let cls = class!(NSEvent);
-        let p: NSPoint = msg_send![cls, mouseLocation];
-        (p.x, p.y)
-    }
+    let p = NSEvent::mouseLocation();
+    (p.x, p.y)
 }
 
-/// Create NSString* from &str.
+/// Create NSString from &str.
+///
+/// Returns a retained NSString that manages its own memory.
+pub fn nsstring(s: &str) -> Retained<NSString> {
+    NSString::from_str(s)
+}
+
+/// Create NSString* (raw pointer) from &str for FFI compatibility.
 ///
 /// # Safety
-/// Caller must ensure the returned id is used within a valid autorelease pool.
-pub unsafe fn nsstring(s: &str) -> id {
-    let cstr = CString::new(s).unwrap();
-    let ns: id = msg_send![class!(NSString), stringWithUTF8String: cstr.as_ptr()];
-    ns
+/// Caller must ensure the returned pointer is used within a valid context
+/// and properly released or autoreleased.
+pub unsafe fn nsstring_raw(s: &str) -> Id {
+    let ns = NSString::from_str(s);
+    Retained::into_raw(ns) as Id
 }
 
 /// Get stable CGDirectDisplayID for an NSScreen.
@@ -43,11 +50,12 @@ pub unsafe fn nsstring(s: &str) -> id {
 ///
 /// # Safety
 /// Caller must ensure `screen` is a valid NSScreen pointer.
-pub unsafe fn display_id_for_screen(screen: id) -> u32 {
-    let desc: id = msg_send![screen, deviceDescription];
+pub unsafe fn display_id_for_screen(screen: Id) -> u32 {
+    let desc: Id = msg_send![screen, deviceDescription];
     let key = nsstring("NSScreenNumber");
-    let num: id = msg_send![desc, objectForKey: key];
-    if num == nil {
+    let key_ptr = Retained::as_ptr(&key) as *mut AnyObject;
+    let num: Id = msg_send![desc, objectForKey: key_ptr];
+    if num == NIL {
         0
     } else {
         let v: u64 = msg_send![num, unsignedIntegerValue];

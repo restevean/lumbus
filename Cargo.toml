@@ -10,10 +10,22 @@ keywords = ["macos", "mouse", "cursor", "highlighter", "presentation"]
 categories = ["gui"]
 
 [dependencies]
-cocoa = "0.25"
-objc = "0.2"
-block = "0.1"
+# Core graphics (not deprecated, keep as-is)
 core-graphics = "0.24"
+
+# macOS-specific: objc2 ecosystem (replaces deprecated cocoa/objc/block crates)
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2 = "0.6"
+objc2-app-kit = "0.3"
+objc2-foundation = { version = "0.3", features = ["NSGeometry", "objc2-core-foundation"] }
+objc2-core-foundation = "0.3"
+block2 = "0.6"
+
+# Kept for spikes/experiments (can be removed after migration complete)
+[target.'cfg(target_os = "macos")'.dev-dependencies]
+eframe = "0.33"
+global-hotkey = "0.7"
+raw-window-handle = "0.6"
 
 # Release profile optimizations
 [profile.release]

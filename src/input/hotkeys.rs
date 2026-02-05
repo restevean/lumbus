@@ -6,9 +6,9 @@
 //! Note: The hotkey event handler remains in main.rs because it needs
 //! to call UI functions (open_settings_window, confirm_and_maybe_quit).
 
-use cocoa::base::id;
+use lumbus::ffi::bridge::{id, ObjectExt};
 
-use crate::ffi::{
+use lumbus::ffi::{
     EventHandlerRef, EventHotKeyID, EventHotKeyRef, EventTypeSpec, GetApplicationEventTarget,
     InstallEventHandler, RegisterEventHotKey, RemoveEventHandler, UnregisterEventHotKey, CMD_KEY,
     CONTROL_KEY, HKID_HELP, HKID_QUIT, HKID_SETTINGS_COMMA, HKID_TOGGLE, KC_A, KC_COMMA, KC_H,
@@ -17,8 +17,8 @@ use crate::ffi::{
 
 /// Type alias for the hotkey event handler function signature.
 pub type HotkeyHandler = extern "C" fn(
-    crate::ffi::EventHandlerCallRef,
-    crate::ffi::EventRef,
+    lumbus::ffi::EventHandlerCallRef,
+    lumbus::ffi::EventRef,
     *mut std::ffi::c_void,
 ) -> i32;
 
@@ -26,8 +26,8 @@ pub type HotkeyHandler = extern "C" fn(
 ///
 /// Registers:
 /// - Ctrl+A: Toggle overlay
-/// - ⌘+,: Open Settings
-/// - ⌘+Shift+H: Show Help
+/// - Cmd+,: Open Settings
+/// - Cmd+Shift+H: Show Help
 /// - Ctrl+Shift+X: Quit confirmation
 ///
 /// # Safety
@@ -48,10 +48,10 @@ pub unsafe fn install_hotkeys(view: id, handler: HotkeyHandler) {
         &mut handler_ref,
     );
     if status != NO_ERR {
-        eprintln!("❌ InstallEventHandler failed: {}", status);
+        eprintln!("InstallEventHandler failed: {}", status);
         return;
     }
-    (*view).set_ivar::<*mut std::ffi::c_void>("_hkHandler", handler_ref as *mut _);
+    (*view).store_ivar::<*mut std::ffi::c_void>("_hkHandler", handler_ref as *mut _);
 
     macro_rules! register_hotkey {
         ($keycode:expr, $mods:expr, $idconst:expr, $slot:literal) => {{
@@ -70,20 +70,20 @@ pub unsafe fn install_hotkeys(view: id, handler: HotkeyHandler) {
             );
             if st != NO_ERR || out_ref.is_null() {
                 eprintln!(
-                    "❌ RegisterEventHotKey failed (code={}, mods={}, id={}): {}",
+                    "RegisterEventHotKey failed (code={}, mods={}, id={}): {}",
                     $keycode, $mods, $idconst, st
                 );
             } else {
-                (*view).set_ivar::<*mut std::ffi::c_void>($slot, out_ref as *mut _);
+                (*view).store_ivar::<*mut std::ffi::c_void>($slot, out_ref as *mut _);
             }
         }};
     }
 
     // Ctrl + A (toggle)
     register_hotkey!(KC_A, CONTROL_KEY, HKID_TOGGLE, "_hkToggle");
-    // ⌘ + , → Settings
+    // Cmd + , → Settings
     register_hotkey!(KC_COMMA, CMD_KEY, HKID_SETTINGS_COMMA, "_hkComma");
-    // ⌘ + Shift + H → Help
+    // Cmd + Shift + H → Help
     register_hotkey!(KC_H, CMD_KEY | SHIFT_KEY, HKID_HELP, "_hkHelp");
     // Ctrl + Shift + X → Quit confirmation
     register_hotkey!(KC_X, CONTROL_KEY | SHIFT_KEY, HKID_QUIT, "_hkQuit");
@@ -94,31 +94,31 @@ pub unsafe fn install_hotkeys(view: id, handler: HotkeyHandler) {
 /// # Safety
 /// Must be called from main thread.
 pub unsafe fn uninstall_hotkeys(view: id) {
-    let hk_toggle: *mut std::ffi::c_void = *(*view).get_ivar("_hkToggle");
-    let hk_comma: *mut std::ffi::c_void = *(*view).get_ivar("_hkComma");
-    let hk_help: *mut std::ffi::c_void = *(*view).get_ivar("_hkHelp");
-    let hk_quit: *mut std::ffi::c_void = *(*view).get_ivar("_hkQuit");
-    let hk_handler: *mut std::ffi::c_void = *(*view).get_ivar("_hkHandler");
+    let hk_toggle: *mut std::ffi::c_void = *(*view).load_ivar("_hkToggle");
+    let hk_comma: *mut std::ffi::c_void = *(*view).load_ivar("_hkComma");
+    let hk_help: *mut std::ffi::c_void = *(*view).load_ivar("_hkHelp");
+    let hk_quit: *mut std::ffi::c_void = *(*view).load_ivar("_hkQuit");
+    let hk_handler: *mut std::ffi::c_void = *(*view).load_ivar("_hkHandler");
 
     if !hk_toggle.is_null() {
         let _ = UnregisterEventHotKey(hk_toggle);
-        (*view).set_ivar::<*mut std::ffi::c_void>("_hkToggle", std::ptr::null_mut());
+        (*view).store_ivar::<*mut std::ffi::c_void>("_hkToggle", std::ptr::null_mut());
     }
     if !hk_comma.is_null() {
         let _ = UnregisterEventHotKey(hk_comma);
-        (*view).set_ivar::<*mut std::ffi::c_void>("_hkComma", std::ptr::null_mut());
+        (*view).store_ivar::<*mut std::ffi::c_void>("_hkComma", std::ptr::null_mut());
     }
     if !hk_help.is_null() {
         let _ = UnregisterEventHotKey(hk_help);
-        (*view).set_ivar::<*mut std::ffi::c_void>("_hkHelp", std::ptr::null_mut());
+        (*view).store_ivar::<*mut std::ffi::c_void>("_hkHelp", std::ptr::null_mut());
     }
     if !hk_quit.is_null() {
         let _ = UnregisterEventHotKey(hk_quit);
-        (*view).set_ivar::<*mut std::ffi::c_void>("_hkQuit", std::ptr::null_mut());
+        (*view).store_ivar::<*mut std::ffi::c_void>("_hkQuit", std::ptr::null_mut());
     }
     if !hk_handler.is_null() {
         let _ = RemoveEventHandler(hk_handler);
-        (*view).set_ivar::<*mut std::ffi::c_void>("_hkHandler", std::ptr::null_mut());
+        (*view).store_ivar::<*mut std::ffi::c_void>("_hkHandler", std::ptr::null_mut());
     }
 }
 

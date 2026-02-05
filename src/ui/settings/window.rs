@@ -2,16 +2,15 @@
 //!
 //! This module contains functions for opening and managing the settings window.
 
-use block::ConcreteBlock;
-use cocoa::appkit::{NSApp, NSBackingStoreType, NSWindow, NSWindowStyleMask};
-use cocoa::base::{id, nil, NO, YES};
-use cocoa::foundation::{NSPoint, NSRect, NSSize};
-use objc::runtime::Class;
-use objc::{class, msg_send, sel, sel_impl};
+use block2::RcBlock;
+use lumbus::ffi::bridge::{
+    get_bool_ivar, get_class, id, msg_send, nil, nsstring_id, sel, set_bool_ivar, NSApp, NSPoint,
+    NSRect, NSSize, ObjectExt, NO, YES,
+};
 
 use crate::app::{apply_to_all_views, lang_is_es};
-use crate::ffi::{nsstring, overlay_window_level};
 use lumbus::events::{publish, AppEvent};
+use lumbus::ffi::overlay_window_level;
 use lumbus::{color_to_hex, tr_key};
 
 /// Configure a hex color text field.
@@ -34,34 +33,39 @@ unsafe fn configure_hex_field(view: id, field_hex: id) {
 ///
 /// # Safety
 /// Must be called from main thread.
+#[allow(unused_unsafe)]
 pub fn open_settings_window(view: id) {
     unsafe {
-        let existing: id = *(*view).get_ivar::<id>("_settingsWindow");
+        let existing: id = *(*view).load_ivar::<id>("_settingsWindow");
         if existing != nil {
             let _: () = msg_send![existing, makeKeyAndOrderFront: nil];
             return;
         }
 
         // Save current overlay state and hide circle during settings
-        let was_enabled = *(*view).get_ivar::<bool>("_overlayEnabled");
+        let was_enabled = get_bool_ivar(view, "_overlayEnabled");
         apply_to_all_views(|v| {
-            *(*v).get_mut_ivar::<bool>("_overlayEnabled") = false;
-            *(*v).get_mut_ivar::<bool>("_visible") = false;
+            set_bool_ivar(v, "_overlayEnabled", false);
+            set_bool_ivar(v, "_visible", false);
             let _: () = msg_send![v, setNeedsDisplay: YES];
         });
 
         let es = lang_is_es(view);
 
-        let style = NSWindowStyleMask::NSTitledWindowMask | NSWindowStyleMask::NSClosableWindowMask;
+        // NSTitledWindowMask (1) | NSClosableWindowMask (2) = 3
+        let style: u64 = 1 | 2;
         let w = 520.0;
         let h = 330.0;
-        let settings = NSWindow::alloc(nil).initWithContentRect_styleMask_backing_defer_(
-            NSRect::new(NSPoint::new(0.0, 0.0), NSSize::new(w, h)),
-            style,
-            NSBackingStoreType::NSBackingStoreBuffered,
-            NO,
-        );
-        let _: () = msg_send![settings, setTitle: nsstring(tr_key("Settings", es).as_ref())];
+
+        let settings: id = msg_send![get_class("NSWindow"), alloc];
+        let settings: id = msg_send![
+            settings,
+            initWithContentRect: NSRect::new(NSPoint::new(0.0, 0.0), NSSize::new(w, h)),
+            styleMask: style,
+            backing: 2u64,  // NSBackingStoreBuffered
+            defer: NO
+        ];
+        let _: () = msg_send![settings, setTitle: nsstring_id(tr_key("Settings", es).as_ref())];
 
         // High level and collection behavior to appear over fullscreen apps
         let _: () = msg_send![settings, setLevel: overlay_window_level()];
@@ -69,10 +73,10 @@ pub fn open_settings_window(view: id) {
         let _: () = msg_send![settings, setCollectionBehavior: 257u64];
 
         // Center on the screen where the cursor is (not just main screen)
-        let mouse_loc: NSPoint = msg_send![class!(NSEvent), mouseLocation];
-        let screens: id = msg_send![class!(NSScreen), screens];
+        let mouse_loc: NSPoint = msg_send![get_class("NSEvent"), mouseLocation];
+        let screens: id = msg_send![get_class("NSScreen"), screens];
         let screen_count: usize = msg_send![screens, count];
-        let mut target_screen: id = msg_send![class!(NSScreen), mainScreen];
+        let mut target_screen: id = msg_send![get_class("NSScreen"), mainScreen];
 
         for i in 0..screen_count {
             let scr: id = msg_send![screens, objectAtIndex: i];
@@ -101,18 +105,18 @@ pub fn open_settings_window(view: id) {
 
         let content: id = msg_send![settings, contentView];
 
-        let radius: f64 = *(*view).get_ivar::<f64>("_radius");
-        let border: f64 = *(*view).get_ivar::<f64>("_borderWidth");
-        let r: f64 = *(*view).get_ivar::<f64>("_strokeR");
-        let g: f64 = *(*view).get_ivar::<f64>("_strokeG");
-        let b: f64 = *(*view).get_ivar::<f64>("_strokeB");
-        let a: f64 = *(*view).get_ivar::<f64>("_strokeA");
-        let fill_t: f64 = *(*view).get_ivar::<f64>("_fillTransparencyPct");
-        let cur_lang: i32 = *(*view).get_ivar::<i32>("_lang");
+        let radius: f64 = *(*view).load_ivar::<f64>("_radius");
+        let border: f64 = *(*view).load_ivar::<f64>("_borderWidth");
+        let r: f64 = *(*view).load_ivar::<f64>("_strokeR");
+        let g: f64 = *(*view).load_ivar::<f64>("_strokeG");
+        let b: f64 = *(*view).load_ivar::<f64>("_strokeB");
+        let a: f64 = *(*view).load_ivar::<f64>("_strokeA");
+        let fill_t: f64 = *(*view).load_ivar::<f64>("_fillTransparencyPct");
+        let cur_lang: i32 = *(*view).load_ivar::<i32>("_lang");
 
         // Helper: static label
         let mk_label = |x, y, text: &str| -> id {
-            let lbl: id = msg_send![class!(NSTextField), alloc];
+            let lbl: id = msg_send![get_class("NSTextField"), alloc];
             let lbl: id = msg_send![
                 lbl,
                 initWithFrame: NSRect::new(NSPoint::new(x, y), NSSize::new(180.0, 20.0))
@@ -121,34 +125,35 @@ pub fn open_settings_window(view: id) {
             let _: () = msg_send![lbl, setDrawsBackground: NO];
             let _: () = msg_send![lbl, setEditable: NO];
             let _: () = msg_send![lbl, setSelectable: NO];
-            let _: () = msg_send![lbl, setStringValue: nsstring(text)];
+            let _: () = msg_send![lbl, setStringValue: nsstring_id(text)];
             lbl
         };
 
         // Helper: value as a non-interactive label
         let mk_value_label = |x, y, w_lbl, h_lbl, val: &str| -> id {
-            let tf: id = msg_send![class!(NSTextField), alloc];
+            let tf: id = msg_send![get_class("NSTextField"), alloc];
             let tf: id = msg_send![tf, initWithFrame: NSRect::new(NSPoint::new(x, y), NSSize::new(w_lbl, h_lbl))];
             let _: () = msg_send![tf, setBezeled: NO];
             let _: () = msg_send![tf, setDrawsBackground: NO];
             let _: () = msg_send![tf, setEditable: NO];
             let _: () = msg_send![tf, setSelectable: NO];
-            let _: () = msg_send![tf, setStringValue: nsstring(val)];
+            let _: () = msg_send![tf, setStringValue: nsstring_id(val)];
             tf
         };
 
         // Language selector
         let label_lang = mk_label(20.0, h - 40.0, tr_key("Language", es).as_ref());
-        let popup_lang: id = msg_send![class!(NSPopUpButton), alloc];
+        let popup_lang: id = msg_send![get_class("NSPopUpButton"), alloc];
         let popup_lang: id = msg_send![
             popup_lang,
             initWithFrame: NSRect::new(NSPoint::new(160.0, h - 44.0), NSSize::new(160.0, 24.0))
         ];
         let _: () =
-            msg_send![popup_lang, addItemWithTitle: nsstring(tr_key("English", es).as_ref())];
+            msg_send![popup_lang, addItemWithTitle: nsstring_id(tr_key("English", es).as_ref())];
         let _: () =
-            msg_send![popup_lang, addItemWithTitle: nsstring(tr_key("Spanish", es).as_ref())];
-        let _: () = msg_send![popup_lang, selectItemAtIndex: (if cur_lang == 1 { 1 } else { 0 })];
+            msg_send![popup_lang, addItemWithTitle: nsstring_id(tr_key("Spanish", es).as_ref())];
+        let _: () =
+            msg_send![popup_lang, selectItemAtIndex: (if cur_lang == 1 { 1i64 } else { 0i64 })];
         let _: () = msg_send![popup_lang, setTarget: view];
         let _: () = msg_send![popup_lang, setAction: sel!(langChanged:)];
 
@@ -167,7 +172,7 @@ pub fn open_settings_window(view: id) {
         // Value labels (non-interactive) + sliders (NO tick marks, still snapping in code)
         // Radius
         let field_radius = mk_value_label(160.0, h - 84.0, 60.0, 24.0, &format!("{:.0}", radius));
-        let slider_radius: id = msg_send![class!(NSSlider), alloc];
+        let slider_radius: id = msg_send![get_class("NSSlider"), alloc];
         let slider_radius: id = msg_send![
             slider_radius,
             initWithFrame: NSRect::new(NSPoint::new(230.0, h - 85.0), NSSize::new(260.0, 24.0))
@@ -181,7 +186,7 @@ pub fn open_settings_window(view: id) {
 
         // Border
         let field_border = mk_value_label(160.0, h - 134.0, 60.0, 24.0, &format!("{:.0}", border));
-        let slider_border: id = msg_send![class!(NSSlider), alloc];
+        let slider_border: id = msg_send![get_class("NSSlider"), alloc];
         let slider_border: id = msg_send![
             slider_border,
             initWithFrame: NSRect::new(NSPoint::new(230.0, h - 135.0), NSSize::new(260.0, 24.0))
@@ -194,14 +199,14 @@ pub fn open_settings_window(view: id) {
         let _: () = msg_send![slider_border, setContinuous: YES];
 
         // Colour + Hex (Hex remains editable)
-        let color_well: id = msg_send![class!(NSColorWell), alloc];
+        let color_well: id = msg_send![get_class("NSColorWell"), alloc];
         let color_well: id = msg_send![
             color_well,
             initWithFrame: NSRect::new(NSPoint::new(160.0, h - 185.0), NSSize::new(50.0, 25.0))
         ];
-        let ns_color = Class::get("NSColor").unwrap();
+        let ns_color = get_class("NSColor");
         let current_color: id =
-            msg_send![ns_color, colorWithCalibratedRed: r green: g blue: b alpha: a];
+            msg_send![ns_color, colorWithCalibratedRed: r, green: g, blue: b, alpha: a];
         let _: () = msg_send![color_well, setColor: current_color];
         let _: () = msg_send![color_well, setTarget: view];
         let _: () = msg_send![color_well, setAction: sel!(colorChanged:)];
@@ -214,17 +219,17 @@ pub fn open_settings_window(view: id) {
         let field_x = label_hex_frame.origin.x + label_hex_frame.size.width + padding;
         let field_w = (w - right_margin) - field_x;
 
-        let field_hex: id = msg_send![class!(NSTextField), alloc];
+        let field_hex: id = msg_send![get_class("NSTextField"), alloc];
         let field_hex: id = msg_send![
             field_hex,
             initWithFrame: NSRect::new(NSPoint::new(field_x, h - 185.0), NSSize::new(field_w, 24.0))
         ];
-        let _: () = msg_send![field_hex, setStringValue: nsstring(&hex_str)];
+        let _: () = msg_send![field_hex, setStringValue: nsstring_id(&hex_str)];
         configure_hex_field(view, field_hex);
 
         // Fill transparency
         let field_fill_t = mk_value_label(160.0, h - 234.0, 60.0, 24.0, &format!("{:.0}", fill_t));
-        let slider_fill_t: id = msg_send![class!(NSSlider), alloc];
+        let slider_fill_t: id = msg_send![get_class("NSSlider"), alloc];
         let slider_fill_t: id = msg_send![
             slider_fill_t,
             initWithFrame: NSRect::new(NSPoint::new(230.0, h - 235.0), NSSize::new(260.0, 24.0))
@@ -237,17 +242,17 @@ pub fn open_settings_window(view: id) {
         let _: () = msg_send![slider_fill_t, setContinuous: YES];
 
         // Close button
-        let btn_close: id = msg_send![class!(NSButton), alloc];
+        let btn_close: id = msg_send![get_class("NSButton"), alloc];
         let btn_close: id = msg_send![
             btn_close,
             initWithFrame: NSRect::new(NSPoint::new(w - 100.0, 15.0), NSSize::new(80.0, 28.0))
         ];
-        let _: () = msg_send![btn_close, setTitle: nsstring(tr_key("Close", es).as_ref())];
+        let _: () = msg_send![btn_close, setTitle: nsstring_id(tr_key("Close", es).as_ref())];
         let _: () = msg_send![btn_close, setTarget: view];
         let _: () = msg_send![btn_close, setAction: sel!(closeSettings:)];
 
         // Enter/Return activates "Close"
-        let _: () = msg_send![btn_close, setKeyEquivalent: nsstring("\r")];
+        let _: () = msg_send![btn_close, setKeyEquivalent: nsstring_id("\r")];
         let cell: id = msg_send![btn_close, cell];
         let _: () = msg_send![settings, setDefaultButtonCell: cell];
 
@@ -275,68 +280,69 @@ pub fn open_settings_window(view: id) {
         let _: () = msg_send![content, addSubview: btn_close];
 
         // Save refs for later sync
-        (*view).set_ivar::<id>("_settingsWindow", settings);
-        (*view).set_ivar::<id>("_labelLang", label_lang);
-        (*view).set_ivar::<id>("_popupLang", popup_lang);
+        (*view).store_ivar::<id>("_settingsWindow", settings);
+        (*view).store_ivar::<id>("_labelLang", label_lang);
+        (*view).store_ivar::<id>("_popupLang", popup_lang);
 
-        (*view).set_ivar::<id>("_labelRadius", label_radius);
-        (*view).set_ivar::<id>("_fieldRadius", field_radius); // label
-        (*view).set_ivar::<id>("_sliderRadius", slider_radius);
+        (*view).store_ivar::<id>("_labelRadius", label_radius);
+        (*view).store_ivar::<id>("_fieldRadius", field_radius); // label
+        (*view).store_ivar::<id>("_sliderRadius", slider_radius);
 
-        (*view).set_ivar::<id>("_labelBorder", label_border);
-        (*view).set_ivar::<id>("_fieldBorder", field_border); // label
-        (*view).set_ivar::<id>("_sliderBorder", slider_border);
+        (*view).store_ivar::<id>("_labelBorder", label_border);
+        (*view).store_ivar::<id>("_fieldBorder", field_border); // label
+        (*view).store_ivar::<id>("_sliderBorder", slider_border);
 
-        (*view).set_ivar::<id>("_labelColor", label_color);
-        (*view).set_ivar::<id>("_colorWell", color_well);
+        (*view).store_ivar::<id>("_labelColor", label_color);
+        (*view).store_ivar::<id>("_colorWell", color_well);
 
-        (*view).set_ivar::<id>("_labelHex", label_hex);
-        (*view).set_ivar::<id>("_fieldHex", field_hex); // editable
+        (*view).store_ivar::<id>("_labelHex", label_hex);
+        (*view).store_ivar::<id>("_fieldHex", field_hex); // editable
 
-        (*view).set_ivar::<id>("_labelFillT", label_fill_t);
-        (*view).set_ivar::<id>("_fieldFillT", field_fill_t); // label
-        (*view).set_ivar::<id>("_sliderFillT", slider_fill_t);
+        (*view).store_ivar::<id>("_labelFillT", label_fill_t);
+        (*view).store_ivar::<id>("_fieldFillT", field_fill_t); // label
+        (*view).store_ivar::<id>("_sliderFillT", slider_fill_t);
 
-        (*view).set_ivar::<id>("_btnClose", btn_close);
+        (*view).store_ivar::<id>("_btnClose", btn_close);
 
         // Local monitor for ESC/Enter to close modal
         const KEY_DOWN_MASK: u64 = 1 << 10;
-        let key_block = ConcreteBlock::new(move |event: id| -> id {
-            let keycode: u16 = msg_send![event, keyCode];
-            if keycode == 53 || keycode == 36 {
-                // 53 = Escape, 36 = Return/Enter - stop modal
-                let app = NSApp();
-                let _: () = msg_send![app, stopModal];
-                return nil;
+        let key_block = RcBlock::new(move |event: id| -> id {
+            unsafe {
+                let keycode: u16 = msg_send![event, keyCode];
+                if keycode == 53 || keycode == 36 {
+                    // 53 = Escape, 36 = Return/Enter - stop modal
+                    let app: id = NSApp();
+                    let _: () = msg_send![app, stopModal];
+                    return nil;
+                }
             }
             event
-        })
-        .copy();
+        });
         let key_mon: id = msg_send![
-            class!(NSEvent),
-            addLocalMonitorForEventsMatchingMask: KEY_DOWN_MASK
+            get_class("NSEvent"),
+            addLocalMonitorForEventsMatchingMask: KEY_DOWN_MASK,
             handler: &*key_block
         ];
 
         // Force activation and show window, then run modal
-        let app = NSApp();
+        let app: id = NSApp();
         let _: () = msg_send![app, activateIgnoringOtherApps: YES];
         let _: () = msg_send![settings, makeKeyAndOrderFront: nil];
         let _: () = msg_send![app, runModalForWindow: settings];
 
         // Modal ended - clean up
-        let _: () = msg_send![class!(NSEvent), removeMonitor: key_mon];
+        let _: () = msg_send![get_class("NSEvent"), removeMonitor: key_mon];
         let _: () = msg_send![settings, orderOut: nil];
 
         // Clear stored references
-        (*view).set_ivar::<id>("_settingsWindow", nil);
-        (*view).set_ivar::<id>("_settingsEscMonitor", nil);
-        (*view).set_ivar::<id>("_settingsGlobalMonitor", nil);
+        (*view).store_ivar::<id>("_settingsWindow", nil);
+        (*view).store_ivar::<id>("_settingsEscMonitor", nil);
+        (*view).store_ivar::<id>("_settingsGlobalMonitor", nil);
 
         // Restore overlay if it was enabled
         if was_enabled {
             apply_to_all_views(|v| {
-                *(*v).get_mut_ivar::<bool>("_overlayEnabled") = true;
+                set_bool_ivar(v, "_overlayEnabled", true);
             });
         }
 
@@ -347,8 +353,8 @@ pub fn open_settings_window(view: id) {
             let _: () = msg_send![overlay_win, orderFrontRegardless];
             let _: () = msg_send![
                 v,
-                performSelectorOnMainThread: sel!(update_cursor_multi)
-                withObject: nil
+                performSelectorOnMainThread: sel!(update_cursor_multi),
+                withObject: nil,
                 waitUntilDone: NO
             ];
         });
@@ -362,7 +368,7 @@ pub fn open_settings_window(view: id) {
 pub fn close_settings_window(_view: id) {
     unsafe {
         // Just stop the modal - cleanup happens in open_settings_window after runModalForWindow returns
-        let app = NSApp();
+        let app: id = NSApp();
         let _: () = msg_send![app, stopModal];
     }
 }
