@@ -177,7 +177,7 @@ Implemented with **Carbon HotKeys** (no beep) and a local key monitor for extra 
 
 ## 🧪 Troubleshooting
 
-- **Shortcuts beep or don’t trigger:** Use **Ctrl+A**, **⌘+,**, or **Ctrl+Shift+X**. Other apps may intercept overlapping shortcuts—adjust their settings if necessary.
+- **Shortcuts beep or don’t trigger:** Use **Ctrl+A**, **Ctrl+,**, or **Ctrl+Shift+X**. Other apps may intercept overlapping shortcuts—adjust their settings if necessary.
 - **Overlay not following the cursor:** Ensure **Input Monitoring** and/or **Accessibility** are enabled for your binary (or for your IDE if launching from it).
 - **Hex field layout:** It sits to the right of the “Hex” label; tweak the constants if you change window width.
 

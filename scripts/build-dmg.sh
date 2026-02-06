@@ -15,6 +15,14 @@ NC='\033[0m' # No Color
 
 echo -e "${GREEN}=== Building Lumbus DMG ===${NC}"
 
+# Run consistency verification first
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+if [ -f "$SCRIPT_DIR/verify-release.sh" ]; then
+    echo ""
+    "$SCRIPT_DIR/verify-release.sh"
+    echo ""
+fi
+
 # Paths
 PROJECT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 BUILD_DIR="$PROJECT_ROOT/target/release"
