@@ -13,10 +13,23 @@
 //! The dispatcher acts as the central coordinator, translating
 //! high-level events into concrete macOS actions.
 
+use std::sync::atomic::{AtomicBool, Ordering};
+
 use lumbus::ffi::bridge::{id, msg_send, nil, NSApp, YES};
 
 use crate::ui::show_help_overlay;
-use lumbus::events::{drain_events, AppEvent};
+use lumbus::events::{take_event, AppEvent};
+
+/// Guard to prevent concurrent dispatch_events calls from racing.
+///
+/// This is necessary because macOS run loop continues processing timers
+/// while a modal dialog is open via `runModalForWindow:`. Without this guard,
+/// pressing Ctrl+, multiple times quickly would open multiple settings windows.
+///
+/// The guard is acquired at the START of dispatch_events and released
+/// when the modal closes, preventing race conditions where two timer
+/// callbacks both take events before either reaches the modal.
+static DISPATCH_GUARD: AtomicBool = AtomicBool::new(false);
 
 /// Callback type for reinstalling hotkeys.
 ///
@@ -45,20 +58,68 @@ pub unsafe fn dispatch_events(
     confirm_quit_fn: unsafe fn(id),
     reinstall_hotkeys_fn: ReinstallHotkeysCallback,
 ) {
-    let events = drain_events();
+    // CRITICAL: Acquire exclusive access to event processing.
+    // This prevents race conditions where two timer callbacks both
+    // enter dispatch_events and take events before either can block.
+    if DISPATCH_GUARD
+        .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
+        .is_err()
+    {
+        // Another dispatch_events call is already running - skip this tick
+        return;
+    }
 
-    for event in events {
-        dispatch_single_event(
+    // Process all pending events
+    while let Some(event) = take_event() {
+        let was_modal = dispatch_single_event(
             view,
             &event,
             open_settings_fn,
             confirm_quit_fn,
             reinstall_hotkeys_fn,
         );
+
+        // After a modal closes, drain any duplicate modal events that accumulated
+        // while the user was spamming the hotkey. This prevents the second window
+        // from opening after the first one closes.
+        if was_modal {
+            drain_duplicate_modal_events();
+            break;
+        }
+    }
+
+    // Release the guard so next timer tick can process events
+    DISPATCH_GUARD.store(false, Ordering::SeqCst);
+}
+
+/// Drain and discard any pending modal events from the queue.
+///
+/// Called after a modal closes to prevent duplicate windows from opening.
+fn drain_duplicate_modal_events() {
+    while let Some(event) = take_event() {
+        match event {
+            // Discard duplicate modal-opening events
+            AppEvent::OpenSettings
+            | AppEvent::RequestQuit
+            | AppEvent::ShowHelp
+            | AppEvent::ShowAbout => {
+                // Silently discard
+            }
+            // Re-queue non-modal events? No, we can't easily re-queue.
+            // These events (SettingsClosed, etc.) are posted AFTER the modal,
+            // so they shouldn't be in the queue at this point anyway.
+            _ => {
+                // This shouldn't happen, but log if it does
+                #[cfg(debug_assertions)]
+                eprintln!("[DISPATCH] Unexpected event after modal: {:?}", event);
+            }
+        }
     }
 }
 
 /// Dispatch a single event.
+///
+/// Returns `true` if the event was a modal (blocking) event.
 ///
 /// # Safety
 ///
@@ -69,21 +130,24 @@ unsafe fn dispatch_single_event(
     open_settings_fn: unsafe fn(id),
     confirm_quit_fn: unsafe fn(id),
     reinstall_hotkeys_fn: ReinstallHotkeysCallback,
-) {
+) -> bool {
     match event {
         AppEvent::ToggleOverlay => {
             // Toggle overlay visibility via the view's method
             let _: () = msg_send![view, requestToggle];
+            false
         }
 
         AppEvent::OpenSettings => {
-            // Open settings window - it will publish SettingsClosed when done
+            // Open settings window - blocks until closed
             open_settings_fn(view);
+            true
         }
 
         AppEvent::RequestQuit => {
-            // Show quit dialog - it will publish QuitCancelled if user cancels
+            // Show quit dialog - blocks until closed
             confirm_quit_fn(view);
+            true
         }
 
         AppEvent::ShowAbout => {
@@ -91,11 +155,14 @@ unsafe fn dispatch_single_event(
             let app: id = NSApp();
             let _: () = msg_send![app, activateIgnoringOtherApps: YES];
             let _: () = msg_send![app, orderFrontStandardAboutPanel: nil];
+            // About panel is non-blocking
+            false
         }
 
         AppEvent::ShowHelp => {
-            // Show help overlay with keyboard shortcuts
+            // Show help overlay - blocks until closed
             show_help_overlay(view);
+            true
         }
 
         AppEvent::SettingsClosed
@@ -104,6 +171,7 @@ unsafe fn dispatch_single_event(
         | AppEvent::ReinstallHotkeys => {
             // These events require hotkey reinstallation
             reinstall_hotkeys_fn(view);
+            false
         }
     }
 }

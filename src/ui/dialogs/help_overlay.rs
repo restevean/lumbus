@@ -3,6 +3,8 @@
 //! Displays a semi-transparent overlay with all available hotkeys.
 //! Dismisses on any key press.
 
+use std::sync::atomic::{AtomicBool, Ordering};
+
 use block2::RcBlock;
 use lumbus::ffi::bridge::{
     get_bool_ivar, get_class, id, msg_send, nil, nsstring_id, sel, set_bool_ivar, NSApp, NSPoint,
@@ -13,6 +15,9 @@ use crate::app::{apply_to_all_views, lang_is_es};
 use lumbus::events::{publish, AppEvent};
 use lumbus::ffi::overlay_window_level;
 use lumbus::tr_key;
+
+/// Guard to prevent multiple help overlays
+static HELP_OPENING: AtomicBool = AtomicBool::new(false);
 
 /// Data structure for a single hotkey entry to display.
 struct HotkeyEntry {
@@ -56,6 +61,14 @@ const HOTKEYS: &[HotkeyEntry] = &[
 /// Must be called from main thread.
 #[allow(unused_unsafe)]
 pub fn show_help_overlay(view: id) {
+    // Atomic guard: only one help overlay can be opening at a time
+    if HELP_OPENING
+        .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
+        .is_err()
+    {
+        return;
+    }
+
     unsafe {
         // Save current overlay state and hide circle during dialog
         let was_enabled = get_bool_ivar(view, "_overlayEnabled");
@@ -279,7 +292,7 @@ pub fn show_help_overlay(view: id) {
         let app: id = NSApp();
         let _: () = msg_send![app, activateIgnoringOtherApps: YES];
         let _: () = msg_send![dialog, makeKeyAndOrderFront: nil];
-        let _: () = msg_send![app, runModalForWindow: dialog];
+        let _: i64 = msg_send![app, runModalForWindow: dialog];
 
         // Clean up monitors
         let _: () = msg_send![get_class("NSEvent"), removeMonitor: key_mon];
@@ -310,6 +323,9 @@ pub fn show_help_overlay(view: id) {
             let _: () = msg_send![overlay_win, setLevel: overlay_window_level()];
             let _: () = msg_send![overlay_win, orderFrontRegardless];
         });
+
+        // Reset atomic guard
+        HELP_OPENING.store(false, Ordering::SeqCst);
 
         // Publish event - dispatcher will handle hotkey reinstallation
         publish(AppEvent::HelpClosed);

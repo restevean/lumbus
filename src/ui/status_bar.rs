@@ -25,7 +25,7 @@ pub unsafe fn install_status_bar(view: id) {
     let status_item: id = msg_send![status_bar, statusItemWithLength: -1.0f64];
 
     // Keep a strong reference so it doesn't get deallocated
-    let _: () = msg_send![status_item, retain];
+    let _: id = msg_send![status_item, retain];
     STATUS_ITEM = status_item;
 
     // Set the icon from StatusBarIcon.png in Resources

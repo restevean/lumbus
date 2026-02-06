@@ -45,7 +45,9 @@ pub unsafe fn prefs_get_int(key: &str, default: i32) -> i32 {
     if obj == nil {
         default
     } else {
-        msg_send![ud, integerForKey: k]
+        // NSInteger is i64 on 64-bit macOS
+        let val: i64 = msg_send![ud, integerForKey: k];
+        val as i32
     }
 }
 
@@ -56,7 +58,8 @@ pub unsafe fn prefs_get_int(key: &str, default: i32) -> i32 {
 pub unsafe fn prefs_set_int(key: &str, val: i32) {
     let ud: id = msg_send![get_class("NSUserDefaults"), standardUserDefaults];
     let k = nsstring_id(key);
-    let _: () = msg_send![ud, setInteger: val, forKey: k];
+    // NSInteger is i64 on 64-bit macOS
+    let _: () = msg_send![ud, setInteger: val as i64, forKey: k];
 }
 
 /// Loads complete state from NSUserDefaults.

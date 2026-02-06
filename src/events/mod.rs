@@ -62,5 +62,5 @@ pub mod types;
 
 // Re-export main types for convenient access
 pub use bus::{EventBus, EventPublisher};
-pub use global::{drain_events, init_event_bus, publish, publisher};
+pub use global::{drain_events, init_event_bus, publish, publisher, take_event};
 pub use types::AppEvent;

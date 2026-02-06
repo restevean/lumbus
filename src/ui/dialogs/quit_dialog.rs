@@ -2,16 +2,22 @@
 //!
 //! Custom borderless dialog that can appear over fullscreen apps.
 
+use std::sync::atomic::{AtomicBool, Ordering};
+
 use block2::RcBlock;
 use lumbus::ffi::bridge::{
     get_bool_ivar, get_class, id, msg_send, nil, nsstring_id, sel, set_bool_ivar, NSApp, NSPoint,
     NSRect, NSSize, NO, YES,
 };
+use lumbus::ffi::CGColorRef;
 
 use crate::app::{apply_to_all_views, lang_is_es};
 use lumbus::events::{publish, AppEvent};
 use lumbus::ffi::overlay_window_level;
 use lumbus::tr_key;
+
+/// Guard to prevent multiple quit dialogs
+static QUIT_DIALOG_OPENING: AtomicBool = AtomicBool::new(false);
 
 /// Show a quit confirmation dialog.
 ///
@@ -26,6 +32,14 @@ use lumbus::tr_key;
 /// Must be called from main thread.
 #[allow(unused_unsafe)]
 pub fn confirm_and_maybe_quit(view: id) {
+    // Atomic guard: only one quit dialog can be opening at a time
+    if QUIT_DIALOG_OPENING
+        .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
+        .is_err()
+    {
+        return;
+    }
+
     unsafe {
         // Save current overlay state and hide circle during dialog
         let was_enabled = get_bool_ivar(view, "_overlayEnabled");
@@ -189,7 +203,7 @@ pub fn confirm_and_maybe_quit(view: id) {
             blue: 0.35f64,
             alpha: 1.0f64
         ];
-        let dark_gray_cg: *const std::ffi::c_void = msg_send![dark_gray, CGColor];
+        let dark_gray_cg: CGColorRef = msg_send![dark_gray, CGColor];
         let _: () = msg_send![cancel_layer, setBackgroundColor: dark_gray_cg];
         let _: () = msg_send![cancel_layer, setCornerRadius: 6.0f64];
         let _: () = msg_send![content, addSubview: cancel_btn];
@@ -205,7 +219,7 @@ pub fn confirm_and_maybe_quit(view: id) {
         let _: () = msg_send![quit_btn, setWantsLayer: YES];
         let quit_layer: id = msg_send![quit_btn, layer];
         let blue_cg: id = msg_send![get_class("NSColor"), systemBlueColor];
-        let blue_cgcolor: *const std::ffi::c_void = msg_send![blue_cg, CGColor];
+        let blue_cgcolor: CGColorRef = msg_send![blue_cg, CGColor];
         let _: () = msg_send![quit_layer, setBackgroundColor: blue_cgcolor];
         let _: () = msg_send![quit_layer, setCornerRadius: 6.0f64];
         let _: () = msg_send![content, addSubview: quit_btn];
@@ -276,8 +290,8 @@ pub fn confirm_and_maybe_quit(view: id) {
                                 blue: 0.35f64,
                                 alpha: 1.0f64
                             ];
-                            let blue_cg: *const std::ffi::c_void = msg_send![blue, CGColor];
-                            let gray_cg: *const std::ffi::c_void = msg_send![dark_gray, CGColor];
+                            let blue_cg: CGColorRef = msg_send![blue, CGColor];
+                            let gray_cg: CGColorRef = msg_send![dark_gray, CGColor];
 
                             // Update layer background colors
                             if new_focus == 0 {
@@ -348,7 +362,7 @@ pub fn confirm_and_maybe_quit(view: id) {
         let app: id = NSApp();
         let _: () = msg_send![app, activateIgnoringOtherApps: YES];
         let _: () = msg_send![dialog, makeKeyAndOrderFront: nil];
-        let _: () = msg_send![app, runModalForWindow: dialog];
+        let _: i64 = msg_send![app, runModalForWindow: dialog];
 
         // Clean up monitors
         let _: () = msg_send![get_class("NSEvent"), removeMonitor: key_mon];
@@ -388,6 +402,9 @@ pub fn confirm_and_maybe_quit(view: id) {
             let _: () = msg_send![overlay_win, setLevel: overlay_window_level()];
             let _: () = msg_send![overlay_win, orderFrontRegardless];
         });
+
+        // Reset atomic guard
+        QUIT_DIALOG_OPENING.store(false, Ordering::SeqCst);
 
         // Publish event - dispatcher will handle hotkey reinstallation
         publish(AppEvent::QuitCancelled);

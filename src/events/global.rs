@@ -94,6 +94,25 @@ pub fn publish(event: AppEvent) {
     let _ = sender.send(event);
 }
 
+/// Take a single event from the global event bus.
+///
+/// Returns `Some(event)` if an event is available, `None` otherwise.
+/// This is preferred over `drain_events` when processing events that
+/// may block (like modal dialogs).
+///
+/// # Panics
+///
+/// Panics if `init_event_bus()` has not been called.
+/// May also panic if the receiver mutex is poisoned.
+pub fn take_event() -> Option<AppEvent> {
+    let receiver = RECEIVER
+        .get()
+        .expect("Event bus not initialized - call init_event_bus() first");
+
+    let receiver = receiver.lock().expect("Event bus receiver mutex poisoned");
+    receiver.try_recv().ok()
+}
+
 /// Drain all pending events from the global event bus.
 ///
 /// Convenience function for the main loop to collect all events

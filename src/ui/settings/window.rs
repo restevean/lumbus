@@ -2,6 +2,8 @@
 //!
 //! This module contains functions for opening and managing the settings window.
 
+use std::sync::atomic::{AtomicBool, Ordering};
+
 use block2::RcBlock;
 use lumbus::ffi::bridge::{
     get_bool_ivar, get_class, id, msg_send, nil, nsstring_id, sel, set_bool_ivar, NSApp, NSPoint,
@@ -12,6 +14,9 @@ use crate::app::{apply_to_all_views, lang_is_es};
 use lumbus::events::{publish, AppEvent};
 use lumbus::ffi::overlay_window_level;
 use lumbus::{color_to_hex, tr_key};
+
+/// Guard to prevent multiple settings windows
+static SETTINGS_OPENING: AtomicBool = AtomicBool::new(false);
 
 /// Configure a hex color text field.
 unsafe fn configure_hex_field(view: id, field_hex: id) {
@@ -35,13 +40,16 @@ unsafe fn configure_hex_field(view: id, field_hex: id) {
 /// Must be called from main thread.
 #[allow(unused_unsafe)]
 pub fn open_settings_window(view: id) {
-    unsafe {
-        let existing: id = *(*view).load_ivar::<id>("_settingsWindow");
-        if existing != nil {
-            let _: () = msg_send![existing, makeKeyAndOrderFront: nil];
-            return;
-        }
+    // Atomic guard: only one settings window can be opening at a time
+    let was_false = SETTINGS_OPENING
+        .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
+        .is_ok();
 
+    if !was_false {
+        return;
+    }
+
+    unsafe {
         // Save current overlay state and hide circle during settings
         let was_enabled = get_bool_ivar(view, "_overlayEnabled");
         apply_to_all_views(|v| {
@@ -328,7 +336,8 @@ pub fn open_settings_window(view: id) {
         let app: id = NSApp();
         let _: () = msg_send![app, activateIgnoringOtherApps: YES];
         let _: () = msg_send![settings, makeKeyAndOrderFront: nil];
-        let _: () = msg_send![app, runModalForWindow: settings];
+
+        let _modal_result: i64 = msg_send![app, runModalForWindow: settings];
 
         // Modal ended - clean up
         let _: () = msg_send![get_class("NSEvent"), removeMonitor: key_mon];
@@ -358,6 +367,9 @@ pub fn open_settings_window(view: id) {
                 waitUntilDone: NO
             ];
         });
+
+        // Reset atomic guard
+        SETTINGS_OPENING.store(false, Ordering::SeqCst);
 
         // Publish event - dispatcher will handle hotkey reinstallation
         publish(AppEvent::SettingsClosed);

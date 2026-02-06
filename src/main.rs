@@ -61,7 +61,7 @@ fn main() {
 
             let app = NSApp();
             // NSApplicationActivationPolicyAccessory = 1
-            let _: () = msg_send![app, setActivationPolicy: 1i64];
+            let _: bool = msg_send![app, setActivationPolicy: 1i64];
 
             // Create one transparent overlay window per screen
             let screens: id = msg_send![get_class("NSScreen"), screens];
@@ -72,12 +72,19 @@ fn main() {
             }
 
             let mut views: Vec<id> = Vec::with_capacity(count);
+            let mut windows: Vec<id> = Vec::with_capacity(count); // Keep windows alive
             for i in 0..count {
                 let screen: id = msg_send![screens, objectAtIndex: i];
                 let (win, view) = make_window_for_screen(screen);
+                // CRITICAL: Retain window and view to prevent autorelease pool from deallocating them
+                let _: id = msg_send![win, retain];
+                let _: id = msg_send![view, retain];
                 let _: () = msg_send![win, orderFrontRegardless];
+                windows.push(win);
                 views.push(view);
             }
+            // Keep windows vector alive for the duration of the app
+            std::mem::forget(windows);
 
             // Host view
             let host_view = *views.first().unwrap();
@@ -264,42 +271,40 @@ unsafe fn register_custom_view_class_and_create_view(window: id, width: f64, hei
         // ====== Methods ======
 
         unsafe extern "C-unwind" fn update_cursor_multi(this: &mut AnyObject, _cmd: Sel) {
-            unsafe {
-                // Process any pending events from the event bus
-                process_pending_events(this as *mut _ as id);
+            // Process any pending events from the event bus
+            process_pending_events(this as *mut _ as id);
 
-                let (x, y) = get_mouse_position_cocoa();
-                let screens: id = msg_send![get_class("NSScreen"), screens];
-                let count: usize = msg_send![screens, count];
+            let (x, y) = get_mouse_position_cocoa();
+            let screens: id = msg_send![get_class("NSScreen"), screens];
+            let count: usize = msg_send![screens, count];
 
-                // Work out the screen under the cursor using a stable DisplayID
-                let mut target_id: u32 = 0;
-                for i in 0..count {
-                    let s: id = msg_send![screens, objectAtIndex: i];
-                    let f: NSRect = msg_send![s, frame];
-                    if x >= f.origin.x
-                        && x <= f.origin.x + f.size.width
-                        && y >= f.origin.y
-                        && y <= f.origin.y + f.size.height
-                    {
-                        target_id = display_id_for_screen(s);
-                        break;
-                    }
+            // Work out the screen under the cursor using a stable DisplayID
+            let mut target_id: u32 = 0;
+            for i in 0..count {
+                let s: id = msg_send![screens, objectAtIndex: i];
+                let f: NSRect = msg_send![s, frame];
+                if x >= f.origin.x
+                    && x <= f.origin.x + f.size.width
+                    && y >= f.origin.y
+                    && y <= f.origin.y + f.size.height
+                {
+                    target_id = display_id_for_screen(s);
+                    break;
                 }
-
-                let enabled = get_bool_ivar(this as *mut _ as id, "_overlayEnabled");
-
-                apply_to_all_views(|v| {
-                    *(*v).load_ivar_mut::<f64>("_cursorXScreen") = x;
-                    *(*v).load_ivar_mut::<f64>("_cursorYScreen") = y;
-                    let own_id = *(*v).load_ivar::<u32>("_ownDisplayID");
-                    let vis = enabled && own_id == target_id && target_id != 0;
-                    set_bool_ivar(v, "_visible", vis);
-                    let _: () = msg_send![v, setNeedsDisplay: YES];
-                    let win: id = msg_send![v, window];
-                    let _: () = msg_send![win, displayIfNeeded];
-                });
             }
+
+            let enabled = get_bool_ivar(this as *mut _ as id, "_overlayEnabled");
+
+            apply_to_all_views(|v| {
+                *(*v).load_ivar_mut::<f64>("_cursorXScreen") = x;
+                *(*v).load_ivar_mut::<f64>("_cursorYScreen") = y;
+                let own_id = *(*v).load_ivar::<u32>("_ownDisplayID");
+                let vis = enabled && own_id == target_id && target_id != 0;
+                set_bool_ivar(v, "_visible", vis);
+                let _: () = msg_send![v, setNeedsDisplay: YES];
+                let win: id = msg_send![v, window];
+                let _: () = msg_send![win, displayIfNeeded];
+            });
         }
 
         unsafe extern "C-unwind" fn toggle_visibility(this: &mut AnyObject, _cmd: Sel) {
