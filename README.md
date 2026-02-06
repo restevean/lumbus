@@ -27,7 +27,7 @@ Highlight the mouse pointer across **all** macOS displays with a configurable ci
     - Changes apply **instantly** and are **persisted**.
 - **Global hotkeys (no beep)**
     - `Ctrl` + `A` → **Toggle overlay visibility**
-    - `⌘` + `,` → **Open Settings**
+    - `Ctrl` + `,` → **Open Settings**
     - `⌘` + `Shift` + `H` → **Show Help** (keyboard shortcuts)
     - `Ctrl` + `Shift` + `X` → **Quit** (with confirmation)
 - **Help overlay** — Press `⌘+Shift+H` to show all keyboard shortcuts in a centered overlay
@@ -50,10 +50,9 @@ Highlight the mouse pointer across **all** macOS displays with a configurable ci
 
 ```toml
 [dependencies]
-cocoa = "0.25"
-objc = "0.2"
-block = "0.1"
-# core-graphics = "0.24"   # Optional; not strictly required by current code
+objc2 = "0.6"
+objc2-foundation = "0.3"
+block2 = "0.6"
 ```
 
 > 🔐 Hotkeys use Carbon and generally **don't require** Accessibility.
@@ -109,7 +108,7 @@ make install
 
 2. Toggle overlay with **Ctrl + A** (works while the app is running; it doesn’t need to be frontmost).
 
-3. Open **Settings** with **⌘ + ,**.
+3. Open **Settings** with **Ctrl + ,**.
 
 4. Adjust **radius**, **border**, **colour** (picker or Hex), and **fill transparency**.
 
@@ -154,7 +153,7 @@ make install
 | Shortcut | Action |
 |----------|--------|
 | `Ctrl` + `A` | Toggle overlay |
-| `⌘` + `,` | Open Settings |
+| `Ctrl` + `,` | Open Settings |
 | `⌘` + `Shift` + `H` | Show Help |
 | `Ctrl` + `Shift` + `X` | Quit (with confirmation) |
 
@@ -232,7 +231,7 @@ src/
     └── helpers.rs       # apply_to_all_views, sync_visual_prefs
 ```
 
-**Tests:** 64 unit tests across `tests/` and inline modules
+**Tests:** 65 unit tests across `tests/` and inline modules
 
 ------
 
@@ -250,5 +249,5 @@ Apache License 2.0. See [LICENSE](LICENSE) file.
 
 ## 🙌 Acknowledgments
 
-Built with `cocoa`, `objc`, `block`, and a sprinkle of Core* frameworks via FFI.
+Built with `objc2`, `objc2-foundation`, `block2`, and a sprinkle of Core* frameworks via FFI.
 Tested on macOS. Works with ANSI and ISO keyboards. ✔️

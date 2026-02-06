@@ -329,45 +329,42 @@ Cleanup: Eliminar bridge, tests          [1-2 horas]
 - [x] `src/input/mouse_monitors.rs` - Migrado (ConcreteBlock → RcBlock)
 - [x] `src/input/observers.rs` - Migrado (ConcreteBlock → RcBlock)
 
-### Fase 4: UI Modules - EN PROGRESO
+### Fase 4: UI Modules - COMPLETADA
 | Archivo | msg_send! | Blocks | Estado |
 |---------|-----------|--------|--------|
 | `ui/overlay/drawing.rs` | 23 | 0 | MIGRADO |
-| `ui/status_bar.rs` | 38 | 0 | Pendiente |
-| `ui/dialogs/help_overlay.rs` | 85 | 3 | Pendiente |
-| `ui/dialogs/quit_dialog.rs` | 95 | 3 | Pendiente |
-| `ui/settings/window.rs` | 114 | 2 | Pendiente |
+| `ui/status_bar.rs` | 38 | 0 | MIGRADO |
+| `ui/dialogs/help_overlay.rs` | 85 | 3 | MIGRADO |
+| `ui/dialogs/quit_dialog.rs` | 95 | 3 | MIGRADO |
+| `ui/settings/window.rs` | 114 | 2 | MIGRADO |
 
-### Fase 5: Main + CustomView - PENDIENTE
+### Fase 5: Main + CustomView - COMPLETADA
 | Archivo | msg_send! | Blocks | Estado |
 |---------|-----------|--------|--------|
-| `main.rs` | 70 | 0 | Pendiente + ClassDecl |
+| `main.rs` | 70 | 0 | MIGRADO (ClassDecl → ClassBuilder) |
 
 ---
 
 ## Resumen de Progreso
 
-**Archivos migrados**: 10 de 15
-**Archivos pendientes**: 5 (todos UI pesados + main.rs)
-**msg_send! migrados**: ~55 de ~470 (~12%)
-**msg_send! pendientes**: ~415 (en 5 archivos)
+**Archivos migrados**: 15 de 15 ✅
+**msg_send! migrados**: ~470 de ~470 (100%)
+**Migracion completada**: Febrero 2026
 
 ### Notas Tecnicas
 
 1. **Blocks**: `block::ConcreteBlock` reemplazado por `block2::RcBlock`
-2. **msg_send!**: objc2 requiere comas entre argumentos (warnings de deprecacion)
+2. **msg_send!**: objc2 requiere comas entre argumentos
 3. **Booleans**: `bool` de Rust no implementa `Encode`, usar `Bool` de objc2
-4. **ivars**: Warnings sobre `get_ivar` deprecated - funciona pero no es idiomatico
+4. **ivars**: Usar `load_ivar`/`store_ivar` con tipos correctos
+5. **CGColorRef**: Tipo opaco con `RefEncode` para encoding correcto
+6. **Retain/Release**: Ventanas y vistas requieren `retain` explicito + `mem::forget`
 
 ---
 
-## Siguiente Paso
+## Post-Migracion: Bugs Corregidos
 
-Continuar Fase 4:
-1. `ui/status_bar.rs` (38 msg_send!)
-2. `ui/dialogs/help_overlay.rs` (85 msg_send!)
-3. `ui/dialogs/quit_dialog.rs` (95 msg_send!)
-4. `ui/settings/window.rs` (114 msg_send!)
-
-Luego Fase 5:
-5. `main.rs` (70 msg_send! + ClassDecl → ClassBuilder)
+1. **Circulo desaparecia**: Ventanas/vistas eran autoreleased. Fix: `retain` + `mem::forget`
+2. **Tipos de retorno incorrectos**: `runModalForWindow:` → `i64`, `CGColor` → `CGColorRef`
+3. **Hotkey Cmd+, conflictuaba**: Cambiado a `Ctrl+,`
+4. **Multiples ventanas modales**: Guard atomico en dispatcher + drain de eventos duplicados

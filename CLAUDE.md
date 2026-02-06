@@ -9,7 +9,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**Lumbus** is a macOS-native application written in Rust that highlights the mouse pointer across all displays with a configurable circle and click indicators (L/R). Built using Cocoa FFI bindings (`cocoa`, `objc`, `block` crates) and low-level Carbon/CoreText/CoreGraphics APIs.
+**Lumbus** is a macOS-native application written in Rust that highlights the mouse pointer across all displays with a configurable circle and click indicators (L/R). Built using the `objc2` ecosystem (`objc2`, `objc2-foundation`, `block2` crates) and low-level Carbon/CoreText/CoreGraphics APIs.
 
 This is a **presentation/screen recording tool**, not a system utility—it creates transparent overlay windows that track the cursor without stealing focus.
 
@@ -36,29 +36,45 @@ cargo test -- --nocapture
 
 ### Core Components
 
-**`src/main.rs`** (~2000+ lines)
-- Single-file application containing all macOS FFI and application logic
-- FFI bindings: Carbon (hotkeys), CoreText (glyph rendering), CoreGraphics, CoreFoundation, ApplicationServices
-- Key structures:
-  - `CustomView`: NSView subclass that draws the circle/letters and handles all state
-  - Overlay windows: One transparent, borderless `NSWindow` per display (always-on-top)
-  - Settings window: Live-synced sliders, read-only numeric fields, editable Hex color field
-  - Global hotkey handlers using Carbon Event Manager
-  - Global mouse monitors (`NSEvent::addGlobalMonitorForEventsMatchingMask`)
-  - Local key monitors for in-window keyboard shortcuts
+**`src/main.rs`** (~930 lines)
+- Entry point and CustomView class registration
+- `CustomView`: NSView subclass that draws the circle/letters and handles state
+- Overlay windows: One transparent, borderless `NSWindow` per display (always-on-top)
 
 **`src/lib.rs`**
 - Pure helper functions (no FFI dependencies)
 - Functions: `clamp`, `color_to_hex`, `parse_hex_color`, `tr_key` (localisation)
-- Designed to be testable without macOS-specific dependencies
+- Re-exports `ffi` and `events` modules
 
-**`tests/helpers.rs`**
-- Unit tests for all pure helpers from `lib.rs`
-- Tests cover: clamping, hex color conversion, parsing, round-trip conversions, localisation
+**`src/ffi/`** - FFI bindings encapsulated
+- `bridge.rs`: Compatibility layer with type aliases (`id`, `nil`, `YES/NO`)
+- `carbon.rs`: Carbon Event Manager (hotkeys)
+- `coretext.rs`: CoreText (glyph rendering)
+- `cocoa_utils.rs`: NSString helpers, display_id, mouse position
+
+**`src/events/`** - Event bus system
+- `bus.rs`: `EventBus` with publish/subscribe
+- `global.rs`: Global `publish()`, `take_event()`, `drain_events()`
+- `types.rs`: `AppEvent` enum definitions
+
+**`src/ui/`** - UI components
+- `overlay/drawing.rs`: Circle and letter rendering
+- `settings/window.rs`: Settings window with sliders
+- `dialogs/`: Help overlay and quit confirmation
+- `status_bar.rs`: Menu bar icon and dropdown
+
+**`src/input/`** - Input handling
+- `hotkeys.rs`: Carbon hotkey registration
+- `mouse_monitors.rs`: Global mouse event monitors
+- `observers.rs`: Wake/space/termination observers
+
+**`tests/`**
+- `helpers.rs`: Tests for pure helpers from `lib.rs`
+- `model_tests.rs`: Tests for OverlayState validation
 
 ### Architecture Patterns
 
-1. **FFI-heavy single binary**: All Cocoa/Carbon/CoreText FFI is in `main.rs`. No Objective-C `.m` files.
+1. **FFI-heavy single binary**: All Cocoa/Carbon/CoreText FFI is in `src/ffi/`. No Objective-C `.m` files.
 
 2. **State management**: All application state lives in `CustomView` instance variables via Rust static `Box::into_raw` pattern. Accessed through `msg_send!` to Objective-C runtime.
 
@@ -77,7 +93,7 @@ cargo test -- --nocapture
 
 ### Hotkeys (Carbon Event Manager)
 - **Ctrl+A**: Toggle overlay visibility
-- **⌘+,**: Open Settings
+- **Ctrl+,**: Open Settings (Ctrl instead of ⌘ to avoid macOS system shortcut conflict)
 - **⌘+Shift+H**: Show Help
 - **Ctrl+Shift+X**: Quit with confirmation
 
@@ -121,9 +137,10 @@ Grant these to the app (or to RustRover/IDE if running from development environm
 
 ## Development Context
 
-This project was created via "vibe coding" (AI-assisted rapid development). Code structure reflects single-iteration development:
-- Minimal refactoring/modularisation (single large `main.rs`)
+This project was created via "vibe coding" (AI-assisted rapid development). Code has been refactored into a modular architecture:
+- FFI bindings encapsulated in `src/ffi/`
+- Event-driven architecture with publish/subscribe bus
+- UI components separated into `src/ui/`
 - FFI-heavy with extensive unsafe blocks
-- Focus on functionality over architectural elegance
 
 When modifying: preserve the FFI patterns and state management approach. Test pure helpers thoroughly; UI/FFI changes require manual testing on macOS.
