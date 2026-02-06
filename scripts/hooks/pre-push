@@ -1,0 +1,31 @@
+#!/bin/bash
+# pre-push hook - Verify project consistency before pushing
+#
+# Runs verify-release.sh to ensure version sync, documentation accuracy, etc.
+# Only blocks push if verification fails.
+
+# Get the project root
+HOOK_DIR="$(cd "$(dirname "$0")" && pwd)"
+PROJECT_ROOT="$(cd "$HOOK_DIR/../.." && pwd)"
+
+# Check if verify-release.sh exists
+VERIFY_SCRIPT="$PROJECT_ROOT/scripts/verify-release.sh"
+if [ ! -f "$VERIFY_SCRIPT" ]; then
+    echo "Warning: verify-release.sh not found, skipping verification"
+    exit 0
+fi
+
+# Run verification
+echo "Running pre-push verification..."
+echo ""
+
+if ! "$VERIFY_SCRIPT"; then
+    echo ""
+    echo "Push blocked: Fix the issues above before pushing."
+    echo "To skip this check (not recommended): git push --no-verify"
+    exit 1
+fi
+
+echo ""
+echo "Pre-push verification passed."
+exit 0
