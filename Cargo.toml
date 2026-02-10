@@ -10,11 +10,11 @@ keywords = ["macos", "mouse", "cursor", "highlighter", "presentation"]
 categories = ["gui"]
 
 [dependencies]
-# Core graphics (not deprecated, keep as-is)
-core-graphics = "0.24"
+# No cross-platform dependencies currently
 
-# macOS-specific: objc2 ecosystem (replaces deprecated cocoa/objc/block crates)
+# macOS-specific: objc2 ecosystem + core-graphics
 [target.'cfg(target_os = "macos")'.dependencies]
+core-graphics = "0.24"
 objc2 = "0.6"
 objc2-app-kit = "0.3"
 objc2-foundation = { version = "0.3", features = ["NSGeometry", "objc2-core-foundation"] }
@@ -26,6 +26,33 @@ block2 = "0.6"
 eframe = "0.33"
 global-hotkey = "0.7"
 raw-window-handle = "0.6"
+
+# Windows-specific: windows-rs (official Microsoft crate)
+[target.'cfg(target_os = "windows")'.dependencies]
+windows = { version = "0.58", features = [
+    # Foundation
+    "Win32_Foundation",
+    "Win32_System_LibraryLoader",
+    # Window management
+    "Win32_UI_WindowsAndMessaging",
+    "Win32_UI_Input_KeyboardAndMouse",
+    # Graphics (GDI for now, can add Direct2D later)
+    "Win32_Graphics_Gdi",
+    # System tray
+    "Win32_UI_Shell",
+    # Hooks for mouse events
+    "Win32_UI_WindowsAndMessaging",
+    # Multi-monitor support
+    "Win32_Graphics_Gdi",
+]}
+
+# For JSON config persistence on Windows
+[target.'cfg(target_os = "windows")'.dependencies.serde]
+version = "1.0"
+features = ["derive"]
+
+[target.'cfg(target_os = "windows")'.dependencies.serde_json]
+version = "1.0"
 
 # Release profile optimizations
 [profile.release]

@@ -4,6 +4,7 @@ use crate::model::constants::*;
 use crate::model::OverlayState;
 
 /// Get config file path: %APPDATA%/Lumbus/config.json
+#[allow(dead_code)] // Will be used when JSON persistence is implemented
 fn config_path() -> std::path::PathBuf {
     let appdata = std::env::var("APPDATA").unwrap_or_else(|_| ".".to_string());
     std::path::PathBuf::from(appdata)
