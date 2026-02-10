@@ -1,50 +1,42 @@
 #![allow(unexpected_cfgs)] // Silence cfg warnings inside objc/cocoa macros
 
-mod app;
-mod handlers;
-mod input;
-mod ui;
-
-// Use FFI from the library crate
-use lumbus::ffi;
-
 // objc2 migration: use bridge module for compatibility
 use lumbus::ffi::bridge::{
     autoreleasepool, get_bool_ivar, get_class, id, msg_send, nil, nsstring_id, set_bool_ivar, sel,
     NSApp, NSPoint, NSRect, NSSize, ObjectExt, NO, YES,
 };
 use objc2::runtime::{AnyClass, AnyObject, ClassBuilder, Sel};
+
 // Import helpers from the library crate (tests use the same code)
 use lumbus::{clamp, color_to_hex, parse_hex_color, tr_key};
+
 // Import event system
 use lumbus::events::{init_event_bus, publish, AppEvent};
-// Import model constants and preferences
-use lumbus::model::{
-    prefs_get_double, prefs_get_int, prefs_set_double, prefs_set_int, DEFAULT_BORDER_WIDTH,
-    DEFAULT_COLOR, DEFAULT_DIAMETER, DEFAULT_FILL_TRANSPARENCY_PCT, PREF_BORDER,
-    PREF_FILL_TRANSPARENCY, PREF_LANG, PREF_RADIUS, PREF_STROKE_A, PREF_STROKE_B, PREF_STROKE_G,
-    PREF_STROKE_R,
-};
-use std::ffi::CStr;
-use std::os::raw::c_char;
 
-// FFI bindings from local module
-use crate::ffi::*;
-// Global helpers (apply_to_all_views, etc.)
-use crate::app::*;
-// Input handling (hotkeys, observers, monitors)
-use crate::input::{
+// Import model constants
+use lumbus::model::{
+    DEFAULT_BORDER_WIDTH, DEFAULT_COLOR, DEFAULT_DIAMETER, DEFAULT_FILL_TRANSPARENCY_PCT,
+    PREF_BORDER, PREF_FILL_TRANSPARENCY, PREF_LANG, PREF_RADIUS, PREF_STROKE_A, PREF_STROKE_B,
+    PREF_STROKE_G, PREF_STROKE_R,
+};
+
+// Import platform-specific modules
+use lumbus::platform::macos::ffi::*;
+use lumbus::platform::macos::app::*;
+use lumbus::platform::macos::storage::{prefs_get_double, prefs_get_int, prefs_set_double, prefs_set_int};
+use lumbus::platform::macos::input::{
     install_hotkeys, install_local_ctrl_a_monitor, install_mouse_monitors,
     install_termination_observer, install_wakeup_space_observers, reinstall_hotkeys,
     start_hotkey_keepalive,
 };
-// UI components
-use crate::ui::{
+use lumbus::platform::macos::ui::{
     close_settings_window, confirm_and_maybe_quit, draw_circle, draw_letter, install_status_bar,
     open_settings_window, update_status_bar_language, ClickLetter, DrawParams,
 };
-// Event dispatcher
-use crate::handlers::dispatch_events;
+use lumbus::platform::macos::handlers::dispatch_events;
+
+use std::ffi::CStr;
+use std::os::raw::c_char;
 
 //
 // ===================== App =====================
