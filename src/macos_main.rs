@@ -7,7 +7,7 @@ use std::ffi::{c_char, CStr};
 
 use lumbus::clamp;
 use lumbus::color_to_hex;
-use lumbus::events::{init_event_bus, publish, AppEvent};
+use lumbus::events::{publish, AppEvent};
 use lumbus::model::constants::*;
 use lumbus::parse_hex_color;
 use lumbus::platform::macos::app::{apply_to_all_views, sync_visual_prefs_to_all_views};
@@ -52,8 +52,7 @@ unsafe fn set_bool_ivar(obj: id, name: &str, val: bool) {
 
 /// Main entry point for macOS.
 pub fn run() {
-    // Initialize event bus before anything else
-    init_event_bus();
+    // Event bus is already initialized by main()
 
     autoreleasepool(|| {
         unsafe {
