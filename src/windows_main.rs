@@ -74,8 +74,8 @@ impl Default for OverlayState {
             height: 0,
             offset_x: 0,
             offset_y: 0,
-            radius: DEFAULT_DIAMETER / 2.0,
-            border_width: DEFAULT_BORDER_WIDTH,
+            radius: 50.0,      // Larger for testing (was DEFAULT_DIAMETER / 2.0 = ~19px)
+            border_width: 4.0, // Thicker for testing (was DEFAULT_BORDER_WIDTH)
             stroke_r: 1.0,
             stroke_g: 1.0,
             stroke_b: 1.0,
