@@ -7,9 +7,9 @@ use std::cell::RefCell;
 
 use lumbus::model::constants::*;
 use windows::core::w;
-use windows::Win32::Foundation::{HWND, LPARAM, LRESULT, POINT, SIZE, WPARAM};
+use windows::Win32::Foundation::{COLORREF, HWND, LPARAM, LRESULT, POINT, SIZE, WPARAM};
 use windows::Win32::Graphics::Direct2D::Common::{
-    D2D1_ALPHA_MODE_PREMULTIPLIED, D2D1_COLOR_F, D2D1_PIXEL_FORMAT, D2D_POINT_2F,
+    D2D1_ALPHA_MODE_PREMULTIPLIED, D2D1_COLOR_F, D2D1_PIXEL_FORMAT,
 };
 use windows::Win32::Graphics::Direct2D::{
     D2D1CreateFactory, ID2D1DCRenderTarget, ID2D1Factory, ID2D1RenderTarget,
@@ -34,6 +34,9 @@ use windows::Win32::UI::WindowsAndMessaging::{
     WM_DESTROY, WM_HOTKEY, WM_TIMER, WNDCLASSW, WS_EX_LAYERED, WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW,
     WS_EX_TOPMOST, WS_EX_TRANSPARENT, WS_POPUP,
 };
+
+// For Vector2 in D2D1_ELLIPSE
+use windows_numerics::Vector2;
 
 // Application-specific constants
 const HOTKEY_TOGGLE: i32 = 1;
@@ -135,7 +138,7 @@ fn run_app() -> windows::core::Result<()> {
             vh,
             None,
             None,
-            instance,
+            Some(instance.into()),
             None,
         )?;
 
@@ -150,12 +153,12 @@ fn run_app() -> windows::core::Result<()> {
         });
 
         // Register global hotkeys
-        let _ = RegisterHotKey(hwnd, HOTKEY_TOGGLE, MOD_CONTROL | MOD_SHIFT, 0x41); // Ctrl+Shift+A
-        let _ = RegisterHotKey(hwnd, HOTKEY_SETTINGS, MOD_CONTROL, 0xBC); // Ctrl+,
-        let _ = RegisterHotKey(hwnd, HOTKEY_QUIT, MOD_CONTROL | MOD_SHIFT, 0x58); // Ctrl+Shift+X
+        let _ = RegisterHotKey(Some(hwnd), HOTKEY_TOGGLE, MOD_CONTROL | MOD_SHIFT, 0x41); // Ctrl+Shift+A
+        let _ = RegisterHotKey(Some(hwnd), HOTKEY_SETTINGS, MOD_CONTROL, 0xBC); // Ctrl+,
+        let _ = RegisterHotKey(Some(hwnd), HOTKEY_QUIT, MOD_CONTROL | MOD_SHIFT, 0x58); // Ctrl+Shift+X
 
         // Start timer for cursor tracking
-        SetTimer(hwnd, TIMER_CURSOR, TIMER_INTERVAL_MS, None);
+        SetTimer(Some(hwnd), TIMER_CURSOR, TIMER_INTERVAL_MS, None);
 
         // Initial draw and show
         update_overlay();
@@ -169,9 +172,9 @@ fn run_app() -> windows::core::Result<()> {
         }
 
         // Cleanup
-        let _ = UnregisterHotKey(hwnd, HOTKEY_TOGGLE);
-        let _ = UnregisterHotKey(hwnd, HOTKEY_SETTINGS);
-        let _ = UnregisterHotKey(hwnd, HOTKEY_QUIT);
+        let _ = UnregisterHotKey(Some(hwnd), HOTKEY_TOGGLE);
+        let _ = UnregisterHotKey(Some(hwnd), HOTKEY_SETTINGS);
+        let _ = UnregisterHotKey(Some(hwnd), HOTKEY_QUIT);
 
         D2D_FACTORY.with(|f| {
             *f.borrow_mut() = None;
@@ -253,7 +256,7 @@ unsafe fn update_layered_window_d2d(state: &OverlayState, factory: &ID2D1Factory
 
     // Create a compatible DC and ARGB bitmap
     let screen_dc = GetDC(None);
-    let mem_dc = CreateCompatibleDC(screen_dc);
+    let mem_dc = CreateCompatibleDC(Some(screen_dc));
 
     let bmi = BITMAPINFO {
         bmiHeader: BITMAPINFOHEADER {
@@ -269,7 +272,7 @@ unsafe fn update_layered_window_d2d(state: &OverlayState, factory: &ID2D1Factory
     };
 
     let mut bits: *mut std::ffi::c_void = std::ptr::null_mut();
-    let bitmap = CreateDIBSection(mem_dc, &bmi, DIB_RGB_COLORS, &mut bits, None, 0);
+    let bitmap = CreateDIBSection(Some(mem_dc), &bmi, DIB_RGB_COLORS, &mut bits, None, 0);
 
     if bitmap.is_err() || bits.is_null() {
         ReleaseDC(None, screen_dc);
@@ -278,9 +281,9 @@ unsafe fn update_layered_window_d2d(state: &OverlayState, factory: &ID2D1Factory
     }
 
     let bitmap = bitmap.unwrap();
-    let old_bitmap = SelectObject(mem_dc, bitmap);
+    let old_bitmap = SelectObject(mem_dc, bitmap.into());
 
-    // Create DC render target - windows-rs 0.58 only takes render target properties
+    // Create DC render target
     let rt_props = D2D1_RENDER_TARGET_PROPERTIES {
         r#type: D2D1_RENDER_TARGET_TYPE_DEFAULT,
         pixelFormat: D2D1_PIXEL_FORMAT {
@@ -341,7 +344,7 @@ unsafe fn update_layered_window_d2d(state: &OverlayState, factory: &ID2D1Factory
 
                 if let Ok(brush) = rt.CreateSolidColorBrush(&color, None) {
                     let ellipse = D2D1_ELLIPSE {
-                        point: D2D_POINT_2F { x, y },
+                        point: Vector2::new(x, y),
                         radiusX: radius,
                         radiusY: radius,
                     };
@@ -372,21 +375,22 @@ unsafe fn update_layered_window_d2d(state: &OverlayState, factory: &ID2D1Factory
         AlphaFormat: 1, // AC_SRC_ALPHA
     };
 
+    // UpdateLayeredWindow in 0.62: (hwnd, hdcDst, pptDst, psize, hdcSrc, pptSrc, crKey, pblend, dwFlags)
     let _ = UpdateLayeredWindow(
         hwnd,
-        screen_dc,
+        Some(screen_dc),
         Some(&pt_dst),
         Some(&size),
-        mem_dc,
+        Some(mem_dc),
         Some(&pt_src),
-        None,
+        COLORREF(0),
         Some(&blend),
         ULW_ALPHA,
     );
 
     // Cleanup
     SelectObject(mem_dc, old_bitmap);
-    let _ = DeleteObject(bitmap);
+    let _ = DeleteObject(bitmap.into());
     let _ = DeleteDC(mem_dc);
     ReleaseDC(None, screen_dc);
 }

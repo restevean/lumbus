@@ -29,6 +29,7 @@ raw-window-handle = "0.6"
 
 # Windows-specific: windows-rs (official Microsoft crate)
 [target.'cfg(target_os = "windows")'.dependencies]
+windows-numerics = "0.2"
 windows = { version = "0.62", features = [
     # Foundation
     "Win32_Foundation",
