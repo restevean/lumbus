@@ -10,24 +10,25 @@ use lumbus::model::constants::*;
 use windows::core::w;
 use windows::Win32::Foundation::{COLORREF, HWND, LPARAM, LRESULT, POINT, SIZE, WPARAM};
 use windows::Win32::Graphics::Direct2D::Common::{
-    D2D1_ALPHA_MODE_PREMULTIPLIED, D2D1_COLOR_F, D2D1_PIXEL_FORMAT, D2D_RECT_F,
+    D2D1_ALPHA_MODE_PREMULTIPLIED, D2D1_COLOR_F, D2D1_PIXEL_FORMAT,
 };
 use windows::Win32::Graphics::Direct2D::{
-    D2D1CreateFactory, ID2D1DCRenderTarget, ID2D1Factory, ID2D1RenderTarget, ID2D1StrokeStyle,
-    D2D1_ANTIALIAS_MODE_PER_PRIMITIVE, D2D1_CAP_STYLE_ROUND, D2D1_DASH_STYLE_SOLID,
-    D2D1_DRAW_TEXT_OPTIONS_NONE, D2D1_ELLIPSE, D2D1_FACTORY_TYPE_SINGLE_THREADED,
-    D2D1_LINE_JOIN_ROUND, D2D1_RENDER_TARGET_PROPERTIES, D2D1_RENDER_TARGET_TYPE_DEFAULT,
-    D2D1_RENDER_TARGET_USAGE_NONE, D2D1_STROKE_STYLE_PROPERTIES,
+    D2D1CreateFactory, ID2D1DCRenderTarget, ID2D1Factory, ID2D1GeometrySink, ID2D1PathGeometry,
+    ID2D1RenderTarget, ID2D1StrokeStyle, D2D1_ANTIALIAS_MODE_PER_PRIMITIVE, D2D1_CAP_STYLE_ROUND,
+    D2D1_DASH_STYLE_SOLID, D2D1_ELLIPSE, D2D1_FACTORY_TYPE_SINGLE_THREADED,
+    D2D1_FIGURE_BEGIN_HOLLOW, D2D1_FIGURE_END_CLOSED, D2D1_FILL_MODE_WINDING, D2D1_LINE_JOIN_ROUND,
+    D2D1_RENDER_TARGET_PROPERTIES, D2D1_RENDER_TARGET_TYPE_DEFAULT, D2D1_RENDER_TARGET_USAGE_NONE,
+    D2D1_STROKE_STYLE_PROPERTIES,
 };
 use windows::Win32::Graphics::DirectWrite::{
-    DWriteCreateFactory, IDWriteFactory, IDWriteTextFormat, DWRITE_FACTORY_TYPE_SHARED,
-    DWRITE_FONT_STRETCH_NORMAL, DWRITE_FONT_STYLE_NORMAL, DWRITE_FONT_WEIGHT_BOLD,
-    DWRITE_PARAGRAPH_ALIGNMENT_CENTER, DWRITE_TEXT_ALIGNMENT_CENTER,
+    DWriteCreateFactory, IDWriteFactory, IDWriteFontFace, IDWriteFontFile, IDWriteGdiInterop,
+    DWRITE_FACTORY_TYPE_SHARED, DWRITE_FONT_FACE_TYPE_TRUETYPE, DWRITE_FONT_SIMULATIONS_BOLD,
 };
 use windows::Win32::Graphics::Dxgi::Common::DXGI_FORMAT_B8G8R8A8_UNORM;
 use windows::Win32::Graphics::Gdi::{
-    CreateCompatibleDC, CreateDIBSection, DeleteDC, DeleteObject, GetDC, ReleaseDC, SelectObject,
-    BITMAPINFO, BITMAPINFOHEADER, BI_RGB, DIB_RGB_COLORS,
+    CreateCompatibleDC, CreateDIBSection, CreateFontW, DeleteDC, DeleteObject, GetDC, ReleaseDC,
+    SelectObject, BITMAPINFO, BITMAPINFOHEADER, BI_RGB, CLIP_DEFAULT_PRECIS, DEFAULT_CHARSET,
+    DEFAULT_PITCH, DIB_RGB_COLORS, FF_DONTCARE, FW_BOLD, LOGFONTW, OUT_TT_PRECIS, PROOF_QUALITY,
 };
 use windows::Win32::System::Com::{CoInitializeEx, CoUninitialize, COINIT_APARTMENTTHREADED};
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
@@ -61,7 +62,6 @@ thread_local! {
     static STATE: RefCell<OverlayState> = RefCell::new(OverlayState::default());
     static D2D_FACTORY: RefCell<Option<ID2D1Factory>> = const { RefCell::new(None) };
     static DWRITE_FACTORY: RefCell<Option<IDWriteFactory>> = const { RefCell::new(None) };
-    static TEXT_FORMAT: RefCell<Option<IDWriteTextFormat>> = const { RefCell::new(None) };
 }
 
 #[allow(dead_code)]
@@ -120,25 +120,8 @@ fn run_app() -> windows::core::Result<()> {
 
         // Create DirectWrite factory for text rendering
         let dwrite_factory: IDWriteFactory = DWriteCreateFactory(DWRITE_FACTORY_TYPE_SHARED)?;
-
-        // Create text format for L/R indicators
-        let text_format = dwrite_factory.CreateTextFormat(
-            w!("Arial"),
-            None,
-            DWRITE_FONT_WEIGHT_BOLD,
-            DWRITE_FONT_STYLE_NORMAL,
-            DWRITE_FONT_STRETCH_NORMAL,
-            72.0, // Font size - will be adjusted based on radius
-            w!("en-US"),
-        )?;
-        text_format.SetTextAlignment(DWRITE_TEXT_ALIGNMENT_CENTER)?;
-        text_format.SetParagraphAlignment(DWRITE_PARAGRAPH_ALIGNMENT_CENTER)?;
-
         DWRITE_FACTORY.with(|f| {
             *f.borrow_mut() = Some(dwrite_factory);
-        });
-        TEXT_FORMAT.with(|f| {
-            *f.borrow_mut() = Some(text_format);
         });
 
         let instance = GetModuleHandleW(None)?;
@@ -222,9 +205,6 @@ fn run_app() -> windows::core::Result<()> {
         let _ = UnregisterHotKey(Some(hwnd), HOTKEY_SETTINGS);
         let _ = UnregisterHotKey(Some(hwnd), HOTKEY_QUIT);
 
-        TEXT_FORMAT.with(|f| {
-            *f.borrow_mut() = None;
-        });
         DWRITE_FACTORY.with(|f| {
             *f.borrow_mut() = None;
         });
@@ -314,18 +294,165 @@ extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM)
 fn update_overlay() {
     STATE.with(|s| {
         let state = s.borrow();
-        D2D_FACTORY.with(|f| {
-            if let Some(factory) = f.borrow().as_ref() {
-                unsafe {
-                    update_layered_window_d2d(&state, factory);
+        D2D_FACTORY.with(|d2d_f| {
+            DWRITE_FACTORY.with(|dw_f| {
+                if let (Some(d2d_factory), Some(dwrite_factory)) =
+                    (d2d_f.borrow().as_ref(), dw_f.borrow().as_ref())
+                {
+                    unsafe {
+                        update_layered_window_d2d(&state, d2d_factory, dwrite_factory);
+                    }
                 }
-            }
+            });
         });
     });
 }
 
+/// Create a font face for glyph outline rendering.
+unsafe fn create_font_face(dwrite_factory: &IDWriteFactory) -> Option<IDWriteFontFace> {
+    // Get GDI interop to create font face from system font
+    let gdi_interop: IDWriteGdiInterop = dwrite_factory.GetGdiInterop().ok()?;
+
+    // Create a GDI font
+    let mut font_name: [u16; 32] = [0; 32];
+    let arial = "Arial\0".encode_utf16().collect::<Vec<u16>>();
+    font_name[..arial.len()].copy_from_slice(&arial);
+
+    let log_font = LOGFONTW {
+        lfHeight: -72, // Negative for character height
+        lfWeight: FW_BOLD.0 as i32,
+        lfCharSet: DEFAULT_CHARSET.0,
+        lfOutPrecision: OUT_TT_PRECIS.0,
+        lfClipPrecision: CLIP_DEFAULT_PRECIS.0,
+        lfQuality: PROOF_QUALITY.0,
+        lfPitchAndFamily: (DEFAULT_PITCH.0 | FF_DONTCARE.0),
+        lfFaceName: font_name,
+        ..Default::default()
+    };
+
+    let hfont = CreateFontW(
+        log_font.lfHeight,
+        log_font.lfWidth,
+        log_font.lfEscapement,
+        log_font.lfOrientation,
+        log_font.lfWeight,
+        log_font.lfItalic as u32,
+        log_font.lfUnderline as u32,
+        log_font.lfStrikeOut as u32,
+        log_font.lfCharSet.0 as u32,
+        log_font.lfOutPrecision.0 as u32,
+        log_font.lfClipPrecision.0 as u32,
+        log_font.lfQuality.0 as u32,
+        log_font.lfPitchAndFamily as u32,
+        windows::core::PCWSTR(font_name.as_ptr()),
+    );
+
+    if hfont.is_invalid() {
+        return None;
+    }
+
+    // Get DC and select font
+    let dc = GetDC(None);
+    let old_font = SelectObject(dc, hfont);
+
+    // Create font face from DC
+    let font_face = gdi_interop.CreateFontFaceFromHdc(dc).ok();
+
+    // Cleanup
+    SelectObject(dc, old_font);
+    ReleaseDC(None, dc);
+    let _ = DeleteObject(hfont);
+
+    font_face
+}
+
+/// Create letter geometry (L or R) for outlined text rendering.
+unsafe fn create_letter_geometry(
+    factory: &ID2D1Factory,
+    font_face: &IDWriteFontFace,
+    letter: char,
+    font_size: f32,
+    center_x: f32,
+    center_y: f32,
+) -> Option<ID2D1PathGeometry> {
+    // Get glyph index for the letter
+    let code_point = letter as u32;
+    let mut glyph_index: u16 = 0;
+
+    font_face
+        .GetGlyphIndices(&code_point, 1, &mut glyph_index)
+        .ok()?;
+
+    if glyph_index == 0 {
+        return None;
+    }
+
+    // Create path geometry
+    let geometry: ID2D1PathGeometry = factory.CreatePathGeometry().ok()?;
+    let sink: ID2D1GeometrySink = geometry.Open().ok()?;
+
+    // Get font metrics for scaling
+    let mut metrics = Default::default();
+    font_face.GetMetrics(&mut metrics);
+
+    let scale = font_size / metrics.designUnitsPerEm as f32;
+
+    // Get glyph outline - the glyph is drawn at origin, we'll transform it
+    let glyph_advance: f32 = 0.0;
+    let glyph_offset = Default::default();
+
+    font_face
+        .GetGlyphRunOutline(
+            font_size,
+            &glyph_index,
+            Some(&glyph_advance),
+            Some(&glyph_offset),
+            1,
+            false,
+            false,
+            &sink,
+        )
+        .ok()?;
+
+    sink.Close().ok()?;
+
+    // Get bounds to center the geometry
+    let bounds = geometry.GetBounds(None).ok()?;
+
+    let glyph_width = bounds.right - bounds.left;
+    let glyph_height = bounds.bottom - bounds.top;
+
+    // Create a transformed geometry centered on the cursor
+    let transform = windows::Win32::Graphics::Direct2D::Common::D2D_MATRIX_3X2_F {
+        M11: 1.0,
+        M12: 0.0,
+        M21: 0.0,
+        M22: -1.0, // Flip Y (font coords are Y-up, screen is Y-down)
+        M31: center_x - bounds.left - glyph_width / 2.0,
+        M32: center_y + bounds.top + glyph_height / 2.0,
+    };
+
+    let transformed = factory
+        .CreateTransformedGeometry(&geometry, &transform)
+        .ok()?;
+
+    // We need to return a PathGeometry, so recreate with transformed points
+    let final_geometry: ID2D1PathGeometry = factory.CreatePathGeometry().ok()?;
+    let final_sink: ID2D1GeometrySink = final_geometry.Open().ok()?;
+
+    final_sink.SetFillMode(D2D1_FILL_MODE_WINDING);
+    transformed.Outline(None, &final_sink).ok()?;
+    final_sink.Close().ok()?;
+
+    Some(final_geometry)
+}
+
 /// Draw using Direct2D and apply with UpdateLayeredWindow.
-unsafe fn update_layered_window_d2d(state: &OverlayState, factory: &ID2D1Factory) {
+unsafe fn update_layered_window_d2d(
+    state: &OverlayState,
+    factory: &ID2D1Factory,
+    dwrite_factory: &IDWriteFactory,
+) {
     let hwnd = state.hwnd;
     let width = state.width;
     let height = state.height;
@@ -366,7 +493,7 @@ unsafe fn update_layered_window_d2d(state: &OverlayState, factory: &ID2D1Factory
             format: DXGI_FORMAT_B8G8R8A8_UNORM,
             alphaMode: D2D1_ALPHA_MODE_PREMULTIPLIED,
         },
-        dpiX: 96.0, // Explicit DPI for consistent rendering
+        dpiX: 96.0,
         dpiY: 96.0,
         usage: D2D1_RENDER_TARGET_USAGE_NONE,
         minLevel: Default::default(),
@@ -396,7 +523,6 @@ unsafe fn update_layered_window_d2d(state: &OverlayState, factory: &ID2D1Factory
         };
 
         if dc_rt.BindDC(mem_dc, &rect).is_ok() {
-            // Convert to ID2D1RenderTarget to access drawing methods
             let rt: ID2D1RenderTarget = dc_rt.into();
 
             rt.BeginDraw();
@@ -410,7 +536,6 @@ unsafe fn update_layered_window_d2d(state: &OverlayState, factory: &ID2D1Factory
             }));
 
             if state.visible {
-                // Get cursor position
                 let mut cursor = POINT::default();
                 let _ = GetCursorPos(&mut cursor);
 
@@ -420,10 +545,8 @@ unsafe fn update_layered_window_d2d(state: &OverlayState, factory: &ID2D1Factory
                 let radius = state.radius as f32;
                 let border = state.border_width as f32;
 
-                // Set anti-alias mode
                 rt.SetAntialiasMode(D2D1_ANTIALIAS_MODE_PER_PRIMITIVE);
 
-                // Create brush for stroke
                 let color = D2D1_COLOR_F {
                     r: state.stroke_r,
                     g: state.stroke_g,
@@ -434,36 +557,30 @@ unsafe fn update_layered_window_d2d(state: &OverlayState, factory: &ID2D1Factory
                 if let Ok(brush) = rt.CreateSolidColorBrush(&color, None) {
                     match state.display_mode {
                         DISPLAY_MODE_LEFT | DISPLAY_MODE_RIGHT => {
-                            // Draw L or R text
-                            let text = if state.display_mode == DISPLAY_MODE_LEFT {
-                                "L"
+                            // Draw L or R as outlined text
+                            let letter = if state.display_mode == DISPLAY_MODE_LEFT {
+                                'L'
                             } else {
-                                "R"
+                                'R'
                             };
 
-                            // Text bounding box centered on cursor
-                            let text_size = radius * 2.0;
-                            let layout_rect = D2D_RECT_F {
-                                left: x - text_size,
-                                top: y - text_size,
-                                right: x + text_size,
-                                bottom: y + text_size,
-                            };
+                            // Font size = 3 * radius (matching macOS: letter height = 1.5 * diameter)
+                            let font_size = 3.0 * radius;
 
-                            TEXT_FORMAT.with(|tf| {
-                                if let Some(format) = tf.borrow().as_ref() {
-                                    let text_wide: Vec<u16> =
-                                        text.encode_utf16().chain(std::iter::once(0)).collect();
-                                    rt.DrawText(
-                                        &text_wide[..text_wide.len() - 1],
-                                        format,
-                                        &layout_rect,
+                            // Create font face and geometry
+                            if let Some(font_face) = create_font_face(dwrite_factory) {
+                                if let Some(letter_geom) = create_letter_geometry(
+                                    factory, &font_face, letter, font_size, x, y,
+                                ) {
+                                    // Draw outlined letter (stroke only, no fill)
+                                    rt.DrawGeometry(
+                                        &letter_geom,
                                         &brush,
-                                        D2D1_DRAW_TEXT_OPTIONS_NONE,
-                                        windows::Win32::Graphics::DirectWrite::DWRITE_MEASURING_MODE_NATURAL,
+                                        border,
+                                        stroke_style.as_ref(),
                                     );
                                 }
-                            });
+                            }
                         }
                         _ => {
                             // Draw circle (default)
@@ -473,7 +590,6 @@ unsafe fn update_layered_window_d2d(state: &OverlayState, factory: &ID2D1Factory
                                 radiusY: radius,
                             };
 
-                            // Use stroke style for smoother edges
                             rt.DrawEllipse(&ellipse, &brush, border, stroke_style.as_ref());
                         }
                     }
@@ -502,7 +618,6 @@ unsafe fn update_layered_window_d2d(state: &OverlayState, factory: &ID2D1Factory
         AlphaFormat: 1, // AC_SRC_ALPHA
     };
 
-    // UpdateLayeredWindow in 0.62: (hwnd, hdcDst, pptDst, psize, hdcSrc, pptSrc, crKey, pblend, dwFlags)
     let _ = UpdateLayeredWindow(
         hwnd,
         Some(screen_dc),
