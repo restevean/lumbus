@@ -122,7 +122,7 @@ fn run_app() -> windows::core::Result<()> {
         });
 
         // Register global hotkeys
-        let _ = RegisterHotKey(hwnd, HOTKEY_TOGGLE, MOD_CONTROL, 0x41); // Ctrl+A
+        let _ = RegisterHotKey(hwnd, HOTKEY_TOGGLE, MOD_CONTROL | MOD_SHIFT, 0x41); // Ctrl+Shift+A
         let _ = RegisterHotKey(hwnd, HOTKEY_SETTINGS, MOD_CONTROL, 0xBC); // Ctrl+,
         let _ = RegisterHotKey(hwnd, HOTKEY_QUIT, MOD_CONTROL | MOD_SHIFT, 0x58); // Ctrl+Shift+X
 
@@ -179,10 +179,15 @@ extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM)
                 let hotkey_id = wparam.0 as i32;
                 match hotkey_id {
                     HOTKEY_TOGGLE => {
-                        STATE.with(|s| {
+                        let new_visible = STATE.with(|s| {
                             let mut state = s.borrow_mut();
                             state.visible = !state.visible;
+                            state.visible
                         });
+                        eprintln!(
+                            "Toggle: overlay {}",
+                            if new_visible { "visible" } else { "hidden" }
+                        );
                         let _ = InvalidateRect(hwnd, None, true);
                     }
                     HOTKEY_SETTINGS => {
