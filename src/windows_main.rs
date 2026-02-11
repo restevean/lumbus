@@ -13,9 +13,10 @@ use windows::Win32::Graphics::Gdi::{
     BITMAPINFO, BITMAPINFOHEADER, BI_RGB, DIB_RGB_COLORS,
 };
 use windows::Win32::Graphics::GdiPlus::{
-    GdipCreateFromHDC, GdipCreatePen1, GdipDeleteGraphics, GdipDeletePen, GdipDrawEllipse,
-    GdipGraphicsClear, GdipSetSmoothingMode, GdiplusShutdown, GdiplusStartup, GdiplusStartupInput,
-    GpGraphics, GpPen, SmoothingModeAntiAlias, Unit,
+    CompositingQualityHighQuality, GdipCreateFromHDC, GdipCreatePen1, GdipDeleteGraphics,
+    GdipDeletePen, GdipDrawEllipse, GdipGraphicsClear, GdipSetCompositingQuality,
+    GdipSetSmoothingMode, GdiplusShutdown, GdiplusStartup, GdiplusStartupInput, GpGraphics, GpPen,
+    SmoothingModeHighQuality, Unit,
 };
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows::Win32::UI::Input::KeyboardAndMouse::{
@@ -288,8 +289,9 @@ unsafe fn update_layered_window(state: &OverlayState) {
             let radius = state.radius as f32;
             let border = state.border_width as f32;
 
-            // Enable anti-aliasing
-            GdipSetSmoothingMode(graphics, SmoothingModeAntiAlias);
+            // Enable high quality rendering
+            GdipSetSmoothingMode(graphics, SmoothingModeHighQuality);
+            GdipSetCompositingQuality(graphics, CompositingQualityHighQuality);
 
             // Create pen with ARGB color (fully opaque)
             let argb_color: u32 = 0xFF000000
