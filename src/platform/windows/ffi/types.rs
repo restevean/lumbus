@@ -4,7 +4,7 @@
 //! and defines application-specific constants.
 
 // Re-export windows-rs types we use frequently
-pub use windows::Win32::Foundation::{BOOL, HWND, LPARAM, LRESULT, POINT, RECT, WPARAM};
+pub use windows::Win32::Foundation::{HWND, LPARAM, LRESULT, POINT, RECT, WPARAM};
 pub use windows::Win32::Graphics::Gdi::{
     BeginPaint, CreatePen, CreateSolidBrush, DeleteObject, Ellipse, EndPaint, GetStockObject,
     SelectObject, SetBkMode, HBRUSH, HDC, HGDIOBJ, HPEN, NULL_BRUSH, PAINTSTRUCT, PS_SOLID,
