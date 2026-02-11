@@ -12,9 +12,10 @@ use windows::Win32::Graphics::Direct2D::Common::{
     D2D1_ALPHA_MODE_PREMULTIPLIED, D2D1_COLOR_F, D2D1_PIXEL_FORMAT,
 };
 use windows::Win32::Graphics::Direct2D::{
-    D2D1CreateFactory, ID2D1DCRenderTarget, ID2D1Factory, ID2D1RenderTarget,
-    D2D1_ANTIALIAS_MODE_PER_PRIMITIVE, D2D1_ELLIPSE, D2D1_FACTORY_TYPE_SINGLE_THREADED,
-    D2D1_RENDER_TARGET_PROPERTIES, D2D1_RENDER_TARGET_TYPE_DEFAULT, D2D1_RENDER_TARGET_USAGE_NONE,
+    D2D1CreateFactory, ID2D1DCRenderTarget, ID2D1Factory, ID2D1RenderTarget, ID2D1StrokeStyle,
+    D2D1_ANTIALIAS_MODE_PER_PRIMITIVE, D2D1_CAP_STYLE_ROUND, D2D1_DASH_STYLE_SOLID, D2D1_ELLIPSE,
+    D2D1_FACTORY_TYPE_SINGLE_THREADED, D2D1_LINE_JOIN_ROUND, D2D1_RENDER_TARGET_PROPERTIES,
+    D2D1_RENDER_TARGET_TYPE_DEFAULT, D2D1_RENDER_TARGET_USAGE_NONE, D2D1_STROKE_STYLE_PROPERTIES,
 };
 use windows::Win32::Graphics::Dxgi::Common::DXGI_FORMAT_B8G8R8A8_UNORM;
 use windows::Win32::Graphics::Gdi::{
@@ -283,18 +284,31 @@ unsafe fn update_layered_window_d2d(state: &OverlayState, factory: &ID2D1Factory
     let bitmap = bitmap.unwrap();
     let old_bitmap = SelectObject(mem_dc, bitmap.into());
 
-    // Create DC render target
+    // Create DC render target with explicit DPI for crisp rendering
     let rt_props = D2D1_RENDER_TARGET_PROPERTIES {
         r#type: D2D1_RENDER_TARGET_TYPE_DEFAULT,
         pixelFormat: D2D1_PIXEL_FORMAT {
             format: DXGI_FORMAT_B8G8R8A8_UNORM,
             alphaMode: D2D1_ALPHA_MODE_PREMULTIPLIED,
         },
-        dpiX: 0.0,
-        dpiY: 0.0,
+        dpiX: 96.0, // Explicit DPI for consistent rendering
+        dpiY: 96.0,
         usage: D2D1_RENDER_TARGET_USAGE_NONE,
         minLevel: Default::default(),
     };
+
+    // Create stroke style with round caps for smoother edges
+    let stroke_props = D2D1_STROKE_STYLE_PROPERTIES {
+        startCap: D2D1_CAP_STYLE_ROUND,
+        endCap: D2D1_CAP_STYLE_ROUND,
+        dashCap: D2D1_CAP_STYLE_ROUND,
+        lineJoin: D2D1_LINE_JOIN_ROUND,
+        miterLimit: 1.0,
+        dashStyle: D2D1_DASH_STYLE_SOLID,
+        dashOffset: 0.0,
+    };
+    let stroke_style: Option<ID2D1StrokeStyle> =
+        factory.CreateStrokeStyle(&stroke_props, None).ok();
 
     let render_target: Result<ID2D1DCRenderTarget, _> = factory.CreateDCRenderTarget(&rt_props);
 
@@ -349,7 +363,8 @@ unsafe fn update_layered_window_d2d(state: &OverlayState, factory: &ID2D1Factory
                         radiusY: radius,
                     };
 
-                    rt.DrawEllipse(&ellipse, &brush, border, None);
+                    // Use stroke style for smoother edges
+                    rt.DrawEllipse(&ellipse, &brush, border, stroke_style.as_ref());
                 }
             }
 
