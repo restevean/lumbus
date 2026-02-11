@@ -6,7 +6,7 @@
 use std::cell::RefCell;
 
 use lumbus::model::constants::*;
-use windows::core::{w, Interface};
+use windows::core::w;
 use windows::Win32::Foundation::{HWND, LPARAM, LRESULT, POINT, SIZE, WPARAM};
 use windows::Win32::Graphics::Direct2D::Common::{
     D2D1_ALPHA_MODE_PREMULTIPLIED, D2D1_COLOR_F, D2D1_PIXEL_FORMAT, D2D_POINT_2F,
@@ -304,8 +304,8 @@ unsafe fn update_layered_window_d2d(state: &OverlayState, factory: &ID2D1Factory
         };
 
         if dc_rt.BindDC(mem_dc, &rect).is_ok() {
-            // Cast to ID2D1RenderTarget to access drawing methods
-            let rt: ID2D1RenderTarget = dc_rt.cast().unwrap();
+            // Convert to ID2D1RenderTarget to access drawing methods
+            let rt: ID2D1RenderTarget = dc_rt.into();
 
             rt.BeginDraw();
 
