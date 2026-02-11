@@ -258,7 +258,7 @@ extern "system" fn mouse_hook_proc(ncode: i32, wparam: WPARAM, lparam: LPARAM) -
         }
 
         let hook = MOUSE_HOOK.load(Ordering::SeqCst);
-        CallNextHookEx(HHOOK(hook as *mut _), ncode, wparam, lparam)
+        CallNextHookEx(Some(HHOOK(hook as *mut _)), ncode, wparam, lparam)
     }
 }
 
