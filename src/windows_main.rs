@@ -1,23 +1,29 @@
 //! Windows-specific entry point and application logic.
 //!
-//! Uses per-pixel alpha transparency with UpdateLayeredWindow for
-//! smooth anti-aliased rendering without artifacts.
+//! Uses Direct2D for GPU-accelerated, high-quality anti-aliased rendering
+//! with per-pixel alpha transparency via UpdateLayeredWindow.
 
 use std::cell::RefCell;
 
 use lumbus::model::constants::*;
 use windows::core::w;
 use windows::Win32::Foundation::{HWND, LPARAM, LRESULT, POINT, SIZE, WPARAM};
+use windows::Win32::Graphics::Direct2D::Common::{
+    D2D1_ALPHA_MODE_PREMULTIPLIED, D2D1_COLOR_F, D2D1_PIXEL_FORMAT, D2D_POINT_2F,
+};
+use windows::Win32::Graphics::Direct2D::{
+    D2D1CreateFactory, ID2D1DCRenderTarget, ID2D1Factory, ID2D1HwndRenderTarget,
+    ID2D1SolidColorBrush, D2D1_ANTIALIAS_MODE_PER_PRIMITIVE, D2D1_DC_RENDER_TARGET_PROPERTIES,
+    D2D1_ELLIPSE, D2D1_FACTORY_TYPE_SINGLE_THREADED, D2D1_HWND_RENDER_TARGET_PROPERTIES,
+    D2D1_PRESENT_OPTIONS_IMMEDIATELY, D2D1_RENDER_TARGET_PROPERTIES,
+    D2D1_RENDER_TARGET_TYPE_DEFAULT, D2D1_RENDER_TARGET_USAGE_NONE,
+};
+use windows::Win32::Graphics::Dxgi::Common::DXGI_FORMAT_B8G8R8A8_UNORM;
 use windows::Win32::Graphics::Gdi::{
     CreateCompatibleDC, CreateDIBSection, DeleteDC, DeleteObject, GetDC, ReleaseDC, SelectObject,
     BITMAPINFO, BITMAPINFOHEADER, BI_RGB, DIB_RGB_COLORS,
 };
-use windows::Win32::Graphics::GdiPlus::{
-    CompositingQualityHighQuality, GdipCreateFromHDC, GdipCreatePen1, GdipDeleteGraphics,
-    GdipDeletePen, GdipDrawEllipse, GdipGraphicsClear, GdipSetCompositingQuality,
-    GdipSetSmoothingMode, GdiplusShutdown, GdiplusStartup, GdiplusStartupInput, GpGraphics, GpPen,
-    SmoothingModeHighQuality, Unit,
-};
+use windows::Win32::System::Com::{CoInitializeEx, CoUninitialize, COINIT_APARTMENTTHREADED};
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows::Win32::UI::Input::KeyboardAndMouse::{
     RegisterHotKey, UnregisterHotKey, MOD_CONTROL, MOD_SHIFT,
@@ -40,6 +46,7 @@ const TIMER_INTERVAL_MS: u32 = 16; // ~60 FPS
 
 thread_local! {
     static STATE: RefCell<OverlayState> = RefCell::new(OverlayState::default());
+    static D2D_FACTORY: RefCell<Option<ID2D1Factory>> = const { RefCell::new(None) };
 }
 
 #[allow(dead_code)]
@@ -51,9 +58,9 @@ struct OverlayState {
     offset_y: i32,
     radius: f64,
     border_width: f64,
-    stroke_r: u8,
-    stroke_g: u8,
-    stroke_b: u8,
+    stroke_r: f32,
+    stroke_g: f32,
+    stroke_b: f32,
     visible: bool,
     display_mode: i32,
 }
@@ -68,9 +75,9 @@ impl Default for OverlayState {
             offset_y: 0,
             radius: DEFAULT_DIAMETER / 2.0,
             border_width: DEFAULT_BORDER_WIDTH,
-            stroke_r: 255,
-            stroke_g: 255,
-            stroke_b: 255,
+            stroke_r: 1.0,
+            stroke_g: 1.0,
+            stroke_b: 1.0,
             visible: true,
             display_mode: DISPLAY_MODE_CIRCLE,
         }
@@ -87,17 +94,14 @@ pub fn run() {
 
 fn run_app() -> windows::core::Result<()> {
     unsafe {
-        // Initialize GDI+
-        let mut gdiplus_token: usize = 0;
-        let startup_input = GdiplusStartupInput {
-            GdiplusVersion: 1,
-            ..Default::default()
-        };
-        let status = GdiplusStartup(&mut gdiplus_token, &startup_input, std::ptr::null_mut());
-        if status.0 != 0 {
-            eprintln!("Failed to initialize GDI+: {:?}", status);
-            return Err(windows::core::Error::from_win32());
-        }
+        // Initialize COM
+        CoInitializeEx(None, COINIT_APARTMENTTHREADED)?;
+
+        // Create Direct2D factory
+        let factory: ID2D1Factory = D2D1CreateFactory(D2D1_FACTORY_TYPE_SINGLE_THREADED, None)?;
+        D2D_FACTORY.with(|f| {
+            *f.borrow_mut() = Some(factory);
+        });
 
         let instance = GetModuleHandleW(None)?;
         let class_name = w!("LumbusOverlay");
@@ -171,7 +175,11 @@ fn run_app() -> windows::core::Result<()> {
         let _ = UnregisterHotKey(hwnd, HOTKEY_SETTINGS);
         let _ = UnregisterHotKey(hwnd, HOTKEY_QUIT);
 
-        GdiplusShutdown(gdiplus_token);
+        D2D_FACTORY.with(|f| {
+            *f.borrow_mut() = None;
+        });
+
+        CoUninitialize();
 
         Ok(())
     }
@@ -225,32 +233,35 @@ extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM)
     }
 }
 
-/// Update the overlay using per-pixel alpha with UpdateLayeredWindow.
+/// Update the overlay using Direct2D rendering.
 fn update_overlay() {
     STATE.with(|s| {
         let state = s.borrow();
-        unsafe {
-            update_layered_window(&state);
-        }
+        D2D_FACTORY.with(|f| {
+            if let Some(factory) = f.borrow().as_ref() {
+                unsafe {
+                    update_layered_window_d2d(&state, factory);
+                }
+            }
+        });
     });
 }
 
-/// Draw to an ARGB bitmap and apply with UpdateLayeredWindow.
-unsafe fn update_layered_window(state: &OverlayState) {
+/// Draw using Direct2D and apply with UpdateLayeredWindow.
+unsafe fn update_layered_window_d2d(state: &OverlayState, factory: &ID2D1Factory) {
     let hwnd = state.hwnd;
     let width = state.width;
     let height = state.height;
 
-    // Create a compatible DC
+    // Create a compatible DC and ARGB bitmap
     let screen_dc = GetDC(None);
     let mem_dc = CreateCompatibleDC(screen_dc);
 
-    // Create 32-bit ARGB bitmap
     let bmi = BITMAPINFO {
         bmiHeader: BITMAPINFOHEADER {
             biSize: std::mem::size_of::<BITMAPINFOHEADER>() as u32,
             biWidth: width,
-            biHeight: -height, // Top-down DIB
+            biHeight: -height, // Top-down
             biPlanes: 1,
             biBitCount: 32,
             biCompression: BI_RGB.0,
@@ -271,47 +282,90 @@ unsafe fn update_layered_window(state: &OverlayState) {
     let bitmap = bitmap.unwrap();
     let old_bitmap = SelectObject(mem_dc, bitmap);
 
-    // Clear bitmap to fully transparent
-    let mut graphics: *mut GpGraphics = std::ptr::null_mut();
-    if GdipCreateFromHDC(mem_dc, &mut graphics).0 == 0 && !graphics.is_null() {
-        // Clear to transparent (ARGB = 0x00000000)
-        GdipGraphicsClear(graphics, 0x00000000);
+    // Create DC render target
+    let rt_props = D2D1_RENDER_TARGET_PROPERTIES {
+        r#type: D2D1_RENDER_TARGET_TYPE_DEFAULT,
+        pixelFormat: D2D1_PIXEL_FORMAT {
+            format: DXGI_FORMAT_B8G8R8A8_UNORM,
+            alphaMode: D2D1_ALPHA_MODE_PREMULTIPLIED,
+        },
+        dpiX: 0.0,
+        dpiY: 0.0,
+        usage: D2D1_RENDER_TARGET_USAGE_NONE,
+        minLevel: Default::default(),
+    };
 
-        if state.visible {
-            // Get cursor position
-            let mut cursor = POINT::default();
-            let _ = GetCursorPos(&mut cursor);
+    let dc_rt_props = D2D1_DC_RENDER_TARGET_PROPERTIES {
+        pixelFormat: D2D1_PIXEL_FORMAT {
+            format: DXGI_FORMAT_B8G8R8A8_UNORM,
+            alphaMode: D2D1_ALPHA_MODE_PREMULTIPLIED,
+        },
+        ..Default::default()
+    };
 
-            // Convert to bitmap coordinates
-            let x = (cursor.x - state.offset_x) as f32;
-            let y = (cursor.y - state.offset_y) as f32;
+    let render_target: Result<ID2D1DCRenderTarget, _> =
+        factory.CreateDCRenderTarget(&rt_props, &dc_rt_props);
 
-            let radius = state.radius as f32;
-            let border = state.border_width as f32;
+    if let Ok(rt) = render_target {
+        let rect = windows::Win32::Foundation::RECT {
+            left: 0,
+            top: 0,
+            right: width,
+            bottom: height,
+        };
 
-            // Enable high quality rendering
-            GdipSetSmoothingMode(graphics, SmoothingModeHighQuality);
-            GdipSetCompositingQuality(graphics, CompositingQualityHighQuality);
+        if rt.BindDC(mem_dc, &rect).is_ok() {
+            rt.BeginDraw();
 
-            // Create pen with ARGB color (fully opaque)
-            let argb_color: u32 = 0xFF000000
-                | ((state.stroke_r as u32) << 16)
-                | ((state.stroke_g as u32) << 8)
-                | (state.stroke_b as u32);
+            // Clear to transparent
+            rt.Clear(Some(&D2D1_COLOR_F {
+                r: 0.0,
+                g: 0.0,
+                b: 0.0,
+                a: 0.0,
+            }));
 
-            let mut pen: *mut GpPen = std::ptr::null_mut();
-            if GdipCreatePen1(argb_color, border, Unit(0), &mut pen).0 == 0 && !pen.is_null() {
-                // Draw anti-aliased circle
-                let diameter = radius * 2.0;
-                GdipDrawEllipse(graphics, pen, x - radius, y - radius, diameter, diameter);
-                GdipDeletePen(pen);
+            if state.visible {
+                // Get cursor position
+                let mut cursor = POINT::default();
+                let _ = GetCursorPos(&mut cursor);
+
+                let x = (cursor.x - state.offset_x) as f32;
+                let y = (cursor.y - state.offset_y) as f32;
+
+                let radius = state.radius as f32;
+                let border = state.border_width as f32;
+
+                // Set anti-alias mode
+                rt.SetAntialiasMode(D2D1_ANTIALIAS_MODE_PER_PRIMITIVE);
+
+                // Create brush for stroke
+                let brush_result: Result<ID2D1SolidColorBrush, _> = rt.CreateSolidColorBrush(
+                    &D2D1_COLOR_F {
+                        r: state.stroke_r,
+                        g: state.stroke_g,
+                        b: state.stroke_b,
+                        a: 1.0,
+                    },
+                    None,
+                );
+
+                if let Ok(brush) = brush_result {
+                    let ellipse = D2D1_ELLIPSE {
+                        point: D2D_POINT_2F { x, y },
+                        radiusX: radius,
+                        radiusY: radius,
+                    };
+
+                    rt.DrawEllipse(&ellipse, &brush, border, None);
+                }
             }
-        }
 
-        GdipDeleteGraphics(graphics);
+            let _ = rt.EndDraw(None, None);
+        }
     }
 
-    // Apply the bitmap to the window using UpdateLayeredWindow
+    // Apply to window
     let pt_src = POINT { x: 0, y: 0 };
     let size = SIZE {
         cx: width,
@@ -322,7 +376,6 @@ unsafe fn update_layered_window(state: &OverlayState) {
         y: state.offset_y,
     };
 
-    // BLENDFUNCTION for per-pixel alpha
     let blend = windows::Win32::Graphics::Gdi::BLENDFUNCTION {
         BlendOp: 0, // AC_SRC_OVER
         BlendFlags: 0,
@@ -337,7 +390,7 @@ unsafe fn update_layered_window(state: &OverlayState) {
         Some(&size),
         mem_dc,
         Some(&pt_src),
-        None, // No color key
+        None,
         Some(&blend),
         ULW_ALPHA,
     );

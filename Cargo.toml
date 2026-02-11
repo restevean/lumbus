@@ -33,12 +33,16 @@ windows = { version = "0.58", features = [
     # Foundation
     "Win32_Foundation",
     "Win32_System_LibraryLoader",
+    "Win32_System_Com",
     # Window management
     "Win32_UI_WindowsAndMessaging",
     "Win32_UI_Input_KeyboardAndMouse",
     # Graphics
     "Win32_Graphics_Gdi",
-    "Win32_Graphics_GdiPlus",
+    "Win32_Graphics_Direct2D",
+    "Win32_Graphics_Direct2D_Common",
+    "Win32_Graphics_Dxgi_Common",
+    "Win32_Graphics_Imaging",
     # System tray
     "Win32_UI_Shell",
 ]}
