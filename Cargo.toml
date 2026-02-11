@@ -36,14 +36,11 @@ windows = { version = "0.58", features = [
     # Window management
     "Win32_UI_WindowsAndMessaging",
     "Win32_UI_Input_KeyboardAndMouse",
-    # Graphics (GDI for now, can add Direct2D later)
+    # Graphics
     "Win32_Graphics_Gdi",
+    "Win32_Graphics_GdiPlus",
     # System tray
     "Win32_UI_Shell",
-    # Hooks for mouse events
-    "Win32_UI_WindowsAndMessaging",
-    # Multi-monitor support
-    "Win32_Graphics_Gdi",
 ]}
 
 # For JSON config persistence on Windows

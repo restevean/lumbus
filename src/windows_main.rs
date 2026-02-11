@@ -9,8 +9,13 @@ use lumbus::model::constants::*;
 use windows::core::w;
 use windows::Win32::Foundation::{COLORREF, HWND, LPARAM, LRESULT, POINT, RECT, WPARAM};
 use windows::Win32::Graphics::Gdi::{
-    BeginPaint, CreatePen, CreateSolidBrush, DeleteObject, Ellipse, EndPaint, FillRect,
-    GetStockObject, InvalidateRect, SelectObject, HDC, NULL_BRUSH, PAINTSTRUCT, PS_SOLID,
+    BeginPaint, CreateSolidBrush, DeleteObject, EndPaint, FillRect, InvalidateRect, HDC,
+    PAINTSTRUCT,
+};
+use windows::Win32::Graphics::GdiPlus::{
+    GdipCreateFromHDC, GdipCreatePen1, GdipDeleteGraphics, GdipDeletePen, GdipDrawEllipse,
+    GdipSetSmoothingMode, GdiplusShutdown, GdiplusStartup, GdiplusStartupInput, GpGraphics, GpPen,
+    SmoothingModeAntiAlias, Unit,
 };
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows::Win32::UI::Input::KeyboardAndMouse::{
@@ -75,6 +80,18 @@ pub fn run() {
 
 fn run_app() -> windows::core::Result<()> {
     unsafe {
+        // Initialize GDI+
+        let mut gdiplus_token: usize = 0;
+        let startup_input = GdiplusStartupInput {
+            GdiplusVersion: 1,
+            ..Default::default()
+        };
+        let status = GdiplusStartup(&mut gdiplus_token, &startup_input, std::ptr::null_mut());
+        if status.0 != 0 {
+            eprintln!("Failed to initialize GDI+: {:?}", status);
+            return Err(windows::core::Error::from_win32());
+        }
+
         let instance = GetModuleHandleW(None)?;
         let class_name = w!("LumbusOverlay");
 
@@ -144,6 +161,9 @@ fn run_app() -> windows::core::Result<()> {
         let _ = UnregisterHotKey(hwnd, HOTKEY_SETTINGS);
         let _ = UnregisterHotKey(hwnd, HOTKEY_QUIT);
 
+        // Shutdown GDI+
+        GdiplusShutdown(gdiplus_token);
+
         Ok(())
     }
 }
@@ -168,6 +188,9 @@ extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM)
                     let state = s.borrow();
                     if state.visible {
                         draw_overlay(hdc, &state);
+                    } else {
+                        // Clear to transparent when hidden
+                        clear_background(hdc, &state);
                     }
                 });
 
@@ -212,6 +235,16 @@ extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM)
     }
 }
 
+/// Clear the background with transparent color.
+unsafe fn clear_background(hdc: HDC, state: &OverlayState) {
+    let bg_brush = CreateSolidBrush(COLORREF(TRANSPARENT_COLOR));
+    let mut client_rect = RECT::default();
+    let _ = GetClientRect(state.hwnd, &mut client_rect);
+    FillRect(hdc, &client_rect, bg_brush);
+    let _ = DeleteObject(bg_brush);
+}
+
+/// Draw the overlay circle using GDI+ for anti-aliased rendering.
 unsafe fn draw_overlay(hdc: HDC, state: &OverlayState) {
     // Get cursor position
     let mut cursor = POINT::default();
@@ -220,35 +253,43 @@ unsafe fn draw_overlay(hdc: HDC, state: &OverlayState) {
     // Convert to window coordinates
     let vx = GetSystemMetrics(SM_XVIRTUALSCREEN);
     let vy = GetSystemMetrics(SM_YVIRTUALSCREEN);
-    let x = cursor.x - vx;
-    let y = cursor.y - vy;
+    let x = (cursor.x - vx) as f32;
+    let y = (cursor.y - vy) as f32;
 
-    let radius = state.radius as i32;
-    let border = state.border_width as i32;
+    let radius = state.radius as f32;
+    let border = state.border_width as f32;
 
     // Clear background with transparent color
-    let bg_brush = CreateSolidBrush(COLORREF(TRANSPARENT_COLOR));
-    let mut client_rect = RECT::default();
-    let _ = GetClientRect(state.hwnd, &mut client_rect);
-    FillRect(hdc, &client_rect, bg_brush);
-    let _ = DeleteObject(bg_brush);
+    clear_background(hdc, state);
 
-    // Create pen for circle border
-    let pen_color = COLORREF(
-        (state.stroke_r as u32) | ((state.stroke_g as u32) << 8) | ((state.stroke_b as u32) << 16),
-    );
-    let pen = CreatePen(PS_SOLID, border, pen_color);
-    let old_pen = SelectObject(hdc, pen);
+    // Create GDI+ Graphics object from HDC
+    let mut graphics: *mut GpGraphics = std::ptr::null_mut();
+    let status = GdipCreateFromHDC(hdc, &mut graphics);
+    if status.0 != 0 || graphics.is_null() {
+        return;
+    }
 
-    // Use null brush for transparent fill
-    let null_brush = GetStockObject(NULL_BRUSH);
-    let old_brush = SelectObject(hdc, null_brush);
+    // Enable anti-aliasing
+    GdipSetSmoothingMode(graphics, SmoothingModeAntiAlias);
 
-    // Draw the circle
-    let _ = Ellipse(hdc, x - radius, y - radius, x + radius, y + radius);
+    // Create pen with ARGB color (fully opaque white)
+    let argb_color: u32 = 0xFF000000
+        | ((state.stroke_r as u32) << 16)
+        | ((state.stroke_g as u32) << 8)
+        | (state.stroke_b as u32);
 
-    // Restore and cleanup
-    SelectObject(hdc, old_pen);
-    SelectObject(hdc, old_brush);
-    let _ = DeleteObject(pen);
+    let mut pen: *mut GpPen = std::ptr::null_mut();
+    let status = GdipCreatePen1(argb_color, border, Unit(0), &mut pen); // Unit 0 = UnitWorld
+    if status.0 != 0 || pen.is_null() {
+        GdipDeleteGraphics(graphics);
+        return;
+    }
+
+    // Draw anti-aliased circle (ellipse with equal width/height)
+    let diameter = radius * 2.0;
+    GdipDrawEllipse(graphics, pen, x - radius, y - radius, diameter, diameter);
+
+    // Cleanup
+    GdipDeletePen(pen);
+    GdipDeleteGraphics(graphics);
 }
