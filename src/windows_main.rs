@@ -6,17 +6,15 @@
 use std::cell::RefCell;
 
 use lumbus::model::constants::*;
-use windows::core::w;
+use windows::core::{w, Interface};
 use windows::Win32::Foundation::{HWND, LPARAM, LRESULT, POINT, SIZE, WPARAM};
 use windows::Win32::Graphics::Direct2D::Common::{
     D2D1_ALPHA_MODE_PREMULTIPLIED, D2D1_COLOR_F, D2D1_PIXEL_FORMAT, D2D_POINT_2F,
 };
 use windows::Win32::Graphics::Direct2D::{
-    D2D1CreateFactory, ID2D1DCRenderTarget, ID2D1Factory, ID2D1HwndRenderTarget,
-    ID2D1SolidColorBrush, D2D1_ANTIALIAS_MODE_PER_PRIMITIVE, D2D1_DC_RENDER_TARGET_PROPERTIES,
-    D2D1_ELLIPSE, D2D1_FACTORY_TYPE_SINGLE_THREADED, D2D1_HWND_RENDER_TARGET_PROPERTIES,
-    D2D1_PRESENT_OPTIONS_IMMEDIATELY, D2D1_RENDER_TARGET_PROPERTIES,
-    D2D1_RENDER_TARGET_TYPE_DEFAULT, D2D1_RENDER_TARGET_USAGE_NONE,
+    D2D1CreateFactory, ID2D1DCRenderTarget, ID2D1Factory, ID2D1RenderTarget,
+    D2D1_ANTIALIAS_MODE_PER_PRIMITIVE, D2D1_ELLIPSE, D2D1_FACTORY_TYPE_SINGLE_THREADED,
+    D2D1_RENDER_TARGET_PROPERTIES, D2D1_RENDER_TARGET_TYPE_DEFAULT, D2D1_RENDER_TARGET_USAGE_NONE,
 };
 use windows::Win32::Graphics::Dxgi::Common::DXGI_FORMAT_B8G8R8A8_UNORM;
 use windows::Win32::Graphics::Gdi::{
@@ -95,7 +93,7 @@ pub fn run() {
 fn run_app() -> windows::core::Result<()> {
     unsafe {
         // Initialize COM
-        CoInitializeEx(None, COINIT_APARTMENTTHREADED)?;
+        CoInitializeEx(None, COINIT_APARTMENTTHREADED).ok()?;
 
         // Create Direct2D factory
         let factory: ID2D1Factory = D2D1CreateFactory(D2D1_FACTORY_TYPE_SINGLE_THREADED, None)?;
@@ -282,7 +280,7 @@ unsafe fn update_layered_window_d2d(state: &OverlayState, factory: &ID2D1Factory
     let bitmap = bitmap.unwrap();
     let old_bitmap = SelectObject(mem_dc, bitmap);
 
-    // Create DC render target
+    // Create DC render target - windows-rs 0.58 only takes render target properties
     let rt_props = D2D1_RENDER_TARGET_PROPERTIES {
         r#type: D2D1_RENDER_TARGET_TYPE_DEFAULT,
         pixelFormat: D2D1_PIXEL_FORMAT {
@@ -295,18 +293,9 @@ unsafe fn update_layered_window_d2d(state: &OverlayState, factory: &ID2D1Factory
         minLevel: Default::default(),
     };
 
-    let dc_rt_props = D2D1_DC_RENDER_TARGET_PROPERTIES {
-        pixelFormat: D2D1_PIXEL_FORMAT {
-            format: DXGI_FORMAT_B8G8R8A8_UNORM,
-            alphaMode: D2D1_ALPHA_MODE_PREMULTIPLIED,
-        },
-        ..Default::default()
-    };
+    let render_target: Result<ID2D1DCRenderTarget, _> = factory.CreateDCRenderTarget(&rt_props);
 
-    let render_target: Result<ID2D1DCRenderTarget, _> =
-        factory.CreateDCRenderTarget(&rt_props, &dc_rt_props);
-
-    if let Ok(rt) = render_target {
+    if let Ok(dc_rt) = render_target {
         let rect = windows::Win32::Foundation::RECT {
             left: 0,
             top: 0,
@@ -314,7 +303,10 @@ unsafe fn update_layered_window_d2d(state: &OverlayState, factory: &ID2D1Factory
             bottom: height,
         };
 
-        if rt.BindDC(mem_dc, &rect).is_ok() {
+        if dc_rt.BindDC(mem_dc, &rect).is_ok() {
+            // Cast to ID2D1RenderTarget to access drawing methods
+            let rt: ID2D1RenderTarget = dc_rt.cast().unwrap();
+
             rt.BeginDraw();
 
             // Clear to transparent
@@ -340,17 +332,14 @@ unsafe fn update_layered_window_d2d(state: &OverlayState, factory: &ID2D1Factory
                 rt.SetAntialiasMode(D2D1_ANTIALIAS_MODE_PER_PRIMITIVE);
 
                 // Create brush for stroke
-                let brush_result: Result<ID2D1SolidColorBrush, _> = rt.CreateSolidColorBrush(
-                    &D2D1_COLOR_F {
-                        r: state.stroke_r,
-                        g: state.stroke_g,
-                        b: state.stroke_b,
-                        a: 1.0,
-                    },
-                    None,
-                );
+                let color = D2D1_COLOR_F {
+                    r: state.stroke_r,
+                    g: state.stroke_g,
+                    b: state.stroke_b,
+                    a: 1.0,
+                };
 
-                if let Ok(brush) = brush_result {
+                if let Ok(brush) = rt.CreateSolidColorBrush(&color, None) {
                     let ellipse = D2D1_ELLIPSE {
                         point: D2D_POINT_2F { x, y },
                         radiusX: radius,
