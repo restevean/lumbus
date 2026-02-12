@@ -8,10 +8,10 @@ use std::sync::atomic::{AtomicIsize, Ordering};
 
 use lumbus::model::constants::*;
 use lumbus::platform::windows::storage::config;
-use lumbus::platform::windows::ui::dialogs::show_about_dialog;
+use lumbus::platform::windows::ui::dialogs::{show_about_dialog, show_help_overlay};
 use lumbus::platform::windows::ui::settings::window as settings_window;
 use lumbus::platform::windows::ui::tray::{
-    self, MENU_ABOUT, MENU_QUIT, MENU_SETTINGS, MENU_TOGGLE, WM_TRAYICON,
+    self, MENU_ABOUT, MENU_HELP, MENU_QUIT, MENU_SETTINGS, MENU_TOGGLE, WM_TRAYICON,
 };
 use windows::core::{w, BOOL};
 use windows::Win32::Foundation::{COLORREF, HWND, LPARAM, LRESULT, POINT, SIZE, WPARAM};
@@ -56,6 +56,7 @@ use windows_numerics::{Matrix3x2, Vector2};
 const HOTKEY_TOGGLE: i32 = 1;
 const HOTKEY_SETTINGS: i32 = 2;
 const HOTKEY_QUIT: i32 = 3;
+const HOTKEY_HELP: i32 = 4;
 const TIMER_CURSOR: usize = 1;
 const TIMER_INTERVAL_MS: u32 = 16; // ~60 FPS
 
@@ -238,9 +239,10 @@ fn run_app() -> windows::core::Result<()> {
         MOUSE_HOOK.store(hook.0 as isize, Ordering::SeqCst);
 
         // Register global hotkeys
-        let _ = RegisterHotKey(Some(hwnd), HOTKEY_TOGGLE, MOD_CONTROL | MOD_SHIFT, 0x41);
-        let _ = RegisterHotKey(Some(hwnd), HOTKEY_SETTINGS, MOD_CONTROL, 0xBC);
-        let _ = RegisterHotKey(Some(hwnd), HOTKEY_QUIT, MOD_CONTROL | MOD_SHIFT, 0x58);
+        let _ = RegisterHotKey(Some(hwnd), HOTKEY_TOGGLE, MOD_CONTROL | MOD_SHIFT, 0x41); // Ctrl+Shift+A
+        let _ = RegisterHotKey(Some(hwnd), HOTKEY_SETTINGS, MOD_CONTROL, 0xBC); // Ctrl+,
+        let _ = RegisterHotKey(Some(hwnd), HOTKEY_HELP, MOD_CONTROL | MOD_SHIFT, 0x48); // Ctrl+Shift+H
+        let _ = RegisterHotKey(Some(hwnd), HOTKEY_QUIT, MOD_CONTROL | MOD_SHIFT, 0x58); // Ctrl+Shift+X
 
         // Install system tray icon
         tray::install_tray_icon(hwnd);
@@ -349,6 +351,14 @@ extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM)
                         reload_settings_from_config();
                         update_overlay();
                     }
+                    HOTKEY_HELP => {
+                        eprintln!("Showing help overlay");
+                        let (hwnd, is_spanish) = STATE.with(|s| {
+                            let state = s.borrow();
+                            (state.hwnd, state.lang == 1)
+                        });
+                        show_help_overlay(hwnd, is_spanish);
+                    }
                     HOTKEY_QUIT => {
                         PostQuitMessage(0);
                     }
@@ -402,6 +412,10 @@ extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM)
                     }
                     MENU_ABOUT => {
                         show_about_dialog(hwnd);
+                    }
+                    MENU_HELP => {
+                        let is_spanish = STATE.with(|s| s.borrow().lang == 1);
+                        show_help_overlay(hwnd, is_spanish);
                     }
                     MENU_QUIT => {
                         PostQuitMessage(0);

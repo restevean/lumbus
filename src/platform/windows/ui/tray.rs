@@ -22,8 +22,9 @@ pub const WM_TRAYICON: u32 = WM_USER + 1;
 // Menu item IDs
 pub const MENU_TOGGLE: u32 = 1001;
 pub const MENU_SETTINGS: u32 = 1002;
-pub const MENU_ABOUT: u32 = 1003;
-pub const MENU_QUIT: u32 = 1004;
+pub const MENU_HELP: u32 = 1003;
+pub const MENU_ABOUT: u32 = 1004;
+pub const MENU_QUIT: u32 = 1005;
 
 // Tray icon ID
 const TRAY_ICON_ID: u32 = 1;
@@ -86,6 +87,19 @@ pub fn install_tray_icon(hwnd: HWND) {
             MF_STRING,
             MENU_SETTINGS as usize,
             w!("Settings (Ctrl+,)"),
+        );
+        let _ = AppendMenuW(
+            menu,
+            MF_STRING,
+            MENU_HELP as usize,
+            w!("Help (Ctrl+Shift+H)"),
+        );
+        let _ = AppendMenuW(menu, MF_STRING, MENU_ABOUT as usize, w!("About..."));
+        let _ = AppendMenuW(
+            menu,
+            MF_STRING,
+            MENU_QUIT as usize,
+            w!("Quit (Ctrl+Shift+X)"),
         );
         let _ = AppendMenuW(menu, MF_STRING, MENU_ABOUT as usize, w!("About..."));
         let _ = AppendMenuW(
@@ -205,6 +219,12 @@ pub fn update_tray_language(is_spanish: bool) {
                 MENU_SETTINGS as usize,
                 w!("Configuración (Ctrl+,)"),
             );
+            let _ = AppendMenuW(
+                menu,
+                MF_STRING,
+                MENU_HELP as usize,
+                w!("Ayuda (Ctrl+Shift+H)"),
+            );
             let _ = AppendMenuW(menu, MF_STRING, MENU_ABOUT as usize, w!("Acerca de..."));
             let _ = AppendMenuW(
                 menu,
@@ -224,6 +244,12 @@ pub fn update_tray_language(is_spanish: bool) {
                 MF_STRING,
                 MENU_SETTINGS as usize,
                 w!("Settings (Ctrl+,)"),
+            );
+            let _ = AppendMenuW(
+                menu,
+                MF_STRING,
+                MENU_HELP as usize,
+                w!("Help (Ctrl+Shift+H)"),
             );
             let _ = AppendMenuW(menu, MF_STRING, MENU_ABOUT as usize, w!("About..."));
             let _ = AppendMenuW(
