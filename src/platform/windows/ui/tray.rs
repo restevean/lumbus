@@ -101,13 +101,6 @@ pub fn install_tray_icon(hwnd: HWND) {
             MENU_QUIT as usize,
             w!("Quit (Ctrl+Shift+X)"),
         );
-        let _ = AppendMenuW(menu, MF_STRING, MENU_ABOUT as usize, w!("About..."));
-        let _ = AppendMenuW(
-            menu,
-            MF_STRING,
-            MENU_QUIT as usize,
-            w!("Quit (Ctrl+Shift+X)"),
-        );
 
         TRAY_MENU.with(|m| *m.borrow_mut() = Some(menu));
     }

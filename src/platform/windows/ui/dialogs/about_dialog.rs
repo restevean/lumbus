@@ -9,6 +9,9 @@ use windows::Win32::UI::WindowsAndMessaging::{MessageBoxW, MB_ICONINFORMATION, M
 /// Application version from Cargo.toml
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
+/// GitHub repository URL
+const REPO_URL: &str = "https://github.com/restevean/lumbus";
+
 /// Show the About dialog.
 pub fn show_about_dialog(hwnd: HWND) {
     let title = "About Lumbus";
@@ -20,9 +23,10 @@ pub fn show_about_dialog(hwnd: HWND) {
         • Configurable circle overlay\n\
         • Click indicators (L/R)\n\
         • Customizable colors and size\n\n\
+        {}\n\n\
         © 2024 restevean\n\
         Apache-2.0 License",
-        VERSION
+        VERSION, REPO_URL
     );
 
     let title_wide: Vec<u16> = title.encode_utf16().chain(std::iter::once(0)).collect();
