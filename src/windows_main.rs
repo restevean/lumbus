@@ -623,6 +623,24 @@ unsafe fn update_layered_window_d2d(
                                 radiusY: radius,
                             };
 
+                            // Fill the inner circle with transparency
+                            // 0% transparency = fully opaque (alpha 1.0)
+                            // 100% transparency = fully transparent (alpha 0.0)
+                            let fill_alpha = 1.0 - (state.fill_transparency_pct as f32 / 100.0);
+                            if fill_alpha > 0.0 {
+                                let fill_color = D2D1_COLOR_F {
+                                    r: state.stroke_r,
+                                    g: state.stroke_g,
+                                    b: state.stroke_b,
+                                    a: fill_alpha,
+                                };
+                                if let Ok(fill_brush) = rt.CreateSolidColorBrush(&fill_color, None)
+                                {
+                                    rt.FillEllipse(&ellipse, &fill_brush);
+                                }
+                            }
+
+                            // Draw the stroke/border on top
                             rt.DrawEllipse(&ellipse, &brush, border, stroke_style.as_ref());
                         }
                     }
