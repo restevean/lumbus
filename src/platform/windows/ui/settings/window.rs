@@ -139,18 +139,20 @@ pub fn open_settings_window(parent_hwnd: HWND) {
 
 /// Close the settings window.
 pub fn close_settings_window() {
-    SETTINGS_HWND.with(|h| {
-        if let Some(hwnd) = h.borrow_mut().take() {
-            unsafe {
-                PARENT_HWND.with(|p| {
-                    if let Some(parent) = *p.borrow() {
-                        let _ = EnableWindow(parent, true);
-                    }
-                });
-                let _ = DestroyWindow(hwnd);
-            }
+    // Take the HWND first, releasing the borrow before calling DestroyWindow
+    // (DestroyWindow sends WM_DESTROY synchronously which would cause a borrow conflict)
+    let hwnd_to_destroy = SETTINGS_HWND.with(|h| h.borrow_mut().take());
+
+    if let Some(hwnd) = hwnd_to_destroy {
+        unsafe {
+            PARENT_HWND.with(|p| {
+                if let Some(parent) = *p.borrow() {
+                    let _ = EnableWindow(parent, true);
+                }
+            });
+            let _ = DestroyWindow(hwnd);
         }
-    });
+    }
 }
 
 unsafe extern "system" fn settings_wnd_proc(
@@ -183,12 +185,7 @@ unsafe extern "system" fn settings_wnd_proc(
         }
 
         WM_DESTROY => {
-            SETTINGS_HWND.with(|h| *h.borrow_mut() = None);
-            PARENT_HWND.with(|p| {
-                if let Some(parent) = *p.borrow() {
-                    let _ = EnableWindow(parent, true);
-                }
-            });
+            // Cleanup already done by close_settings_window, just post quit
             PostMessageW(None, 0x0012, WPARAM(0), LPARAM(0)).ok();
             LRESULT(0)
         }
