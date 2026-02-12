@@ -13,17 +13,15 @@ use windows::Win32::Graphics::Direct2D::Common::{
     D2D1_ALPHA_MODE_PREMULTIPLIED, D2D1_COLOR_F, D2D1_PIXEL_FORMAT, D2D_RECT_F,
 };
 use windows::Win32::Graphics::Direct2D::{
-    D2D1CreateFactory, ID2D1DCRenderTarget, ID2D1Factory, ID2D1PathGeometry, ID2D1RenderTarget,
-    ID2D1StrokeStyle, D2D1_ANTIALIAS_MODE_PER_PRIMITIVE, D2D1_CAP_STYLE_ROUND,
-    D2D1_DASH_STYLE_SOLID, D2D1_ELLIPSE, D2D1_FACTORY_TYPE_SINGLE_THREADED, D2D1_FILL_MODE_WINDING,
-    D2D1_LINE_JOIN_ROUND, D2D1_RENDER_TARGET_PROPERTIES, D2D1_RENDER_TARGET_TYPE_DEFAULT,
-    D2D1_RENDER_TARGET_USAGE_NONE, D2D1_STROKE_STYLE_PROPERTIES,
+    D2D1CreateFactory, ID2D1DCRenderTarget, ID2D1Factory, ID2D1RenderTarget, ID2D1StrokeStyle,
+    D2D1_ANTIALIAS_MODE_PER_PRIMITIVE, D2D1_CAP_STYLE_ROUND, D2D1_DASH_STYLE_SOLID, D2D1_ELLIPSE,
+    D2D1_FACTORY_TYPE_SINGLE_THREADED, D2D1_LINE_JOIN_ROUND, D2D1_RENDER_TARGET_PROPERTIES,
+    D2D1_RENDER_TARGET_TYPE_DEFAULT, D2D1_RENDER_TARGET_USAGE_NONE, D2D1_STROKE_STYLE_PROPERTIES,
 };
 use windows::Win32::Graphics::DirectWrite::{
-    DWriteCreateFactory, IDWriteFactory, IDWriteTextFormat, IDWriteTextLayout,
-    DWRITE_FACTORY_TYPE_SHARED, DWRITE_FONT_STRETCH_NORMAL, DWRITE_FONT_STYLE_NORMAL,
-    DWRITE_FONT_WEIGHT_BOLD, DWRITE_PARAGRAPH_ALIGNMENT_CENTER, DWRITE_TEXT_ALIGNMENT_CENTER,
-    DWRITE_TEXT_METRICS,
+    DWriteCreateFactory, IDWriteFactory, IDWriteTextFormat, DWRITE_FACTORY_TYPE_SHARED,
+    DWRITE_FONT_STRETCH_NORMAL, DWRITE_FONT_STYLE_NORMAL, DWRITE_FONT_WEIGHT_BOLD,
+    DWRITE_PARAGRAPH_ALIGNMENT_CENTER, DWRITE_TEXT_ALIGNMENT_CENTER,
 };
 use windows::Win32::Graphics::Dxgi::Common::DXGI_FORMAT_B8G8R8A8_UNORM;
 use windows::Win32::Graphics::Gdi::{
@@ -306,64 +304,6 @@ fn update_overlay() {
             });
         });
     });
-}
-
-/// Create letter outline geometry using DirectWrite text layout.
-unsafe fn create_letter_outline(
-    d2d_factory: &ID2D1Factory,
-    dwrite_factory: &IDWriteFactory,
-    letter: &str,
-    font_size: f32,
-    center_x: f32,
-    center_y: f32,
-) -> Option<ID2D1PathGeometry> {
-    // Create text format with the desired font size
-    let text_format: IDWriteTextFormat = dwrite_factory
-        .CreateTextFormat(
-            w!("Arial"),
-            None,
-            DWRITE_FONT_WEIGHT_BOLD,
-            DWRITE_FONT_STYLE_NORMAL,
-            DWRITE_FONT_STRETCH_NORMAL,
-            font_size,
-            w!("en-US"),
-        )
-        .ok()?;
-
-    text_format
-        .SetTextAlignment(DWRITE_TEXT_ALIGNMENT_CENTER)
-        .ok()?;
-    text_format
-        .SetParagraphAlignment(DWRITE_PARAGRAPH_ALIGNMENT_CENTER)
-        .ok()?;
-
-    // Create text layout
-    let text_wide: Vec<u16> = letter.encode_utf16().collect();
-    let text_layout: IDWriteTextLayout = dwrite_factory
-        .CreateTextLayout(&text_wide, &text_format, font_size * 2.0, font_size * 2.0)
-        .ok()?;
-
-    // Get text metrics to calculate actual size
-    let mut metrics: DWRITE_TEXT_METRICS = Default::default();
-    text_layout.GetMetrics(&mut metrics).ok()?;
-
-    // Create path geometry
-    let path_geometry: ID2D1PathGeometry = d2d_factory.CreatePathGeometry().ok()?;
-    let sink = path_geometry.Open().ok()?;
-    sink.SetFillMode(D2D1_FILL_MODE_WINDING);
-
-    // Get the font face from the text format to extract glyphs
-    // Use a simpler approach: get glyph run from text layout
-    // Actually, let's use the text renderer approach
-
-    // For simplicity, let's create an ellipse-like path for now and draw text separately
-    // The proper way requires implementing IDWriteTextRenderer which is complex
-
-    sink.Close().ok()?;
-
-    // Since creating glyph outlines is complex, let's return None and fall back to filled text
-    // but with proper sizing
-    None
 }
 
 /// Draw using Direct2D and apply with UpdateLayeredWindow.
