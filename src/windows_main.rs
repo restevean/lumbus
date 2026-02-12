@@ -402,14 +402,14 @@ unsafe fn create_letter_geometry(
     let glyph_height = bounds.bottom - bounds.top;
 
     // Create transform to center the glyph on the cursor
-    // Font glyphs are Y-up, so we need to flip and translate
+    // Direct2D handles Y coordinates correctly, just need to center
     let transform = Matrix3x2 {
         M11: 1.0,
         M12: 0.0,
         M21: 0.0,
-        M22: -1.0, // Flip Y axis
+        M22: 1.0, // No flip needed
         M31: center_x - bounds.left - glyph_width / 2.0,
-        M32: center_y + glyph_height / 2.0 + bounds.top,
+        M32: center_y - bounds.top - glyph_height / 2.0,
     };
 
     // Create transformed geometry
