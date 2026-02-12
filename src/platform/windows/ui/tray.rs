@@ -22,7 +22,8 @@ pub const WM_TRAYICON: u32 = WM_USER + 1;
 // Menu item IDs
 pub const MENU_TOGGLE: u32 = 1001;
 pub const MENU_SETTINGS: u32 = 1002;
-pub const MENU_QUIT: u32 = 1003;
+pub const MENU_ABOUT: u32 = 1003;
+pub const MENU_QUIT: u32 = 1004;
 
 // Tray icon ID
 const TRAY_ICON_ID: u32 = 1;
@@ -86,6 +87,7 @@ pub fn install_tray_icon(hwnd: HWND) {
             MENU_SETTINGS as usize,
             w!("Settings (Ctrl+,)"),
         );
+        let _ = AppendMenuW(menu, MF_STRING, MENU_ABOUT as usize, w!("About..."));
         let _ = AppendMenuW(
             menu,
             MF_STRING,
@@ -203,6 +205,7 @@ pub fn update_tray_language(is_spanish: bool) {
                 MENU_SETTINGS as usize,
                 w!("Configuración (Ctrl+,)"),
             );
+            let _ = AppendMenuW(menu, MF_STRING, MENU_ABOUT as usize, w!("Acerca de..."));
             let _ = AppendMenuW(
                 menu,
                 MF_STRING,
@@ -222,6 +225,7 @@ pub fn update_tray_language(is_spanish: bool) {
                 MENU_SETTINGS as usize,
                 w!("Settings (Ctrl+,)"),
             );
+            let _ = AppendMenuW(menu, MF_STRING, MENU_ABOUT as usize, w!("About..."));
             let _ = AppendMenuW(
                 menu,
                 MF_STRING,

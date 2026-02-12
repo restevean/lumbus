@@ -8,9 +8,10 @@ use std::sync::atomic::{AtomicIsize, Ordering};
 
 use lumbus::model::constants::*;
 use lumbus::platform::windows::storage::config;
+use lumbus::platform::windows::ui::dialogs::show_about_dialog;
 use lumbus::platform::windows::ui::settings::window as settings_window;
 use lumbus::platform::windows::ui::tray::{
-    self, MENU_QUIT, MENU_SETTINGS, MENU_TOGGLE, WM_TRAYICON,
+    self, MENU_ABOUT, MENU_QUIT, MENU_SETTINGS, MENU_TOGGLE, WM_TRAYICON,
 };
 use windows::core::{w, BOOL};
 use windows::Win32::Foundation::{COLORREF, HWND, LPARAM, LRESULT, POINT, SIZE, WPARAM};
@@ -398,6 +399,9 @@ extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM)
                         settings_window::open_settings_window(hwnd);
                         reload_settings_from_config();
                         update_overlay();
+                    }
+                    MENU_ABOUT => {
+                        show_about_dialog(hwnd);
                     }
                     MENU_QUIT => {
                         PostQuitMessage(0);
