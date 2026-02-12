@@ -5,14 +5,15 @@
 use std::cell::RefCell;
 use windows::core::w;
 use windows::Win32::Foundation::{HWND, POINT};
+use windows::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows::Win32::UI::Shell::{
     Shell_NotifyIconW, NIF_ICON, NIF_MESSAGE, NIF_TIP, NIM_ADD, NIM_DELETE, NIM_MODIFY,
     NOTIFYICONDATAW,
 };
 use windows::Win32::UI::WindowsAndMessaging::{
-    AppendMenuW, CreatePopupMenu, DestroyMenu, GetCursorPos, LoadIconW, SetForegroundWindow,
-    TrackPopupMenu, HMENU, IDI_APPLICATION, MF_STRING, TPM_BOTTOMALIGN, TPM_LEFTALIGN,
-    TPM_RIGHTBUTTON, WM_USER,
+    AppendMenuW, CreatePopupMenu, DestroyMenu, GetCursorPos, LoadImageW, SetForegroundWindow,
+    TrackPopupMenu, HMENU, IMAGE_ICON, LR_DEFAULTSIZE, LR_SHARED, MF_STRING, TPM_BOTTOMALIGN,
+    TPM_LEFTALIGN, TPM_RIGHTBUTTON, WM_USER,
 };
 
 // Custom message for tray icon events
@@ -36,6 +37,21 @@ pub fn install_tray_icon(hwnd: HWND) {
     unsafe {
         TRAY_HWND.with(|h| *h.borrow_mut() = Some(hwnd));
 
+        // Load the custom icon from resources (resource ID 1)
+        let hinstance = GetModuleHandleW(None).unwrap_or_default();
+        let icon = LoadImageW(
+            Some(hinstance.into()),
+            windows::core::PCWSTR(1 as *const u16), // Resource ID 1
+            IMAGE_ICON,
+            16, // Small icon for tray
+            16,
+            LR_DEFAULTSIZE | LR_SHARED,
+        );
+        let hicon = match icon {
+            Ok(handle) => windows::Win32::UI::WindowsAndMessaging::HICON(handle.0),
+            Err(_) => windows::Win32::UI::WindowsAndMessaging::HICON::default(),
+        };
+
         // Create the notification icon
         let mut nid = NOTIFYICONDATAW {
             cbSize: std::mem::size_of::<NOTIFYICONDATAW>() as u32,
@@ -43,7 +59,7 @@ pub fn install_tray_icon(hwnd: HWND) {
             uID: TRAY_ICON_ID,
             uFlags: NIF_ICON | NIF_MESSAGE | NIF_TIP,
             uCallbackMessage: WM_TRAYICON,
-            hIcon: LoadIconW(None, IDI_APPLICATION).unwrap_or_default(),
+            hIcon: hicon,
             ..Default::default()
         };
 

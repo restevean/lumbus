@@ -60,6 +60,10 @@ features = ["derive"]
 [target.'cfg(target_os = "windows")'.dependencies.serde_json]
 version = "1.0"
 
+# Build dependencies for Windows resource embedding
+[target.'cfg(target_os = "windows")'.build-dependencies]
+embed-resource = "3"
+
 # Release profile optimizations
 [profile.release]
 opt-level = "z"          # Optimize for size
