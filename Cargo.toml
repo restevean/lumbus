@@ -45,6 +45,9 @@ windows = { version = "0.62", features = [
     "Win32_Graphics_DirectWrite",
     "Win32_Graphics_Dxgi_Common",
     "Win32_Graphics_Imaging",
+    # UI Controls (for settings window)
+    "Win32_UI_Controls",
+    "Win32_UI_Controls_Dialogs",
     # System tray
     "Win32_UI_Shell",
 ]}

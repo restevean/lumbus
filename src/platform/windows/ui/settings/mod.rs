@@ -1,5 +1,5 @@
 //! Settings window for Windows.
 
-mod window;
+pub mod window;
 
 pub use window::*;

@@ -2,6 +2,6 @@
 //!
 //! Persists settings to a JSON file in %APPDATA%/Lumbus/config.json
 
-mod config;
+pub mod config;
 
 pub use config::*;

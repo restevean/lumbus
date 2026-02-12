@@ -7,6 +7,8 @@ use std::cell::RefCell;
 use std::sync::atomic::{AtomicIsize, Ordering};
 
 use lumbus::model::constants::*;
+use lumbus::platform::windows::storage::config;
+use lumbus::platform::windows::ui::settings::window as settings_window;
 use windows::core::{w, BOOL};
 use windows::Win32::Foundation::{COLORREF, HWND, LPARAM, LRESULT, POINT, SIZE, WPARAM};
 use windows::Win32::Graphics::Direct2D::Common::{
@@ -65,16 +67,22 @@ thread_local! {
 
 #[allow(dead_code)]
 struct OverlayState {
+    // Window-specific fields
     hwnd: HWND,
     width: i32,
     height: i32,
     offset_x: i32,
     offset_y: i32,
+    // Settings fields (persisted)
     radius: f64,
     border_width: f64,
     stroke_r: f32,
     stroke_g: f32,
     stroke_b: f32,
+    stroke_a: f32,
+    fill_transparency_pct: f64,
+    lang: i32,
+    // Runtime state
     visible: bool,
     display_mode: i32,
 }
@@ -87,11 +95,14 @@ impl Default for OverlayState {
             height: 0,
             offset_x: 0,
             offset_y: 0,
-            radius: 50.0,
-            border_width: 4.0,
-            stroke_r: 1.0,
-            stroke_g: 1.0,
-            stroke_b: 1.0,
+            radius: DEFAULT_DIAMETER / 2.0,
+            border_width: DEFAULT_BORDER_WIDTH,
+            stroke_r: DEFAULT_COLOR.0 as f32,
+            stroke_g: DEFAULT_COLOR.1 as f32,
+            stroke_b: DEFAULT_COLOR.2 as f32,
+            stroke_a: DEFAULT_COLOR.3 as f32,
+            fill_transparency_pct: DEFAULT_FILL_TRANSPARENCY_PCT,
+            lang: LANG_EN,
             visible: true,
             display_mode: DISPLAY_MODE_CIRCLE,
         }
@@ -215,6 +226,9 @@ fn run_app() -> windows::core::Result<()> {
             state.offset_y = vy;
         });
 
+        // Load settings from config file
+        reload_settings_from_config();
+
         // Install low-level mouse hook for click detection
         let hook = SetWindowsHookExW(WH_MOUSE_LL, Some(mouse_hook_proc), None, 0)?;
         MOUSE_HOOK.store(hook.0 as isize, Ordering::SeqCst);
@@ -316,7 +330,14 @@ extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM)
                         update_overlay();
                     }
                     HOTKEY_SETTINGS => {
-                        eprintln!("Settings hotkey pressed (not yet implemented)");
+                        eprintln!("Opening settings window");
+                        STATE.with(|s| {
+                            let state = s.borrow();
+                            settings_window::open_settings_window(state.hwnd);
+                        });
+                        // Reload settings after window closes
+                        reload_settings_from_config();
+                        update_overlay();
                     }
                     HOTKEY_QUIT => {
                         PostQuitMessage(0);
@@ -350,6 +371,22 @@ fn update_overlay() {
                 }
             });
         });
+    });
+}
+
+/// Reload settings from JSON config file.
+fn reload_settings_from_config() {
+    let loaded = config::load_state();
+    STATE.with(|s| {
+        let mut state = s.borrow_mut();
+        state.radius = loaded.radius;
+        state.border_width = loaded.border_width;
+        state.stroke_r = loaded.stroke_r as f32;
+        state.stroke_g = loaded.stroke_g as f32;
+        state.stroke_b = loaded.stroke_b as f32;
+        state.stroke_a = loaded.stroke_a as f32;
+        state.fill_transparency_pct = loaded.fill_transparency_pct;
+        state.lang = loaded.lang;
     });
 }
 
