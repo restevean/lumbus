@@ -331,10 +331,10 @@ extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM)
                     }
                     HOTKEY_SETTINGS => {
                         eprintln!("Opening settings window");
-                        STATE.with(|s| {
-                            let state = s.borrow();
-                            settings_window::open_settings_window(state.hwnd);
-                        });
+                        // Get hwnd first, then drop the borrow before opening settings
+                        // (settings window has its own message loop that may access STATE)
+                        let hwnd = STATE.with(|s| s.borrow().hwnd);
+                        settings_window::open_settings_window(hwnd);
                         // Reload settings after window closes
                         reload_settings_from_config();
                         update_overlay();
