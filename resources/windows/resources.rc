@@ -1,3 +1,5 @@
 // Windows resource file for Lumbus
-// Tray icon
-1 ICON "../icons/StatusBarIcon.ico"
+// Application icon (shown on .exe file)
+1 ICON "../icons/AppIcon.ico"
+// Tray icon (16x16 for notification area)
+2 ICON "../icons/StatusBarIcon.ico"

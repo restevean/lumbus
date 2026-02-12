@@ -39,11 +39,11 @@ pub fn install_tray_icon(hwnd: HWND) {
     unsafe {
         TRAY_HWND.with(|h| *h.borrow_mut() = Some(hwnd));
 
-        // Load the custom icon from resources (resource ID 1)
+        // Load the custom icon from resources (resource ID 2 = tray icon)
         let hinstance = GetModuleHandleW(None).unwrap_or_default();
         let icon = LoadImageW(
             Some(hinstance.into()),
-            windows::core::PCWSTR(1 as *const u16), // Resource ID 1
+            windows::core::PCWSTR(2 as *const u16), // Resource ID 2 (tray icon)
             IMAGE_ICON,
             16, // Small icon for tray
             16,
