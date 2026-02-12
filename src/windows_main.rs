@@ -9,6 +9,9 @@ use std::sync::atomic::{AtomicIsize, Ordering};
 use lumbus::model::constants::*;
 use lumbus::platform::windows::storage::config;
 use lumbus::platform::windows::ui::settings::window as settings_window;
+use lumbus::platform::windows::ui::tray::{
+    self, MENU_QUIT, MENU_SETTINGS, MENU_TOGGLE, WM_TRAYICON,
+};
 use windows::core::{w, BOOL};
 use windows::Win32::Foundation::{COLORREF, HWND, LPARAM, LRESULT, POINT, SIZE, WPARAM};
 use windows::Win32::Graphics::Direct2D::Common::{
@@ -40,9 +43,9 @@ use windows::Win32::UI::WindowsAndMessaging::{
     GetSystemMetrics, LoadCursorW, PostQuitMessage, RegisterClassW, SetTimer, SetWindowsHookExW,
     ShowWindow, TranslateMessage, UnhookWindowsHookEx, UpdateLayeredWindow, CS_HREDRAW, CS_VREDRAW,
     HHOOK, IDC_ARROW, MSG, SM_CXVIRTUALSCREEN, SM_CYVIRTUALSCREEN, SM_XVIRTUALSCREEN,
-    SM_YVIRTUALSCREEN, SW_SHOW, ULW_ALPHA, WH_MOUSE_LL, WM_CREATE, WM_DESTROY, WM_HOTKEY,
-    WM_LBUTTONDOWN, WM_LBUTTONUP, WM_RBUTTONDOWN, WM_RBUTTONUP, WM_TIMER, WNDCLASSW, WS_EX_LAYERED,
-    WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW, WS_EX_TOPMOST, WS_EX_TRANSPARENT, WS_POPUP,
+    SM_YVIRTUALSCREEN, SW_SHOW, ULW_ALPHA, WH_MOUSE_LL, WM_COMMAND, WM_CREATE, WM_DESTROY,
+    WM_HOTKEY, WM_LBUTTONDOWN, WM_LBUTTONUP, WM_RBUTTONDOWN, WM_RBUTTONUP, WM_TIMER, WNDCLASSW,
+    WS_EX_LAYERED, WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW, WS_EX_TOPMOST, WS_EX_TRANSPARENT, WS_POPUP,
 };
 
 // For Vector2 in D2D1_ELLIPSE and Matrix3x2 for transforms
@@ -238,6 +241,9 @@ fn run_app() -> windows::core::Result<()> {
         let _ = RegisterHotKey(Some(hwnd), HOTKEY_SETTINGS, MOD_CONTROL, 0xBC);
         let _ = RegisterHotKey(Some(hwnd), HOTKEY_QUIT, MOD_CONTROL | MOD_SHIFT, 0x58);
 
+        // Install system tray icon
+        tray::install_tray_icon(hwnd);
+
         // Start timer for cursor tracking
         SetTimer(Some(hwnd), TIMER_CURSOR, TIMER_INTERVAL_MS, None);
 
@@ -261,6 +267,9 @@ fn run_app() -> windows::core::Result<()> {
         let _ = UnregisterHotKey(Some(hwnd), HOTKEY_TOGGLE);
         let _ = UnregisterHotKey(Some(hwnd), HOTKEY_SETTINGS);
         let _ = UnregisterHotKey(Some(hwnd), HOTKEY_QUIT);
+
+        // Remove system tray icon
+        tray::remove_tray_icon();
 
         FONT_FACE.with(|f| {
             *f.borrow_mut() = None;
@@ -349,6 +358,52 @@ extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM)
 
             WM_DESTROY => {
                 PostQuitMessage(0);
+                LRESULT(0)
+            }
+
+            // System tray icon messages
+            msg if msg == WM_TRAYICON => {
+                let event = lparam.0 as u32;
+                // WM_RBUTTONUP = 0x0205, WM_LBUTTONDBLCLK = 0x0203
+                if event == 0x0205 {
+                    // Right-click: show context menu
+                    tray::show_tray_menu(hwnd);
+                } else if event == 0x0203 {
+                    // Double-click: toggle visibility
+                    let new_visible = STATE.with(|s| {
+                        let mut state = s.borrow_mut();
+                        state.visible = !state.visible;
+                        state.visible
+                    });
+                    tray::update_tray_tooltip(new_visible);
+                    update_overlay();
+                }
+                LRESULT(0)
+            }
+
+            // Context menu commands
+            WM_COMMAND => {
+                let cmd = (wparam.0 & 0xFFFF) as u32;
+                match cmd {
+                    MENU_TOGGLE => {
+                        let new_visible = STATE.with(|s| {
+                            let mut state = s.borrow_mut();
+                            state.visible = !state.visible;
+                            state.visible
+                        });
+                        tray::update_tray_tooltip(new_visible);
+                        update_overlay();
+                    }
+                    MENU_SETTINGS => {
+                        settings_window::open_settings_window(hwnd);
+                        reload_settings_from_config();
+                        update_overlay();
+                    }
+                    MENU_QUIT => {
+                        PostQuitMessage(0);
+                    }
+                    _ => {}
+                }
                 LRESULT(0)
             }
 
