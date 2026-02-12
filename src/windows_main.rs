@@ -7,10 +7,10 @@ use std::cell::RefCell;
 use std::sync::atomic::{AtomicIsize, Ordering};
 
 use lumbus::model::constants::*;
-use windows::core::w;
+use windows::core::{w, BOOL};
 use windows::Win32::Foundation::{COLORREF, HWND, LPARAM, LRESULT, POINT, SIZE, WPARAM};
 use windows::Win32::Graphics::Direct2D::Common::{
-    D2D1_ALPHA_MODE_PREMULTIPLIED, D2D1_COLOR_F, D2D1_PIXEL_FORMAT, D2D_MATRIX_3X2_F,
+    D2D1_ALPHA_MODE_PREMULTIPLIED, D2D1_COLOR_F, D2D1_PIXEL_FORMAT,
 };
 use windows::Win32::Graphics::Direct2D::{
     D2D1CreateFactory, ID2D1DCRenderTarget, ID2D1Factory, ID2D1PathGeometry, ID2D1RenderTarget,
@@ -20,8 +20,8 @@ use windows::Win32::Graphics::Direct2D::{
     D2D1_STROKE_STYLE_PROPERTIES,
 };
 use windows::Win32::Graphics::DirectWrite::{
-    DWriteCreateFactory, IDWriteFactory, IDWriteFontFace, DWRITE_FACTORY_TYPE_SHARED,
-    DWRITE_FONT_SIMULATIONS_BOLD, DWRITE_GLYPH_OFFSET,
+    DWriteCreateFactory, IDWriteFactory, IDWriteFontCollection, IDWriteFontFace,
+    DWRITE_FACTORY_TYPE_SHARED, DWRITE_GLYPH_OFFSET,
 };
 use windows::Win32::Graphics::Dxgi::Common::DXGI_FORMAT_B8G8R8A8_UNORM;
 use windows::Win32::Graphics::Gdi::{
@@ -43,8 +43,8 @@ use windows::Win32::UI::WindowsAndMessaging::{
     WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW, WS_EX_TOPMOST, WS_EX_TRANSPARENT, WS_POPUP,
 };
 
-// For Vector2 in D2D1_ELLIPSE
-use windows_numerics::Vector2;
+// For Vector2 in D2D1_ELLIPSE and Matrix3x2 for transforms
+use windows_numerics::{Matrix3x2, Vector2};
 
 // Application-specific constants
 const HOTKEY_TOGGLE: i32 = 1;
@@ -108,12 +108,16 @@ pub fn run() {
 
 /// Create a font face for the Arial Bold font.
 unsafe fn create_arial_bold_font_face(dwrite_factory: &IDWriteFactory) -> Option<IDWriteFontFace> {
-    // Get system font collection
-    let font_collection = dwrite_factory.GetSystemFontCollection(false).ok()?;
+    // Get system font collection (windows-rs 0.62 uses output parameter)
+    let mut font_collection: Option<IDWriteFontCollection> = None;
+    dwrite_factory
+        .GetSystemFontCollection(&mut font_collection, false)
+        .ok()?;
+    let font_collection = font_collection?;
 
     // Find Arial font family
     let mut index: u32 = 0;
-    let mut exists = windows::Win32::Foundation::BOOL::default();
+    let mut exists = BOOL::default();
     font_collection
         .FindFamilyName(w!("Arial"), &mut index, &mut exists)
         .ok()?;
@@ -399,7 +403,7 @@ unsafe fn create_letter_geometry(
 
     // Create transform to center the glyph on the cursor
     // Font glyphs are Y-up, so we need to flip and translate
-    let transform = D2D_MATRIX_3X2_F {
+    let transform = Matrix3x2 {
         M11: 1.0,
         M12: 0.0,
         M21: 0.0,
@@ -417,7 +421,8 @@ unsafe fn create_letter_geometry(
     let final_geometry: ID2D1PathGeometry = d2d_factory.CreatePathGeometry().ok()?;
     let final_sink = final_geometry.Open().ok()?;
 
-    transformed_geometry.Outline(None, &final_sink).ok()?;
+    // 0.25 is the default flattening tolerance for D2D
+    transformed_geometry.Outline(None, 0.25, &final_sink).ok()?;
     final_sink.Close().ok()?;
 
     Some(final_geometry)
