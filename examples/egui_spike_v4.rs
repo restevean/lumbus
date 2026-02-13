@@ -23,6 +23,7 @@ mod macos {
 
     #[repr(C)]
     #[derive(Debug, Copy, Clone)]
+    #[allow(dead_code)]
     pub struct NSRect {
         pub x: f64,
         pub y: f64,
@@ -44,7 +45,7 @@ mod macos {
             return;
         }
 
-        let sel_window = sel_registerName(b"window\0".as_ptr() as *const i8);
+        let sel_window = sel_registerName(c"window".as_ptr());
         let window = objc_msgSend(ns_view_ptr, sel_window);
         if window.is_null() {
             return;
@@ -54,16 +55,16 @@ mod macos {
         let _ = bbox; // suppress unused warning
         println!("   [DEBUG] Skipping setFrame - testing basic rendering");
 
-        let sel_set_level = sel_registerName(b"setLevel:\0".as_ptr() as *const i8);
+        let sel_set_level = sel_registerName(c"setLevel:".as_ptr());
         objc_msgSend(window, sel_set_level, OVERLAY_WINDOW_LEVEL);
 
         let behavior = NS_WINDOW_COLLECTION_BEHAVIOR_CAN_JOIN_ALL_SPACES
             | NS_WINDOW_COLLECTION_BEHAVIOR_FULL_SCREEN_AUXILIARY
             | NS_WINDOW_COLLECTION_BEHAVIOR_STATIONARY;
-        let sel_set_behavior = sel_registerName(b"setCollectionBehavior:\0".as_ptr() as *const i8);
+        let sel_set_behavior = sel_registerName(c"setCollectionBehavior:".as_ptr());
         objc_msgSend(window, sel_set_behavior, behavior);
 
-        let sel_set_ignores = sel_registerName(b"setIgnoresMouseEvents:\0".as_ptr() as *const i8);
+        let sel_set_ignores = sel_registerName(c"setIgnoresMouseEvents:".as_ptr());
         objc_msgSend(window, sel_set_ignores, 1i32);
 
         println!("✅ NSWindow configured");
@@ -131,8 +132,8 @@ mod macos {
         let mut max_x = f64::MIN;
         let mut max_y = f64::MIN;
 
-        for i in 0..count as usize {
-            let display = CGDisplay::new(ids[i]);
+        for (i, &display_id) in ids.iter().enumerate().take(count as usize) {
+            let display = CGDisplay::new(display_id);
             let b = display.bounds();
             println!(
                 "Screen {}: origin=({}, {}), size={}x{}",
