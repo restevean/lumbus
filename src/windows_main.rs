@@ -648,10 +648,19 @@ unsafe fn update_layered_window_d2d(
                 if let Ok(brush) = rt.CreateSolidColorBrush(&color, None) {
                     match state.display_mode {
                         DISPLAY_MODE_LEFT | DISPLAY_MODE_RIGHT => {
+                            // Use I/D for Spanish, L/R for English
                             let letter = if state.display_mode == DISPLAY_MODE_LEFT {
-                                'L'
+                                if state.lang == LANG_ES {
+                                    'I'
+                                } else {
+                                    'L'
+                                }
                             } else {
-                                'R'
+                                if state.lang == LANG_ES {
+                                    'D'
+                                } else {
+                                    'R'
+                                }
                             };
 
                             // Font size = 3 * radius (matching macOS: letter height = 1.5 * diameter)
