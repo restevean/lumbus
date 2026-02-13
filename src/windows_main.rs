@@ -239,18 +239,11 @@ fn run_app() -> windows::core::Result<()> {
         MOUSE_HOOK.store(hook.0 as isize, Ordering::SeqCst);
 
         // Register global hotkeys
-        if RegisterHotKey(Some(hwnd), HOTKEY_TOGGLE, MOD_CONTROL | MOD_SHIFT, 0x41).is_err() {
-            eprintln!("Failed to register Ctrl+Shift+A hotkey");
-        }
-        if RegisterHotKey(Some(hwnd), HOTKEY_SETTINGS, MOD_CONTROL, 0xBC).is_err() {
-            eprintln!("Failed to register Ctrl+, hotkey");
-        }
-        if RegisterHotKey(Some(hwnd), HOTKEY_HELP, MOD_CONTROL | MOD_SHIFT, 0x48).is_err() {
-            eprintln!("Failed to register Ctrl+Shift+H hotkey");
-        }
-        if RegisterHotKey(Some(hwnd), HOTKEY_QUIT, MOD_CONTROL | MOD_SHIFT, 0x58).is_err() {
-            eprintln!("Failed to register Ctrl+Shift+X hotkey");
-        }
+        // Note: Using Shift+letter combinations for consistency across keyboard layouts
+        let _ = RegisterHotKey(Some(hwnd), HOTKEY_TOGGLE, MOD_CONTROL | MOD_SHIFT, 0x41); // Ctrl+Shift+A
+        let _ = RegisterHotKey(Some(hwnd), HOTKEY_SETTINGS, MOD_CONTROL | MOD_SHIFT, 0x53); // Ctrl+Shift+S
+        let _ = RegisterHotKey(Some(hwnd), HOTKEY_HELP, MOD_CONTROL | MOD_SHIFT, 0x48); // Ctrl+Shift+H
+        let _ = RegisterHotKey(Some(hwnd), HOTKEY_QUIT, MOD_CONTROL | MOD_SHIFT, 0x51); // Ctrl+Shift+Q
 
         // Install system tray icon
         tray::install_tray_icon(hwnd);

@@ -15,16 +15,16 @@ static HELP_OPENING: AtomicBool = AtomicBool::new(false);
 /// All hotkeys to display (Windows versions)
 const HOTKEYS_EN: &[(&str, &str)] = &[
     ("Ctrl + Shift + A", "Toggle overlay"),
-    ("Ctrl + ,", "Open settings"),
+    ("Ctrl + Shift + S", "Open settings"),
     ("Ctrl + Shift + H", "Show help"),
-    ("Ctrl + Shift + X", "Quit application"),
+    ("Ctrl + Shift + Q", "Quit application"),
 ];
 
 const HOTKEYS_ES: &[(&str, &str)] = &[
     ("Ctrl + Shift + A", "Alternar overlay"),
-    ("Ctrl + ,", "Abrir configuración"),
+    ("Ctrl + Shift + S", "Abrir configuración"),
     ("Ctrl + Shift + H", "Mostrar ayuda"),
-    ("Ctrl + Shift + X", "Salir de la aplicación"),
+    ("Ctrl + Shift + Q", "Salir de la aplicación"),
 ];
 
 /// Show the help overlay with keyboard shortcuts.

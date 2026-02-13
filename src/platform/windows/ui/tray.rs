@@ -151,7 +151,7 @@ pub fn install_tray_icon(hwnd: HWND) {
             menu,
             MF_STRING,
             MENU_SETTINGS as usize,
-            w!("Settings (Ctrl+,)"),
+            w!("Settings (Ctrl+Shift+S)"),
         );
         let _ = AppendMenuW(
             menu,
@@ -164,7 +164,7 @@ pub fn install_tray_icon(hwnd: HWND) {
             menu,
             MF_STRING,
             MENU_QUIT as usize,
-            w!("Quit (Ctrl+Shift+X)"),
+            w!("Quit (Ctrl+Shift+Q)"),
         );
 
         TRAY_MENU.with(|m| *m.borrow_mut() = Some(menu));
@@ -275,7 +275,7 @@ pub fn update_tray_language(is_spanish: bool) {
                 menu,
                 MF_STRING,
                 MENU_SETTINGS as usize,
-                w!("Configuración (Ctrl+,)"),
+                w!("Configuración (Ctrl+Shift+S)"),
             );
             let _ = AppendMenuW(
                 menu,
@@ -288,7 +288,7 @@ pub fn update_tray_language(is_spanish: bool) {
                 menu,
                 MF_STRING,
                 MENU_QUIT as usize,
-                w!("Salir (Ctrl+Shift+X)"),
+                w!("Salir (Ctrl+Shift+Q)"),
             );
         } else {
             let _ = AppendMenuW(
@@ -301,7 +301,7 @@ pub fn update_tray_language(is_spanish: bool) {
                 menu,
                 MF_STRING,
                 MENU_SETTINGS as usize,
-                w!("Settings (Ctrl+,)"),
+                w!("Settings (Ctrl+Shift+S)"),
             );
             let _ = AppendMenuW(
                 menu,
@@ -314,7 +314,7 @@ pub fn update_tray_language(is_spanish: bool) {
                 menu,
                 MF_STRING,
                 MENU_QUIT as usize,
-                w!("Quit (Ctrl+Shift+X)"),
+                w!("Quit (Ctrl+Shift+Q)"),
             );
         }
 
