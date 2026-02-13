@@ -4,9 +4,9 @@ version = "0.3.3"
 authors = ["restevean <restevean@protonmail.com>"]
 edition = "2021"
 license = "Apache-2.0"
-description = "Highlight the mouse pointer with a configurable circle on macOS"
+description = "Cross-platform mouse pointer highlighter for presentations and screen recordings (macOS & Windows)"
 repository = "https://github.com/restevean/lumbus"
-keywords = ["macos", "mouse", "cursor", "highlighter", "presentation"]
+keywords = ["mouse", "cursor", "highlighter", "presentation", "cross-platform"]
 categories = ["gui"]
 
 [dependencies]

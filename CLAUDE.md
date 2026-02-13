@@ -9,20 +9,24 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**Lumbus** is a cross-platform application written in Rust that highlights the mouse pointer across all displays with a configurable circle and click indicators (L/R). Currently supports **macOS** (production-ready) with **Windows support in development**.
+**Lumbus** is a cross-platform application written in Rust that highlights the mouse pointer across all displays with a configurable circle and click indicators (L/R). Supports **macOS** and **Windows** (both production-ready).
 
-The macOS version uses the `objc2` ecosystem (`objc2`, `objc2-foundation`, `block2` crates) and low-level Carbon/CoreText/CoreGraphics APIs.
+- **macOS:** Uses the `objc2` ecosystem (`objc2`, `objc2-foundation`, `block2` crates) and Carbon/CoreText/CoreGraphics APIs.
+- **Windows:** Uses `windows-rs` (official Microsoft crate) with Direct2D/DirectWrite for rendering.
 
 This is a **presentation/screen recording tool**, not a system utility—it creates transparent overlay windows that track the cursor without stealing focus.
 
 ## Build and Run Commands
 
 ```bash
-# Development build and run
+# Development build and run (current platform)
 cargo run --profile dev
 
-# Release build
+# Release build (current platform)
 cargo build --release
+
+# Cross-compile for Windows from macOS (requires target)
+cargo build --release --target x86_64-pc-windows-msvc
 
 # Run tests
 cargo test
@@ -30,8 +34,11 @@ cargo test
 # Run specific test
 cargo test test_name
 
-# Run with verbose output
-cargo test -- --nocapture
+# Build macOS .app bundle
+./scripts/build-app.sh
+
+# Build macOS DMG installer
+./scripts/build-dmg.sh
 ```
 
 ## Architecture Overview
@@ -42,9 +49,9 @@ The codebase follows a **platform-abstraction pattern** with conditional compila
 
 ```
 src/
-├── main.rs                     # Entry point with cfg gates (~28 lines)
+├── main.rs                     # Entry point with cfg gates (~30 lines)
 ├── macos_main.rs               # macOS application logic (~950 lines)
-├── windows_main.rs             # Windows stub (TODO)
+├── windows_main.rs             # Windows application logic (~770 lines)
 ├── lib.rs                      # Shared helpers + re-exports
 ├── events/                     # Cross-platform event bus
 │   ├── bus.rs                  # EventBus with publish/subscribe
@@ -61,13 +68,13 @@ src/
     │   ├── input/              # Hotkeys, mouse monitors, observers
     │   ├── storage/            # NSUserDefaults persistence
     │   └── ui/                 # Overlay drawing, settings, dialogs, status bar
-    └── windows/                # Windows scaffolding (TODO)
-        ├── app/
-        ├── ffi/
-        ├── handlers/
-        ├── input/
-        ├── storage/
-        └── ui/
+    └── windows/                # Windows implementation
+        ├── app/                # App helpers
+        ├── ffi/                # Win32 type definitions
+        ├── handlers/           # (minimal, logic in windows_main.rs)
+        ├── input/              # (minimal, hotkeys in windows_main.rs)
+        ├── storage/            # JSON config persistence
+        └── ui/                 # Settings window, dialogs, tray icon
 
 tests/
 ├── helpers.rs                  # Tests for pure helpers from lib.rs
@@ -76,7 +83,7 @@ tests/
 
 ### Core Components
 
-**`src/main.rs`** (~28 lines)
+**`src/main.rs`** (~30 lines)
 - Minimal entry point with platform cfg gates
 - Initialises event bus, then calls `macos_main::run()` or `windows_main::run()`
 
@@ -86,101 +93,93 @@ tests/
 - Hotkey handler callback
 - All macOS-specific application logic
 
+**`src/windows_main.rs`** (~770 lines)
+- Direct2D/DirectWrite initialization
+- Layered window for transparent overlay
+- Global hotkeys and mouse hooks
+- Cursor tracking timer
+
 **`src/lib.rs`**
 - Pure helper functions: `clamp`, `color_to_hex`, `parse_hex_color`, `tr_key`
 - Re-exports `events`, `model`, `platform` modules
-- Backward-compatible `ffi` re-export for macOS
 
-**`src/platform/macos/`** - macOS implementation
+### Platform-Specific Details
+
+#### macOS
 - `ffi/`: Carbon, CoreText, CoreGraphics, Cocoa bindings
 - `ui/`: Overlay drawing, settings window, dialogs, status bar
-- `input/`: Hotkeys, mouse monitors, system observers
+- `input/`: Hotkeys (Carbon), mouse monitors (NSEvent), observers
 - `storage/`: NSUserDefaults persistence
 - `handlers/`: Event dispatcher
 
-**`src/events/`** - Cross-platform event bus
-- Decoupled publish/subscribe for hotkey events
-- Thread-safe global access via `publish()`, `drain_events()`
-
-**`src/model/`** - Cross-platform state
-- `OverlayState`: Visual parameters (radius, color, transparency)
-- `constants`: Default values, preference keys, validation limits
+#### Windows
+- `ui/settings/`: Win32 settings dialog with sliders and combobox
+- `ui/dialogs/`: About, Help, Quit confirmation (MessageBox)
+- `ui/tray.rs`: System tray icon with context menu
+- `storage/config.rs`: JSON persistence in %APPDATA%\Lumbus\
 
 ### Architecture Patterns
 
 1. **Platform abstraction**: Entry point dispatches to platform-specific modules via cfg gates. Shared code (events, model) is platform-agnostic.
 
-2. **FFI encapsulation**: All Cocoa/Carbon/CoreText FFI is in `platform/macos/ffi/`. No Objective-C `.m` files.
+2. **FFI encapsulation**: 
+   - macOS: All Cocoa/Carbon/CoreText FFI in `platform/macos/ffi/`
+   - Windows: Uses `windows-rs` crate (type-safe bindings)
 
-3. **State management**: Application state lives in `CustomView` instance variables (Objective-C runtime). Accessed through `msg_send!` macros.
+3. **State management**: 
+   - macOS: State in CustomView instance variables (Objective-C runtime)
+   - Windows: State in thread-local `RefCell<OverlayState>`
 
-4. **Event-driven architecture**: Hotkeys publish events to a global bus; timer-based dispatcher processes them on main thread.
+4. **Drawing strategy**:
+   - macOS: `NSBezierPath` for circle, `CTFontCreatePathForGlyph` for letters
+   - Windows: Direct2D `FillEllipse`/`DrawEllipse`, DirectWrite glyph outlines
 
-5. **Drawing strategy**:
-   - Circle: `NSBezierPath::bezierPathWithOvalInRect`
-   - Letters (L/R): `CTFontCreatePathForGlyph` -> CGPath -> NSBezierPath
-   - Both use same stroke colour/width and fill alpha
+5. **Persistence**: 
+   - macOS: `NSUserDefaults`
+   - Windows: JSON file in `%APPDATA%\Lumbus\config.json`
 
-6. **Persistence**: `NSUserDefaults` for all settings (radius, border, colour, transparency, language)
+6. **Multi-display support**: 
+   - macOS: One overlay window per `NSScreen`
+   - Windows: Single layered window spanning virtual screen
 
-7. **Multi-display support**: Enumerate `NSScreen.screens` and create one overlay window per screen.
+## Global Hotkeys
 
-## Specific Implementation Details
-
-### Hotkeys (Carbon Event Manager)
-- **Ctrl+A**: Toggle overlay visibility
-- **Ctrl+,**: Open Settings (Ctrl instead of Cmd to avoid macOS system shortcut conflict)
-- **Cmd+Shift+H**: Show Help
-- **Ctrl+Shift+X**: Quit with confirmation
-
-Hotkeys use Carbon API (not NSEvent global monitors) to avoid triggering system beep. Handler installed on `GetApplicationEventTarget()`.
-
-### Click Indicators
-- Left mouse down -> bold **L**
-- Right mouse down -> bold **R**
-- Mouse up -> revert to circle
-- Letters rendered using CoreText glyphs, centred on cursor, height = 1.5x circle diameter
-
-### Settings Window
-- All numeric fields (radius, border, transparency) are **read-only** labels
-- Sliders snap to specific increments (radius: 5px, border: 1px, transparency: 5%)
-- Hex colour field is **editable** and bidirectionally synced with NSColorWell
-- Changes apply instantly and persist to NSUserDefaults
-
-### Coordinate Conversion
-Pointer obtained from `NSEvent.mouseLocation` (screen coordinates) -> converted to each window's coordinate system -> converted to view coordinates for drawing.
+| Action | macOS | Windows |
+|--------|-------|---------|
+| Toggle overlay | Ctrl+A | Ctrl+Shift+A |
+| Open Settings | Ctrl+, | Ctrl+, |
+| Show Help | Cmd+Shift+H | Ctrl+Shift+H |
+| Quit | Ctrl+Shift+X | Ctrl+Shift+X |
 
 ## Testing Notes
 
 - All pure functions in `lib.rs` have corresponding tests in `tests/helpers.rs`
 - Model validation tested in `tests/model_tests.rs`
 - Event bus tested in `src/events/bus.rs` (unit tests)
-- No integration/UI tests (Cocoa UI testing is non-trivial)
+- No integration/UI tests (platform UI testing is non-trivial)
 - Total: 65 tests
 
-## macOS Permissions
+## Platform Requirements
 
-First run prompts for:
-- **Accessibility** (via `AXIsProcessTrustedWithOptions`)
-- **Input Monitoring** (for global mouse/keyboard monitors)
+### macOS
+- macOS 10.13+ (uses modern Cocoa/CoreGraphics APIs)
+- Grant **Accessibility** and **Input Monitoring** permissions
 
-Grant these to the app (or to RustRover/IDE if running from development environment).
+### Windows
+- Windows 10/11
+- Visual Studio Build Tools (for MSVC linker when building)
+- No special permissions required
 
 ## Known Constraints
 
-- macOS 10.13+ required (uses modern Cocoa/CoreGraphics APIs)
-- Windows support in development (currently shows stub message)
 - No CLI arguments; all configuration via GUI
-- No external config files; all state in NSUserDefaults (macOS)
+- Settings persist automatically on change
+- Overlay doesn't capture mouse events (click-through)
 
 ## Development Context
 
-This project uses a modular, platform-abstracted architecture:
-- Cross-platform: `events/`, `model/`, `lib.rs`
-- Platform-specific: `platform/macos/`, `platform/windows/`
-- Entry points: `macos_main.rs`, `windows_main.rs`
-
 When modifying:
-- **Cross-platform code**: Keep it free of FFI/platform dependencies
-- **macOS code**: Preserve FFI patterns and state management approach
+- **Cross-platform code** (`events/`, `model/`, `lib.rs`): Keep it free of FFI/platform dependencies
+- **macOS code**: Preserve FFI patterns and Objective-C state management
+- **Windows code**: Use `windows-rs` types, maintain layered window approach
 - **Testing**: Test pure helpers thoroughly; UI/FFI changes require manual testing

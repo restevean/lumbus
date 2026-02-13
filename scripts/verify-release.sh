@@ -62,7 +62,7 @@ echo -e "${YELLOW}[3/5] Checking dependency documentation...${NC}"
 if grep -q 'cocoa = "' README.md 2>/dev/null; then
     echo -e "${RED}   ERROR: README still mentions deprecated 'cocoa' crate${NC}"
     ERRORS=$((ERRORS + 1))
-elif grep -q 'objc2 = "' README.md 2>/dev/null; then
+elif grep -qi 'objc2' README.md 2>/dev/null; then
     echo -e "${GREEN}   OK: README mentions objc2 ecosystem${NC}"
 else
     echo -e "${YELLOW}   WARN: Could not verify dependencies in README${NC}"
