@@ -8,17 +8,20 @@ use crate::platform::windows::ui::tray;
 use std::cell::RefCell;
 use windows::core::{w, PCWSTR};
 use windows::Win32::Foundation::{COLORREF, HWND, LPARAM, LRESULT, WPARAM};
-use windows::Win32::Graphics::Gdi::{GetStockObject, HBRUSH};
+use windows::Win32::Graphics::Gdi::{
+    CreateFontW, CreateSolidBrush, GetStockObject, InvalidateRect, CLIP_DEFAULT_PRECIS,
+    DEFAULT_CHARSET, DEFAULT_QUALITY, FW_NORMAL, HBRUSH, HFONT, OUT_DEFAULT_PRECIS,
+};
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows::Win32::UI::Controls::Dialogs::{ChooseColorW, CC_FULLOPEN, CC_RGBINIT, CHOOSECOLORW};
 use windows::Win32::UI::Input::KeyboardAndMouse::EnableWindow;
 use windows::Win32::UI::WindowsAndMessaging::{
-    CreateWindowExW, DefWindowProcW, DestroyWindow, DispatchMessageW, GetMessageW,
-    GetWindowLongPtrW, LoadCursorW, PostMessageW, RegisterClassW, SendMessageW, SetWindowLongPtrW,
-    SetWindowTextW, ShowWindow, TranslateMessage, CS_HREDRAW, CS_VREDRAW, CW_USEDEFAULT,
-    GWLP_USERDATA, HMENU, IDC_ARROW, MSG, SW_SHOW, WINDOW_EX_STYLE, WINDOW_STYLE, WM_CLOSE,
-    WM_COMMAND, WM_CREATE, WM_DESTROY, WM_HSCROLL, WNDCLASSW, WS_CAPTION, WS_CHILD, WS_OVERLAPPED,
-    WS_SYSMENU, WS_TABSTOP, WS_VISIBLE,
+    CreateWindowExW, DefWindowProcW, DestroyWindow, DispatchMessageW, GetDlgCtrlID, GetDlgItem,
+    GetMessageW, GetSystemMetrics, GetWindowLongPtrW, LoadCursorW, PostMessageW, RegisterClassW,
+    SendMessageW, SetWindowLongPtrW, SetWindowTextW, ShowWindow, TranslateMessage, CS_HREDRAW,
+    CS_VREDRAW, GWLP_USERDATA, HMENU, IDC_ARROW, MSG, SM_CXSCREEN, SM_CYSCREEN, SW_SHOW,
+    WINDOW_EX_STYLE, WINDOW_STYLE, WM_CLOSE, WM_COMMAND, WM_CREATE, WM_DESTROY, WM_HSCROLL,
+    WM_SETFONT, WNDCLASSW, WS_CAPTION, WS_CHILD, WS_OVERLAPPED, WS_SYSMENU, WS_TABSTOP, WS_VISIBLE,
 };
 
 // Control IDs
@@ -27,6 +30,7 @@ const ID_RADIUS_VALUE: i32 = 103;
 const ID_BORDER_SLIDER: i32 = 104;
 const ID_BORDER_VALUE: i32 = 105;
 const ID_COLOR_BUTTON: i32 = 106;
+const ID_COLOR_PREVIEW: i32 = 111;
 const ID_TRANSP_SLIDER: i32 = 107;
 const ID_TRANSP_VALUE: i32 = 108;
 const ID_LANG_COMBO: i32 = 109;
@@ -44,20 +48,22 @@ const CB_GETCURSEL: u32 = 0x0147;
 const CBN_SELCHANGE: u32 = 1;
 
 // Window dimensions
-const WINDOW_WIDTH: i32 = 400;
-const WINDOW_HEIGHT: i32 = 300;
+const WINDOW_WIDTH: i32 = 420;
+const WINDOW_HEIGHT: i32 = 340;
 
 // Layout constants
-const MARGIN: i32 = 20;
-const ROW_HEIGHT: i32 = 40;
-const LABEL_WIDTH: i32 = 140;
-const VALUE_WIDTH: i32 = 50;
-const SLIDER_WIDTH: i32 = 150;
+const MARGIN: i32 = 24;
+const ROW_HEIGHT: i32 = 44;
+const LABEL_WIDTH: i32 = 150;
+const VALUE_WIDTH: i32 = 45;
+const SLIDER_WIDTH: i32 = 160;
+const COLOR_PREVIEW_SIZE: i32 = 24;
 
 thread_local! {
     static SETTINGS_HWND: RefCell<Option<HWND>> = const { RefCell::new(None) };
     static PARENT_HWND: RefCell<Option<HWND>> = const { RefCell::new(None) };
     static ON_SETTINGS_CHANGED: RefCell<Option<Box<dyn Fn()>>> = const { RefCell::new(None) };
+    static UI_FONT: RefCell<Option<HFONT>> = const { RefCell::new(None) };
 }
 
 /// Set callback for when settings change.
@@ -101,14 +107,43 @@ pub fn open_settings_window(parent_hwnd: HWND) {
         };
         let _ = RegisterClassW(&wc);
 
+        // Create Segoe UI font (modern Windows font)
+        let font_name: Vec<u16> = "Segoe UI"
+            .encode_utf16()
+            .chain(std::iter::once(0))
+            .collect();
+        let font = CreateFontW(
+            -15, // height (negative = character height)
+            0,
+            0,
+            0,
+            FW_NORMAL.0 as i32,
+            0,
+            0,
+            0,
+            DEFAULT_CHARSET,
+            OUT_DEFAULT_PRECIS,
+            CLIP_DEFAULT_PRECIS,
+            DEFAULT_QUALITY,
+            0, // DEFAULT_PITCH | FF_DONTCARE
+            PCWSTR(font_name.as_ptr()),
+        );
+        UI_FONT.with(|f| *f.borrow_mut() = Some(font));
+
+        // Center window on screen
+        let screen_width = GetSystemMetrics(SM_CXSCREEN);
+        let screen_height = GetSystemMetrics(SM_CYSCREEN);
+        let x = (screen_width - WINDOW_WIDTH) / 2;
+        let y = (screen_height - WINDOW_HEIGHT) / 2;
+
         // Create window
         let hwnd = CreateWindowExW(
             WINDOW_EX_STYLE::default(),
             class_name,
             w!("Settings"),
             WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU,
-            CW_USEDEFAULT,
-            CW_USEDEFAULT,
+            x,
+            y,
             WINDOW_WIDTH,
             WINDOW_HEIGHT,
             Some(parent_hwnd),
@@ -186,6 +221,19 @@ unsafe extern "system" fn settings_wnd_proc(
             let slider_hwnd = HWND(lparam.0 as *mut _);
             handle_slider_change(slider_hwnd);
             LRESULT(0)
+        }
+
+        // WM_CTLCOLORSTATIC = 0x0138
+        0x0138 => {
+            let control_hwnd = HWND(lparam.0 as *mut _);
+            let control_id = GetDlgCtrlID(control_hwnd);
+            if control_id == ID_COLOR_PREVIEW {
+                // Get color from GWLP_USERDATA
+                let color = COLORREF(GetWindowLongPtrW(control_hwnd, GWLP_USERDATA) as u32);
+                let brush = CreateSolidBrush(color);
+                return LRESULT(brush.0 as isize);
+            }
+            DefWindowProcW(hwnd, msg, wparam, lparam)
         }
 
         WM_CLOSE => {
@@ -285,15 +333,30 @@ unsafe fn create_controls(hwnd: HWND) {
 
     // Color row
     create_label(hwnd, hinstance.into(), MARGIN, y, "Color");
-    let choose_label = if is_spanish { "Elegir..." } else { "Choose..." };
-    create_button(
+
+    // Color preview square
+    let r = (state.stroke_r * 255.0) as u32;
+    let g = (state.stroke_g * 255.0) as u32;
+    let b = (state.stroke_b * 255.0) as u32;
+    let current_color = COLORREF(r | (g << 8) | (b << 16));
+    create_color_preview(
         hwnd,
         hinstance.into(),
         MARGIN + LABEL_WIDTH,
         y,
+        current_color,
+    );
+
+    // Choose button
+    let choose_label = if is_spanish { "Elegir..." } else { "Choose..." };
+    create_button(
+        hwnd,
+        hinstance.into(),
+        MARGIN + LABEL_WIDTH + COLOR_PREVIEW_SIZE + 10,
+        y,
         choose_label,
         ID_COLOR_BUTTON,
-        80,
+        90,
     );
 
     y += ROW_HEIGHT;
@@ -374,6 +437,19 @@ unsafe fn create_controls(hwnd: HWND) {
     );
 }
 
+unsafe fn apply_font(control: HWND) {
+    UI_FONT.with(|f| {
+        if let Some(font) = *f.borrow() {
+            SendMessageW(
+                control,
+                WM_SETFONT,
+                Some(WPARAM(font.0 as usize)),
+                Some(LPARAM(1)),
+            );
+        }
+    });
+}
+
 unsafe fn create_label(
     hwnd: HWND,
     hinstance: windows::Win32::Foundation::HINSTANCE,
@@ -382,20 +458,22 @@ unsafe fn create_label(
     text: &str,
 ) {
     let text_wide: Vec<u16> = text.encode_utf16().chain(std::iter::once(0)).collect();
-    let _ = CreateWindowExW(
+    if let Ok(label) = CreateWindowExW(
         WINDOW_EX_STYLE::default(),
         w!("STATIC"),
         PCWSTR(text_wide.as_ptr()),
         WS_CHILD | WS_VISIBLE,
         x,
-        y + 4,
+        y + 6,
         LABEL_WIDTH,
-        20,
+        22,
         Some(hwnd),
         None,
         Some(hinstance),
         None,
-    );
+    ) {
+        apply_font(label);
+    }
 }
 
 unsafe fn create_value_label(
@@ -405,13 +483,13 @@ unsafe fn create_value_label(
     y: i32,
     id: i32,
 ) -> HWND {
-    CreateWindowExW(
+    let label = CreateWindowExW(
         WINDOW_EX_STYLE::default(),
         w!("STATIC"),
         w!("0"),
         WS_CHILD | WS_VISIBLE | WINDOW_STYLE(0x0001), // SS_CENTER
         x,
-        y + 2,
+        y + 6,
         VALUE_WIDTH,
         22,
         Some(hwnd),
@@ -419,7 +497,9 @@ unsafe fn create_value_label(
         Some(hinstance),
         None,
     )
-    .unwrap_or_default()
+    .unwrap_or_default();
+    apply_font(label);
+    label
 }
 
 unsafe fn create_slider(
@@ -456,20 +536,22 @@ unsafe fn create_button(
     width: i32,
 ) {
     let text_wide: Vec<u16> = text.encode_utf16().chain(std::iter::once(0)).collect();
-    let _ = CreateWindowExW(
+    if let Ok(button) = CreateWindowExW(
         WINDOW_EX_STYLE::default(),
         w!("BUTTON"),
         PCWSTR(text_wide.as_ptr()),
         WS_CHILD | WS_VISIBLE | WS_TABSTOP,
         x,
-        y,
+        y + 2,
         width,
-        26,
+        28,
         Some(hwnd),
         Some(HMENU(id as *mut _)),
         Some(hinstance),
         None,
-    );
+    ) {
+        apply_font(button);
+    }
 }
 
 unsafe fn create_combobox(
@@ -480,21 +562,54 @@ unsafe fn create_combobox(
     id: i32,
 ) -> HWND {
     // CBS_DROPDOWNLIST = 0x0003
-    CreateWindowExW(
+    let combo = CreateWindowExW(
         WINDOW_EX_STYLE::default(),
         w!("COMBOBOX"),
         None,
         WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(0x0003),
         x,
-        y,
-        120,
-        100, // Height includes dropdown area
+        y + 2,
+        130,
+        120, // Height includes dropdown area
         Some(hwnd),
         Some(HMENU(id as *mut _)),
         Some(hinstance),
         None,
     )
-    .unwrap_or_default()
+    .unwrap_or_default();
+    apply_font(combo);
+    combo
+}
+
+unsafe fn create_color_preview(
+    hwnd: HWND,
+    hinstance: windows::Win32::Foundation::HINSTANCE,
+    x: i32,
+    y: i32,
+    color: COLORREF,
+) -> HWND {
+    // SS_OWNERDRAW would be better, but for simplicity we create a static with a background brush
+    // We use SS_NOTIFY (0x0100) + SS_SUNKEN style (0x1000) for a bordered look
+    let preview = CreateWindowExW(
+        WINDOW_EX_STYLE::default(),
+        w!("STATIC"),
+        None,
+        WS_CHILD | WS_VISIBLE | WINDOW_STYLE(0x1000), // SS_SUNKEN
+        x,
+        y + 4,
+        COLOR_PREVIEW_SIZE,
+        COLOR_PREVIEW_SIZE,
+        Some(hwnd),
+        Some(HMENU(ID_COLOR_PREVIEW as *mut _)),
+        Some(hinstance),
+        None,
+    )
+    .unwrap_or_default();
+
+    // Set background color via subclassing would be complex; we'll update it in WM_CTLCOLORSTATIC
+    // For now, store color in GWLP_USERDATA
+    SetWindowLongPtrW(preview, GWLP_USERDATA, color.0 as isize);
+    preview
 }
 
 unsafe fn init_slider(slider: HWND, min: i32, max: i32, pos: i32) {
@@ -616,6 +731,12 @@ unsafe fn show_color_picker(hwnd: HWND) {
         config::prefs_set_double(PREF_STROKE_R, new_r);
         config::prefs_set_double(PREF_STROKE_G, new_g);
         config::prefs_set_double(PREF_STROKE_B, new_b);
+
+        // Update color preview
+        if let Ok(preview) = GetDlgItem(Some(hwnd), ID_COLOR_PREVIEW) {
+            SetWindowLongPtrW(preview, GWLP_USERDATA, cc.rgbResult.0 as isize);
+            let _ = InvalidateRect(Some(preview), None, true);
+        }
 
         notify_settings_changed();
     }
