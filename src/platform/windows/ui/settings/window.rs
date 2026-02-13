@@ -206,11 +206,26 @@ unsafe extern "system" fn settings_wnd_proc(
 unsafe fn create_controls(hwnd: HWND) {
     let hinstance = GetModuleHandleW(None).unwrap_or_default();
     let state = config::load_state();
+    let is_spanish = state.lang == LANG_ES;
+
+    // Update window title based on language
+    let title = if is_spanish {
+        "Configuración"
+    } else {
+        "Settings"
+    };
+    let title_wide: Vec<u16> = title.encode_utf16().chain(std::iter::once(0)).collect();
+    let _ = SetWindowTextW(hwnd, PCWSTR(title_wide.as_ptr()));
 
     let mut y = MARGIN;
 
     // Radius row
-    create_label(hwnd, hinstance.into(), MARGIN, y, "Radius (px)");
+    let radius_label = if is_spanish {
+        "Radio (px)"
+    } else {
+        "Radius (px)"
+    };
+    create_label(hwnd, hinstance.into(), MARGIN, y, radius_label);
     let radius_value = create_value_label(
         hwnd,
         hinstance.into(),
@@ -237,7 +252,12 @@ unsafe fn create_controls(hwnd: HWND) {
     y += ROW_HEIGHT;
 
     // Border row
-    create_label(hwnd, hinstance.into(), MARGIN, y, "Border (px)");
+    let border_label = if is_spanish {
+        "Borde (px)"
+    } else {
+        "Border (px)"
+    };
+    create_label(hwnd, hinstance.into(), MARGIN, y, border_label);
     let border_value = create_value_label(
         hwnd,
         hinstance.into(),
@@ -265,12 +285,13 @@ unsafe fn create_controls(hwnd: HWND) {
 
     // Color row
     create_label(hwnd, hinstance.into(), MARGIN, y, "Color");
+    let choose_label = if is_spanish { "Elegir..." } else { "Choose..." };
     create_button(
         hwnd,
         hinstance.into(),
         MARGIN + LABEL_WIDTH,
         y,
-        "Choose...",
+        choose_label,
         ID_COLOR_BUTTON,
         80,
     );
@@ -278,7 +299,12 @@ unsafe fn create_controls(hwnd: HWND) {
     y += ROW_HEIGHT;
 
     // Transparency row
-    create_label(hwnd, hinstance.into(), MARGIN, y, "Fill Transparency (%)");
+    let transp_label = if is_spanish {
+        "Transparencia (%)"
+    } else {
+        "Fill Transparency (%)"
+    };
+    create_label(hwnd, hinstance.into(), MARGIN, y, transp_label);
     let transp_value = create_value_label(
         hwnd,
         hinstance.into(),
@@ -305,7 +331,8 @@ unsafe fn create_controls(hwnd: HWND) {
     y += ROW_HEIGHT;
 
     // Language row
-    create_label(hwnd, hinstance.into(), MARGIN, y, "Language");
+    let lang_label = if is_spanish { "Idioma" } else { "Language" };
+    create_label(hwnd, hinstance.into(), MARGIN, y, lang_label);
     let lang_combo = create_combobox(
         hwnd,
         hinstance.into(),
@@ -335,12 +362,13 @@ unsafe fn create_controls(hwnd: HWND) {
     y += ROW_HEIGHT + 10;
 
     // Close button
+    let close_label = if is_spanish { "Cerrar" } else { "Close" };
     create_button(
         hwnd,
         hinstance.into(),
         WINDOW_WIDTH - 100 - MARGIN,
         y,
-        "Close",
+        close_label,
         ID_CLOSE_BUTTON,
         80,
     );
