@@ -29,12 +29,12 @@ Highlight the mouse pointer across **all** displays with a configurable circle. 
 
 ### Global Hotkeys
 
-| Shortcut | Action | macOS | Windows |
-|----------|--------|-------|---------|
+| Action | macOS | Windows |
+|--------|-------|---------|
 | Toggle overlay | `Ctrl+A` | `Ctrl+Shift+A` |
-| Open Settings | `Ctrl+,` | `Ctrl+,` |
+| Open Settings | `Ctrl+,` | `Ctrl+Shift+S` |
 | Show Help | `Cmd+Shift+H` | `Ctrl+Shift+H` |
-| Quit | `Ctrl+Shift+X` | `Ctrl+Shift+X` |
+| Quit | `Ctrl+Shift+X` | `Ctrl+Shift+Q` |
 
 ---
 
