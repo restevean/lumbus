@@ -247,6 +247,10 @@ fn run_app() -> windows::core::Result<()> {
         // Install system tray icon
         tray::install_tray_icon(hwnd);
 
+        // Update tray menu language based on loaded settings
+        let is_spanish = STATE.with(|s| s.borrow().lang == LANG_ES);
+        tray::update_tray_language(is_spanish);
+
         // Start timer for cursor tracking
         SetTimer(Some(hwnd), TIMER_CURSOR, TIMER_INTERVAL_MS, None);
 
