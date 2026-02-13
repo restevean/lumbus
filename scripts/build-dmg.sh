@@ -28,7 +28,7 @@ PROJECT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 BUILD_DIR="$PROJECT_ROOT/target/release"
 APP_NAME="Lumbus"
 APP_BUNDLE="$BUILD_DIR/$APP_NAME.app"
-DMG_NAME="Lumbus-$(grep '^version' "$PROJECT_ROOT/Cargo.toml" | cut -d'"' -f2)"
+DMG_NAME="Lumbus-$(grep '^version' "$PROJECT_ROOT/Cargo.toml" | head -1 | cut -d'"' -f2)"
 DMG_OUTPUT="$PROJECT_ROOT/dist/$DMG_NAME.dmg"
 
 # Resources
