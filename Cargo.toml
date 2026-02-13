@@ -50,6 +50,8 @@ windows = { version = "0.62", features = [
     "Win32_UI_Controls_Dialogs",
     # System tray
     "Win32_UI_Shell",
+    # Registry (for theme detection)
+    "Win32_System_Registry",
 ]}
 
 # For JSON config persistence on Windows

@@ -1,11 +1,15 @@
 //! System tray (notification area) icon for Windows.
 //!
 //! Provides a tray icon with context menu for controlling the overlay.
+//! Automatically selects light/dark icon based on system theme.
 
 use std::cell::RefCell;
-use windows::core::w;
+use windows::core::{w, PCWSTR};
 use windows::Win32::Foundation::{HWND, POINT};
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
+use windows::Win32::System::Registry::{
+    RegCloseKey, RegOpenKeyExW, RegQueryValueExW, HKEY, HKEY_CURRENT_USER, KEY_READ, REG_VALUE_TYPE,
+};
 use windows::Win32::UI::Shell::{
     Shell_NotifyIconW, NIF_ICON, NIF_MESSAGE, NIF_TIP, NIM_ADD, NIM_DELETE, NIM_MODIFY,
     NOTIFYICONDATAW,
@@ -29,6 +33,59 @@ pub const MENU_QUIT: u32 = 1005;
 // Tray icon ID
 const TRAY_ICON_ID: u32 = 1;
 
+// Resource IDs for tray icons
+const ICON_TRAY_DARK: u16 = 2; // Dark icon for light theme
+const ICON_TRAY_LIGHT: u16 = 3; // Light icon for dark theme
+
+/// Detect if Windows is using light theme.
+/// Returns true for light theme, false for dark theme.
+fn is_light_theme() -> bool {
+    unsafe {
+        let subkey: Vec<u16> = "Software\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize"
+            .encode_utf16()
+            .chain(std::iter::once(0))
+            .collect();
+        let value_name: Vec<u16> = "AppsUseLightTheme"
+            .encode_utf16()
+            .chain(std::iter::once(0))
+            .collect();
+
+        let mut hkey = HKEY::default();
+        let result = RegOpenKeyExW(
+            HKEY_CURRENT_USER,
+            PCWSTR(subkey.as_ptr()),
+            Some(0),
+            KEY_READ,
+            &mut hkey,
+        );
+
+        if result.is_err() {
+            return true; // Default to light theme if can't read registry
+        }
+
+        let mut data: u32 = 1;
+        let mut data_size: u32 = std::mem::size_of::<u32>() as u32;
+        let mut data_type = REG_VALUE_TYPE::default();
+
+        let query_result = RegQueryValueExW(
+            hkey,
+            PCWSTR(value_name.as_ptr()),
+            None,
+            Some(&mut data_type),
+            Some(&mut data as *mut u32 as *mut u8),
+            Some(&mut data_size),
+        );
+
+        let _ = RegCloseKey(hkey);
+
+        if query_result.is_err() {
+            return true; // Default to light theme
+        }
+
+        data == 1 // 1 = light theme, 0 = dark theme
+    }
+}
+
 thread_local! {
     static TRAY_HWND: RefCell<Option<HWND>> = const { RefCell::new(None) };
     static TRAY_MENU: RefCell<Option<HMENU>> = const { RefCell::new(None) };
@@ -39,11 +96,19 @@ pub fn install_tray_icon(hwnd: HWND) {
     unsafe {
         TRAY_HWND.with(|h| *h.borrow_mut() = Some(hwnd));
 
-        // Load the custom icon from resources (resource ID 2 = tray icon)
+        // Select icon based on system theme
+        // Light theme = dark taskbar text = need dark icon
+        // Dark theme = light taskbar text = need light icon
+        let icon_id = if is_light_theme() {
+            ICON_TRAY_DARK // Dark icon for light theme
+        } else {
+            ICON_TRAY_LIGHT // Light icon for dark theme
+        };
+
         let hinstance = GetModuleHandleW(None).unwrap_or_default();
         let icon = LoadImageW(
             Some(hinstance.into()),
-            windows::core::PCWSTR(2 as *const u16), // Resource ID 2 (tray icon)
+            PCWSTR(icon_id as *const u16),
             IMAGE_ICON,
             16, // Small icon for tray
             16,
