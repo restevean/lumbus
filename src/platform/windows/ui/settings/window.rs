@@ -4,6 +4,7 @@
 
 use crate::model::constants::*;
 use crate::platform::windows::storage::config;
+use crate::platform::windows::ui::tray;
 use std::cell::RefCell;
 use windows::core::{w, PCWSTR};
 use windows::Win32::Foundation::{COLORREF, HWND, LPARAM, LRESULT, WPARAM};
@@ -28,16 +29,23 @@ const ID_BORDER_VALUE: i32 = 105;
 const ID_COLOR_BUTTON: i32 = 106;
 const ID_TRANSP_SLIDER: i32 = 107;
 const ID_TRANSP_VALUE: i32 = 108;
-const ID_CLOSE_BUTTON: i32 = 109;
+const ID_LANG_COMBO: i32 = 109;
+const ID_CLOSE_BUTTON: i32 = 110;
 
 // Trackbar messages (from commctrl.h)
 const TBM_SETRANGE: u32 = 0x0406;
 const TBM_SETPOS: u32 = 0x0405;
 const TBM_GETPOS: u32 = 0x0400;
 
+// ComboBox messages
+const CB_ADDSTRING: u32 = 0x0143;
+const CB_SETCURSEL: u32 = 0x014E;
+const CB_GETCURSEL: u32 = 0x0147;
+const CBN_SELCHANGE: u32 = 1;
+
 // Window dimensions
 const WINDOW_WIDTH: i32 = 400;
-const WINDOW_HEIGHT: i32 = 260;
+const WINDOW_HEIGHT: i32 = 300;
 
 // Layout constants
 const MARGIN: i32 = 20;
@@ -169,7 +177,8 @@ unsafe extern "system" fn settings_wnd_proc(
 
         WM_COMMAND => {
             let control_id = (wparam.0 & 0xFFFF) as i32;
-            handle_command(hwnd, control_id);
+            let notification = ((wparam.0 >> 16) & 0xFFFF) as u32;
+            handle_command(hwnd, control_id, notification, lparam);
             LRESULT(0)
         }
 
@@ -293,6 +302,36 @@ unsafe fn create_controls(hwnd: HWND) {
     );
     SetWindowLongPtrW(transp_slider, GWLP_USERDATA, transp_value.0 as isize);
 
+    y += ROW_HEIGHT;
+
+    // Language row
+    create_label(hwnd, hinstance.into(), MARGIN, y, "Language");
+    let lang_combo = create_combobox(
+        hwnd,
+        hinstance.into(),
+        MARGIN + LABEL_WIDTH,
+        y,
+        ID_LANG_COMBO,
+    );
+    // Add language options
+    let en_text: Vec<u16> = "English".encode_utf16().chain(std::iter::once(0)).collect();
+    let es_text: Vec<u16> = "Español".encode_utf16().chain(std::iter::once(0)).collect();
+    SendMessageW(
+        lang_combo,
+        CB_ADDSTRING,
+        None,
+        Some(LPARAM(en_text.as_ptr() as isize)),
+    );
+    SendMessageW(
+        lang_combo,
+        CB_ADDSTRING,
+        None,
+        Some(LPARAM(es_text.as_ptr() as isize)),
+    );
+    // Set current selection (0 = English, 1 = Spanish)
+    let current_lang = if state.lang == LANG_ES { 1 } else { 0 };
+    SendMessageW(lang_combo, CB_SETCURSEL, Some(WPARAM(current_lang)), None);
+
     y += ROW_HEIGHT + 10;
 
     // Close button
@@ -405,6 +444,31 @@ unsafe fn create_button(
     );
 }
 
+unsafe fn create_combobox(
+    hwnd: HWND,
+    hinstance: windows::Win32::Foundation::HINSTANCE,
+    x: i32,
+    y: i32,
+    id: i32,
+) -> HWND {
+    // CBS_DROPDOWNLIST = 0x0003
+    CreateWindowExW(
+        WINDOW_EX_STYLE::default(),
+        w!("COMBOBOX"),
+        None,
+        WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(0x0003),
+        x,
+        y,
+        120,
+        100, // Height includes dropdown area
+        Some(hwnd),
+        Some(HMENU(id as *mut _)),
+        Some(hinstance),
+        None,
+    )
+    .unwrap_or_default()
+}
+
 unsafe fn init_slider(slider: HWND, min: i32, max: i32, pos: i32) {
     let range = ((max as isize) << 16) | (min as isize);
     SendMessageW(slider, TBM_SETRANGE, Some(WPARAM(1)), Some(LPARAM(range)));
@@ -422,13 +486,24 @@ unsafe fn set_value_text(hwnd: HWND, value: i32) {
     let _ = SetWindowTextW(hwnd, PCWSTR(text_wide.as_ptr()));
 }
 
-unsafe fn handle_command(hwnd: HWND, control_id: i32) {
+unsafe fn handle_command(hwnd: HWND, control_id: i32, notification: u32, lparam: LPARAM) {
     match control_id {
         ID_CLOSE_BUTTON => {
             close_settings_window();
         }
         ID_COLOR_BUTTON => {
             show_color_picker(hwnd);
+        }
+        ID_LANG_COMBO => {
+            if notification == CBN_SELCHANGE {
+                let combo_hwnd = HWND(lparam.0 as *mut _);
+                let selection = SendMessageW(combo_hwnd, CB_GETCURSEL, None, None).0 as i32;
+                let new_lang = if selection == 1 { LANG_ES } else { LANG_EN };
+                config::prefs_set_int(PREF_LANG, new_lang);
+                // Update tray menu language
+                tray::update_tray_language(new_lang == LANG_ES);
+                notify_settings_changed();
+            }
         }
         _ => {}
     }
