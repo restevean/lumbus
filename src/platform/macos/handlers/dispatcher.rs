@@ -17,8 +17,8 @@ use std::sync::atomic::{AtomicBool, Ordering};
 
 use crate::platform::macos::ffi::bridge::{id, msg_send, nil, NSApp, YES};
 
-use crate::platform::macos::ui::show_help_overlay;
 use crate::events::{take_event, AppEvent};
+use crate::platform::macos::ui::show_help_overlay;
 
 /// Guard to prevent concurrent dispatch_events calls from racing.
 ///

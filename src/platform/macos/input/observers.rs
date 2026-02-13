@@ -3,8 +3,8 @@
 //! This module installs observers that help maintain Carbon hotkeys
 //! across system events like sleep/wake, session changes, and space changes.
 
-use block2::RcBlock;
 use crate::platform::macos::ffi::bridge::{get_class, id, msg_send, nil, sel, ObjectExt, YES};
+use block2::RcBlock;
 
 use crate::platform::macos::input::hotkeys::{reinstall_hotkeys, uninstall_hotkeys, HotkeyHandler};
 
@@ -19,10 +19,8 @@ pub unsafe fn install_termination_observer(view: id, handler: HotkeyHandler) {
 
     // Use handler indirectly to avoid capturing it
     let _ = handler; // We only use uninstall_hotkeys in termination
-    let block = RcBlock::new(move |_note: id| {
-        unsafe {
-            uninstall_hotkeys(view);
-        }
+    let block = RcBlock::new(move |_note: id| unsafe {
+        uninstall_hotkeys(view);
     });
 
     let name: id = msg_send![
@@ -79,10 +77,8 @@ pub unsafe fn install_wakeup_space_observers(view: id, handler: HotkeyHandler) {
     // Helper to add an observer for a given notification name (C string)
     let add_obs = |name_cstr: &std::ffi::CStr| {
         let name: id = msg_send![get_class("NSString"), stringWithUTF8String: name_cstr.as_ptr()];
-        let block = RcBlock::new(move |_note: id| {
-            unsafe {
-                reinstall_hotkeys(view, handler);
-            }
+        let block = RcBlock::new(move |_note: id| unsafe {
+            reinstall_hotkeys(view, handler);
         });
         let _: id =
             msg_send![nc, addObserverForName: name, object: nil, queue: nil, usingBlock: &*block];

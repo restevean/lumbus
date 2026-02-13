@@ -1,4 +1,8 @@
 //! Tests for the model layer (OverlayState).
+//!
+//! Note: We intentionally use `Default::default()` then field reassignment
+//! to test individual field validation. This is clearer than struct update syntax.
+#![allow(clippy::field_reassign_with_default)]
 
 use lumbus::model::app_state::OverlayState;
 use lumbus::model::constants::*;

@@ -23,16 +23,16 @@ use lumbus::platform::macos::ffi::{
 };
 use lumbus::platform::macos::handlers::dispatch_events;
 use lumbus::platform::macos::input::{
-    install_hotkeys, install_local_ctrl_a_monitor, install_mouse_monitors, reinstall_hotkeys,
-    install_termination_observer, install_wakeup_space_observers, start_hotkey_keepalive,
+    install_hotkeys, install_local_ctrl_a_monitor, install_mouse_monitors,
+    install_termination_observer, install_wakeup_space_observers, reinstall_hotkeys,
+    start_hotkey_keepalive,
 };
 use lumbus::platform::macos::storage::{
     prefs_get_double, prefs_get_int, prefs_set_double, prefs_set_int,
 };
 use lumbus::platform::macos::ui::{
-    close_settings_window, confirm_and_maybe_quit, draw_circle, draw_letter,
-    install_status_bar, open_settings_window, update_status_bar_language,
-    ClickLetter, DrawParams,
+    close_settings_window, confirm_and_maybe_quit, draw_circle, draw_letter, install_status_bar,
+    open_settings_window, update_status_bar_language, ClickLetter, DrawParams,
 };
 use lumbus::tr_key;
 
@@ -592,17 +592,16 @@ unsafe fn register_custom_view_class_and_create_view(window: id, width: f64, hei
 
                 let lr: id = *this.load_ivar("_labelRadius");
                 if lr != nil {
-                    let _: () =
-                        msg_send![lr, setStringValue: nsstring_id(tr_key("Radius (px)", es).as_ref())];
+                    let _: () = msg_send![lr, setStringValue: nsstring_id(tr_key("Radius (px)", es).as_ref())];
                 }
                 let lb: id = *this.load_ivar("_labelBorder");
                 if lb != nil {
-                    let _: () =
-                        msg_send![lb, setStringValue: nsstring_id(tr_key("Border (px)", es).as_ref())];
+                    let _: () = msg_send![lb, setStringValue: nsstring_id(tr_key("Border (px)", es).as_ref())];
                 }
                 let lc: id = *this.load_ivar("_labelColor");
                 if lc != nil {
-                    let _: () = msg_send![lc, setStringValue: nsstring_id(tr_key("Color", es).as_ref())];
+                    let _: () =
+                        msg_send![lc, setStringValue: nsstring_id(tr_key("Color", es).as_ref())];
                 }
                 let lhex: id = *this.load_ivar("_labelHex");
                 if lhex != nil {
@@ -618,7 +617,8 @@ unsafe fn register_custom_view_class_and_create_view(window: id, width: f64, hei
                         let label_hex_frame: NSRect = msg_send![lhex, frame];
                         let padding: f64 = 8.0;
                         let right_margin: f64 = 175.0;
-                        let field_x = label_hex_frame.origin.x + label_hex_frame.size.width + padding;
+                        let field_x =
+                            label_hex_frame.origin.x + label_hex_frame.size.width + padding;
                         let field_w = (w - right_margin) - field_x;
 
                         let mut fh_frame: NSRect = msg_send![field_hex, frame];
