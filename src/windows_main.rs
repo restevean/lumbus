@@ -385,6 +385,8 @@ extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM)
             }
 
             WM_DESTROY => {
+                // Flush any pending config changes to disk before exiting
+                config::flush_config();
                 PostQuitMessage(0);
                 LRESULT(0)
             }

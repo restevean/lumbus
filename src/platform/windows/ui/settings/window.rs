@@ -181,7 +181,12 @@ pub fn open_settings_window(parent_hwnd: HWND) {
 }
 
 /// Close the settings window.
+///
+/// Flushes config changes to disk before closing.
 pub fn close_settings_window() {
+    // Persist config changes to disk
+    config::flush_config();
+
     // Take the HWND first, releasing the borrow before calling DestroyWindow
     // (DestroyWindow sends WM_DESTROY synchronously which would cause a borrow conflict)
     let hwnd_to_destroy = SETTINGS_HWND.with(|h| h.borrow_mut().take());
