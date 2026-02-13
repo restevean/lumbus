@@ -55,9 +55,10 @@ pub unsafe fn sync_visual_prefs_to_all_views(src: id) {
 }
 
 /// Check if current language is Spanish.
-pub fn lang_is_es(view: id) -> bool {
-    unsafe {
-        let l = *(*view).load_ivar::<i32>("_lang");
-        l == 1
-    }
+///
+/// # Safety
+/// `view` must be a valid, non-null pointer to an NSView with `_lang` ivar.
+pub unsafe fn lang_is_es(view: id) -> bool {
+    let l = *(*view).load_ivar::<i32>("_lang");
+    l == 1
 }

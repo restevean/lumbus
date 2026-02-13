@@ -6,7 +6,9 @@
 //! - About (Acerca de...)
 //! - Quit (Salir)
 
-use crate::platform::macos::ffi::bridge::{get_class, id, msg_send, nil, nsstring_id, sel, NSSize, YES};
+use crate::platform::macos::ffi::bridge::{
+    get_class, id, msg_send, nil, nsstring_id, sel, NSSize, YES,
+};
 
 use crate::platform::macos::app::lang_is_es;
 use crate::tr_key;
@@ -132,6 +134,10 @@ unsafe fn create_status_menu(view: id) -> id {
 /// Update the status bar menu language.
 ///
 /// Call this when the language changes in settings.
+///
+/// # Safety
+/// - `view` must be a valid, non-null pointer to a CustomViewMulti.
+/// - Must be called from main thread with valid autorelease pool.
 pub unsafe fn update_status_bar_language(view: id) {
     if STATUS_ITEM == nil {
         return;

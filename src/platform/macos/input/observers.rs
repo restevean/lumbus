@@ -9,6 +9,10 @@ use crate::platform::macos::ffi::bridge::{get_class, id, msg_send, nil, sel, Obj
 use crate::platform::macos::input::hotkeys::{reinstall_hotkeys, uninstall_hotkeys, HotkeyHandler};
 
 /// Install an observer that cleans up Carbon resources when app terminates.
+///
+/// # Safety
+/// - `view` must be a valid, non-null pointer to a CustomViewMulti.
+/// - Must be called from main thread with valid autorelease pool.
 pub unsafe fn install_termination_observer(view: id, handler: HotkeyHandler) {
     let center: id = msg_send![get_class("NSNotificationCenter"), defaultCenter];
     let queue: id = nil; // main thread
@@ -32,6 +36,10 @@ pub unsafe fn install_termination_observer(view: id, handler: HotkeyHandler) {
 /// Start a repeating NSTimer to periodically re-install hotkeys (defensive).
 ///
 /// This helps recover from scenarios where Carbon hotkeys get dropped.
+///
+/// # Safety
+/// - `view` must be a valid, non-null pointer to a CustomViewMulti.
+/// - Must be called from main thread with valid autorelease pool.
 pub unsafe fn start_hotkey_keepalive(view: id) {
     // Clear previous timer if any
     let prev: id = *(*view).load_ivar::<id>("_hkKeepAliveTimer");
@@ -59,6 +67,11 @@ pub unsafe fn start_hotkey_keepalive(view: id) {
 /// - Wake from sleep
 /// - Session became active (unlock/login)
 /// - Active Space changed (Mission Control / Spaces)
+///
+/// # Safety
+/// - `view` must be a valid, non-null pointer to a CustomViewMulti.
+/// - `handler` must be a valid function pointer.
+/// - Must be called from main thread with valid autorelease pool.
 pub unsafe fn install_wakeup_space_observers(view: id, handler: HotkeyHandler) {
     let ws: id = msg_send![get_class("NSWorkspace"), sharedWorkspace];
     let nc: id = msg_send![ws, notificationCenter];

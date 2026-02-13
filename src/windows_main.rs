@@ -64,21 +64,32 @@ const TIMER_INTERVAL_MS: u32 = 16; // ~60 FPS
 static MOUSE_HOOK: AtomicIsize = AtomicIsize::new(0);
 
 thread_local! {
-    static STATE: RefCell<OverlayState> = RefCell::new(OverlayState::default());
+    static STATE: RefCell<WindowsRuntimeState> = RefCell::new(WindowsRuntimeState::default());
     static D2D_FACTORY: RefCell<Option<ID2D1Factory>> = const { RefCell::new(None) };
     static DWRITE_FACTORY: RefCell<Option<IDWriteFactory>> = const { RefCell::new(None) };
     static FONT_FACE: RefCell<Option<IDWriteFontFace>> = const { RefCell::new(None) };
 }
 
+/// Windows-specific runtime state.
+///
+/// Contains both persistent settings (loaded from config) and transient
+/// window state (hwnd, dimensions). The settings fields mirror
+/// `model::OverlayState` but use `f32` for colors as required by Direct2D.
+///
+/// Note: This is intentionally separate from `model::OverlayState` to avoid
+/// type conversion overhead during rendering. Settings are synced via
+/// `config::load_state()` which converts f64 → f32.
 #[allow(dead_code)]
-struct OverlayState {
-    // Window-specific fields
+struct WindowsRuntimeState {
+    // Window-specific fields (not persisted)
     hwnd: HWND,
     width: i32,
     height: i32,
     offset_x: i32,
     offset_y: i32,
-    // Settings fields (persisted)
+
+    // Settings fields (persisted via config.json)
+    // Note: colors are f32 for Direct2D compatibility
     radius: f64,
     border_width: f64,
     stroke_r: f32,
@@ -87,12 +98,13 @@ struct OverlayState {
     stroke_a: f32,
     fill_transparency_pct: f64,
     lang: i32,
-    // Runtime state
+
+    // Runtime state (not persisted)
     visible: bool,
     display_mode: i32,
 }
 
-impl Default for OverlayState {
+impl Default for WindowsRuntimeState {
     fn default() -> Self {
         Self {
             hwnd: HWND::default(),
@@ -545,7 +557,7 @@ unsafe fn create_letter_geometry(
 
 /// Draw using Direct2D and apply with UpdateLayeredWindow.
 unsafe fn update_layered_window_d2d(
-    state: &OverlayState,
+    state: &WindowsRuntimeState,
     factory: &ID2D1Factory,
     font_face: Option<&IDWriteFontFace>,
 ) {

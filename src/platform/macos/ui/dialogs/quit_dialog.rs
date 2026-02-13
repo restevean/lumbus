@@ -4,15 +4,15 @@
 
 use std::sync::atomic::{AtomicBool, Ordering};
 
-use block2::RcBlock;
 use crate::platform::macos::ffi::bridge::{
     get_bool_ivar, get_class, id, msg_send, nil, nsstring_id, sel, set_bool_ivar, NSApp, NSPoint,
     NSRect, NSSize, NO, YES,
 };
 use crate::platform::macos::ffi::CGColorRef;
+use block2::RcBlock;
 
-use crate::platform::macos::app::{apply_to_all_views, lang_is_es};
 use crate::events::{publish, AppEvent};
+use crate::platform::macos::app::{apply_to_all_views, lang_is_es};
 use crate::platform::macos::ffi::overlay_window_level;
 use crate::tr_key;
 
@@ -25,13 +25,10 @@ static QUIT_DIALOG_OPENING: AtomicBool = AtomicBool::new(false);
 /// The dispatcher handles hotkey reinstallation.
 /// If user confirms quit, terminates the application.
 ///
-/// # Arguments
-/// * `view` - The host view (for accessing ivars and triggering updates)
-///
 /// # Safety
-/// Must be called from main thread.
-#[allow(unused_unsafe)]
-pub fn confirm_and_maybe_quit(view: id) {
+/// - `view` must be a valid, non-null pointer to a CustomViewMulti.
+/// - Must be called from main thread with valid autorelease pool.
+pub unsafe fn confirm_and_maybe_quit(view: id) {
     // Atomic guard: only one quit dialog can be opening at a time
     if QUIT_DIALOG_OPENING
         .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)

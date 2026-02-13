@@ -3,8 +3,8 @@
 //! This module handles global mouse events to show L/R indicators
 //! when clicking and to track mouse movement.
 
-use block2::RcBlock;
 use crate::platform::macos::ffi::bridge::{get_class, id, msg_send, nil, sel, ObjectExt, NO, YES};
+use block2::RcBlock;
 
 use crate::platform::macos::app::apply_to_all_views;
 
@@ -16,6 +16,10 @@ use crate::platform::macos::app::apply_to_all_views;
 /// - Right mouse down → show "R"
 /// - Right mouse up → show circle
 /// - Mouse moved → update cursor position
+///
+/// # Safety
+/// - `view` must be a valid, non-null pointer to a CustomViewMulti.
+/// - Must be called from main thread with valid autorelease pool.
 pub unsafe fn install_mouse_monitors(view: id) {
     // NSEvent masks: leftDown=1<<1, leftUp=1<<2, rightDown=1<<3, rightUp=1<<4, mouseMoved=1<<6
     const LEFT_DOWN_MASK: u64 = 1 << 1;

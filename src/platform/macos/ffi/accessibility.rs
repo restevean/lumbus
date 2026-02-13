@@ -21,6 +21,9 @@ extern "C" {
 ///
 /// This function triggers the macOS accessibility permission dialog if
 /// the app doesn't have accessibility access yet.
+///
+/// # Safety
+/// Must be called from main thread with valid autorelease pool.
 pub unsafe fn ensure_accessibility_prompt() {
     // Create CFDictionary with kAXTrustedCheckOptionPrompt = true
     let keys = [kAXTrustedCheckOptionPrompt];

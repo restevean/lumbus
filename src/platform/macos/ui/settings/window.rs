@@ -4,14 +4,14 @@
 
 use std::sync::atomic::{AtomicBool, Ordering};
 
-use block2::RcBlock;
 use crate::platform::macos::ffi::bridge::{
     get_bool_ivar, get_class, id, msg_send, nil, nsstring_id, sel, set_bool_ivar, NSApp, NSPoint,
     NSRect, NSSize, ObjectExt, NO, YES,
 };
+use block2::RcBlock;
 
-use crate::platform::macos::app::{apply_to_all_views, lang_is_es};
 use crate::events::{publish, AppEvent};
+use crate::platform::macos::app::{apply_to_all_views, lang_is_es};
 use crate::platform::macos::ffi::overlay_window_level;
 use crate::{color_to_hex, tr_key};
 
@@ -33,13 +33,10 @@ unsafe fn configure_hex_field(view: id, field_hex: id) {
 /// When the window closes, publishes `AppEvent::SettingsClosed` to the event bus.
 /// The dispatcher handles hotkey reinstallation.
 ///
-/// # Arguments
-/// * `view` - The host view (for accessing ivars and triggering updates)
-///
 /// # Safety
-/// Must be called from main thread.
-#[allow(unused_unsafe)]
-pub fn open_settings_window(view: id) {
+/// - `view` must be a valid, non-null pointer to a CustomViewMulti.
+/// - Must be called from main thread with valid autorelease pool.
+pub unsafe fn open_settings_window(view: id) {
     // Atomic guard: only one settings window can be opening at a time
     let was_false = SETTINGS_OPENING
         .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
@@ -377,10 +374,11 @@ pub fn open_settings_window(view: id) {
 }
 
 /// Close the settings window by stopping the modal.
-pub fn close_settings_window(_view: id) {
-    unsafe {
-        // Just stop the modal - cleanup happens in open_settings_window after runModalForWindow returns
-        let app: id = NSApp();
-        let _: () = msg_send![app, stopModal];
-    }
+///
+/// # Safety
+/// Must be called from main thread with valid autorelease pool.
+pub unsafe fn close_settings_window(_view: id) {
+    // Just stop the modal - cleanup happens in open_settings_window after runModalForWindow returns
+    let app: id = NSApp();
+    let _: () = msg_send![app, stopModal];
 }
