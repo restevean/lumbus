@@ -1,0 +1,7 @@
+// Windows resource file for Lumbus
+// Application icon (shown on .exe file)
+1 ICON "../icons/AppIcon.ico"
+// Tray icon for light system theme (dark icon)
+2 ICON "../icons/StatusBarIcon_dark.ico"
+// Tray icon for dark system theme (light icon)
+3 ICON "../icons/StatusBarIcon_light.ico"

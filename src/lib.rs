@@ -1,19 +1,22 @@
 #![allow(unexpected_cfgs)] // Silence cfg warnings from objc macros
 
-//! Lumbus - Mouse pointer highlighter for macOS.
+//! Lumbus - Mouse pointer highlighter for macOS and Windows.
 //!
 //! This library contains:
 //! - Pure helpers (clamp, color conversion, i18n)
-//! - Event system
-//! - Model/state management
-//! - FFI bindings (macOS only)
+//! - Event system (cross-platform)
+//! - Model/state management (cross-platform)
+//! - Platform-specific implementations
 
 pub mod events;
 pub mod model;
+pub mod platform;
 
-// FFI module only available on macOS
+// Re-export FFI for backward compatibility (macOS)
 #[cfg(target_os = "macos")]
-pub mod ffi;
+pub mod ffi {
+    pub use crate::platform::macos::ffi::*;
+}
 
 use std::borrow::Cow;
 

@@ -4,17 +4,17 @@ version = "0.3.3"
 authors = ["restevean <restevean@protonmail.com>"]
 edition = "2021"
 license = "Apache-2.0"
-description = "Highlight the mouse pointer with a configurable circle on macOS"
+description = "Cross-platform mouse pointer highlighter for presentations and screen recordings (macOS & Windows)"
 repository = "https://github.com/restevean/lumbus"
-keywords = ["macos", "mouse", "cursor", "highlighter", "presentation"]
+keywords = ["mouse", "cursor", "highlighter", "presentation", "cross-platform"]
 categories = ["gui"]
 
 [dependencies]
-# Core graphics (not deprecated, keep as-is)
-core-graphics = "0.24"
+# No cross-platform dependencies currently
 
-# macOS-specific: objc2 ecosystem (replaces deprecated cocoa/objc/block crates)
+# macOS-specific: objc2 ecosystem + core-graphics
 [target.'cfg(target_os = "macos")'.dependencies]
+core-graphics = "0.24"
 objc2 = "0.6"
 objc2-app-kit = "0.3"
 objc2-foundation = { version = "0.3", features = ["NSGeometry", "objc2-core-foundation"] }
@@ -26,6 +26,45 @@ block2 = "0.6"
 eframe = "0.33"
 global-hotkey = "0.7"
 raw-window-handle = "0.6"
+
+# Windows-specific: windows-rs (official Microsoft crate)
+[target.'cfg(target_os = "windows")'.dependencies]
+windows-numerics = "0.3"
+windows = { version = "0.62", features = [
+    # Foundation
+    "Win32_Foundation",
+    "Win32_System_LibraryLoader",
+    "Win32_System_Com",
+    # Window management
+    "Win32_UI_WindowsAndMessaging",
+    "Win32_UI_Input_KeyboardAndMouse",
+    # Graphics
+    "Win32_Graphics_Gdi",
+    "Win32_Graphics_Direct2D",
+    "Win32_Graphics_Direct2D_Common",
+    "Win32_Graphics_DirectWrite",
+    "Win32_Graphics_Dxgi_Common",
+    "Win32_Graphics_Imaging",
+    # UI Controls (for settings window)
+    "Win32_UI_Controls",
+    "Win32_UI_Controls_Dialogs",
+    # System tray
+    "Win32_UI_Shell",
+    # Registry (for theme detection)
+    "Win32_System_Registry",
+]}
+
+# For JSON config persistence on Windows
+[target.'cfg(target_os = "windows")'.dependencies.serde]
+version = "1.0"
+features = ["derive"]
+
+[target.'cfg(target_os = "windows")'.dependencies.serde_json]
+version = "1.0"
+
+# Build dependencies for Windows resource embedding
+[target.'cfg(target_os = "windows")'.build-dependencies]
+embed-resource = "3"
 
 # Release profile optimizations
 [profile.release]

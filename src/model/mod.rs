@@ -1,14 +1,12 @@
 //! Application domain model.
 //!
-//! This module contains pure business logic (no FFI where possible)
-//! including overlay state and configuration persistence.
+//! This module contains pure business logic (no FFI dependencies)
+//! including overlay state definition and configuration constants.
+//!
+//! Platform-specific persistence is in `platform::{macos,windows}::storage`.
 
 pub mod app_state;
 pub mod constants;
-pub mod preferences;
 
 pub use app_state::OverlayState;
 pub use constants::*;
-pub use preferences::{
-    load_state, prefs_get_double, prefs_get_int, prefs_set_double, prefs_set_int, save_state,
-};

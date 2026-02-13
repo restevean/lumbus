@@ -1,253 +1,194 @@
-# Lumbus (macOS)
+# Lumbus
 
-Highlight the mouse pointer across **all** macOS displays with a configurable circle. Optionally show a bold **L** (left click) or **R** (right click) to visualise clicks—great for **presentations**, **screen recordings**, and **remote support**. The overlay stays on top without stealing focus or causing the system beep. 🔨🤖🔧
+Highlight the mouse pointer across **all** displays with a configurable circle. Optionally show a bold **L** (left click) or **R** (right click) to visualise clicks—great for **presentations**, **screen recordings**, and **remote support**. The overlay stays on top without stealing focus.
 
-> ⚠️ This software is not affiliated with Apple or any other company. Use at your own risk.
+**Cross-platform:** macOS and Windows.
 
----
-
-## ✨ Features
-
-- **Multi-display overlay**
-    - One transparent, borderless window **per display**, above menus and Dock.
-    - Doesn’t take focus or interfere with the active app.
-- **Smooth pointer tracking** (~60 FPS using Cocoa screen coordinates).
-- **Click indicators**
-    - Default: **circle** at the cursor.
-    - **Left mouse down** → bold **I** (Spanish) / **L** (English).
-    - **Right mouse down** → bold **D** (Spanish) / **R** (English).
-    - Letters use the **same border width** and **same fill transparency** as the circle.
-- **Live configuration**
-    - **Circle radius (px)** — via slider (snap in steps of **5**)
-    - **Border thickness (px)** — via slider (snap in steps of **1**)
-    - **Colour** via system colour picker (**NSColorWell**) and editable **Hex** (`#RRGGBB` or `#RRGGBBAA`)
-    - **Fill transparency (%)** — via slider (snap in steps of **5**), `0` (opaque) → `100` (fully transparent)
-    - Numeric fields for radius/border/transparency are **display-only** (read-only). Adjust via sliders.
-    - Sliders have **no tick marks**, but values still **snap** to the increments above.
-    - Changes apply **instantly** and are **persisted**.
-- **Global hotkeys (no beep)**
-    - `Ctrl` + `A` → **Toggle overlay visibility**
-    - `Ctrl` + `,` → **Open Settings**
-    - `⌘` + `Shift` + `H` → **Show Help** (keyboard shortcuts)
-    - `Ctrl` + `Shift` + `X` → **Quit** (with confirmation)
-- **Help overlay** — Press `⌘+Shift+H` to show all keyboard shortcuts in a centered overlay
-- **Persistence** via `NSUserDefaults` (restored on launch)
+> This software is not affiliated with Apple or Microsoft. Use at your own risk.
 
 ---
 
-## 🖼️ Visuals
+## Features
 
-- **Circle:** configurable stroke colour/width; fill uses the same colour with configurable alpha.
-- **I/D letters (Spanish) / L/R (English):** CoreText (glyph → CGPath → NSBezierPath), same stroke and fill alpha as the circle, centred on the cursor, height ≈ `1.5 × circle diameter`.
+| Feature | macOS | Windows |
+|---------|-------|---------|
+| Multi-display overlay | Yes | Yes |
+| Smooth pointer tracking (~60 FPS) | Yes | Yes |
+| Click indicators (L/R or I/D) | Yes | Yes |
+| Configurable radius, border, color | Yes | Yes |
+| Fill transparency | Yes | Yes |
+| Global hotkeys | Yes | Yes |
+| System tray / Status bar | Yes | Yes |
+| Settings persistence | NSUserDefaults | JSON |
+| Localisation (EN/ES) | Yes | Yes |
+
+### Click Indicators
+- **Default:** Circle at cursor
+- **Left click:** **L** (English) / **I** (Spanish)
+- **Right click:** **R** (English) / **D** (Spanish)
+
+### Global Hotkeys
+
+| Action | macOS | Windows |
+|--------|-------|---------|
+| Toggle overlay | `Ctrl+A` | `Ctrl+Shift+A` |
+| Open Settings | `Ctrl+,` | `Ctrl+Shift+S` |
+| Show Help | `Cmd+Shift+H` | `Ctrl+Shift+H` |
+| Quit | `Ctrl+Shift+X` | `Ctrl+Shift+Q` |
 
 ---
 
-## 📦 Requirements
+## Installation
 
-- macOS **10.13+** (uses `NSBezierPath` + CGPath bridging and Accessibility prompt API)
-- Rust stable (1.70+ recommended)
-- `Cargo.toml`:
+### macOS
 
-```toml
-[dependencies]
-objc2 = "0.6"
-objc2-foundation = "0.3"
-block2 = "0.6"
-```
-
-> 🔐 Hotkeys use Carbon and generally **don't require** Accessibility.
->  🖱️ Mouse monitors use `NSEvent::addGlobalMonitorForEventsMatchingMask`. If prompted, allow **Input Monitoring** and/or **Accessibility** for the app (or for your IDE if you run from there).
-
-------
-
-## 📥 Installation
-
-### Option 1: Download DMG installer (recommended)
+#### Option 1: Download DMG (recommended)
 
 Download the latest `Lumbus-x.x.x.dmg` from [Releases](https://github.com/restevean/lumbus/releases), open it, and drag `Lumbus.app` to your Applications folder.
 
-> ⚠️ **First launch**: Since the app is not signed with an Apple Developer ID, macOS will show a warning. Right-click the app → Open → Open to bypass Gatekeeper.
+> **First launch:** Since the app is not signed with an Apple Developer ID, macOS will show a warning. Right-click the app → Open → Open to bypass Gatekeeper.
 
-### Option 2: Build from source
+#### Option 2: Build from source
 
 ```bash
-# Clone the repository
 git clone https://github.com/restevean/lumbus.git
 cd lumbus
-
-# Build the .app bundle
-make bundle
-
-# Install to ~/Applications
-make install-user
-
-# Or install to /Applications (may require sudo)
-make install
+./scripts/build-app.sh
+cp -R target/release/Lumbus.app /Applications/
 ```
 
-### Available make targets
+**Requirements:**
+- macOS 10.13+
+- Rust stable (1.70+)
+- Grant **Accessibility** and **Input Monitoring** permissions when prompted
 
-| Command | Description |
-|---------|-------------|
-| `make bundle` | Build release `.app` bundle |
-| `make install-user` | Install to `~/Applications` |
-| `make install` | Install to `/Applications` |
-| `make icons` | Regenerate app icon from `resources/icons/source.png` |
-| `make open` | Build and launch the app |
-| `make clean` | Clean build artifacts |
+### Windows
 
-------
+#### Option 1: Download executable (recommended)
 
-## ▶️ Usage
+Download the latest `lumbus.exe` from [Releases](https://github.com/restevean/lumbus/releases):
+- `lumbus-x.x.x-windows-x64.exe` for Intel/AMD (64-bit)
+- `lumbus-x.x.x-windows-arm64.exe` for ARM64
 
-1. Build & run:
+> **First launch:** Windows SmartScreen may block the unsigned executable. Click "More info" → "Run anyway", or right-click → Properties → Unblock.
 
-   ```bash
-   cargo run --profile dev
-   ```
+#### Option 2: Build from source
 
-2. Toggle overlay with **Ctrl + A** (works while the app is running; it doesn’t need to be frontmost).
+```powershell
+git clone https://github.com/restevean/lumbus.git
+cd lumbus
+cargo build --release
+# Executable at target\release\lumbus.exe
+```
 
-3. Open **Settings** with **Ctrl + ,**.
+**Requirements:**
+- Windows 10/11
+- Rust stable (1.70+)
+- Visual Studio Build Tools (for MSVC linker)
 
-4. Adjust **radius**, **border**, **colour** (picker or Hex), and **fill transparency**.
+---
 
-    - Numeric boxes show the value but are **not editable**.
-    - Use sliders (snap to valid steps).
-    - **Hex** remains editable.
+## Usage
 
-5. Click behaviour:
+1. **Launch** the app. A circle appears following your cursor.
+2. **Toggle** visibility with the hotkey (`Ctrl+A` on macOS, `Ctrl+Shift+A` on Windows).
+3. **Configure** via Settings hotkey (`Ctrl+,`) or tray/status bar menu.
+4. **Click** to see L/R indicators (or I/D in Spanish).
 
-    - **Left down** → shows **I** (Spanish) / **L** (English)
-    - **Right down** → shows **D** (Spanish) / **R** (English)
-    - On release → reverts to **circle**
+### Settings Panel
 
-6. Quit with **Ctrl + Shift + X**.
-   A confirmation dialog appears with **Cancel** (default) and **Quit**.
+- **Language:** English / Español
+- **Radius (px):** Slider (5-200, snaps to 5)
+- **Border (px):** Slider (1-20, snaps to 1)
+- **Color:** Color picker (macOS: Hex editable, Windows: system dialog)
+- **Fill Transparency (%):** Slider (0-100, snaps to 5)
+  - 0% = fully opaque fill
+  - 100% = no fill (transparent)
 
-    - **Enter/Return** activates the highlighted default button.
-    - **Esc** cancels and closes the dialog.
-    - **Tab** cycles focus between buttons.
+---
 
-------
+## Visuals
 
-## ⚙️ Settings Panel
+- **Circle:** Configurable stroke color/width; fill uses same color with configurable alpha.
+- **Letters (L/R or I/D):** Bold font, same stroke and fill as circle, centered on cursor, height ≈ 1.5× circle diameter.
 
-- **Language**: English / Español
-- **Radius (px)** — **read-only** value + slider (`5..200`, snap `5`)
-- **Border (px)** — **read-only** value + slider (`1..20`, snap `1`)
-- **Colour** — colour well + **Hex** (`#RRGGBB` or `#RRGGBBAA`, **Hex is editable**)
-- **Fill Transparency (%)** — **read-only** value + slider (`0..100`, snap `5`)
-  `100` = no fill (fully transparent), `0` = fully opaque
+---
 
-**Shortcuts in Settings:**
+## How It Works
 
-- **Enter/Return** → activates **Close**
-- **Esc** → closes Settings
-- Initial focus is on the **Close** button.
+### macOS
+- One borderless, transparent `NSWindow` per screen, always-on-top.
+- Pointer from `NSEvent.mouseLocation`, converted to view coordinates.
+- Drawing: `NSBezierPath` for circle, `CTFontCreatePathForGlyph` for letters.
+- Hotkeys: Carbon `RegisterEventHotKey` (no system beep).
+- Persistence: `NSUserDefaults`.
 
-------
+### Windows
+- One layered window (`WS_EX_LAYERED`) spanning all monitors.
+- Pointer from `GetCursorPos`.
+- Drawing: Direct2D with `UpdateLayeredWindow` for per-pixel alpha.
+- Hotkeys: `RegisterHotKey`.
+- Persistence: JSON in `%APPDATA%\Lumbus\config.json`.
 
-## ⌨️ Global Shortcuts
+---
 
-| Shortcut | Action |
-|----------|--------|
-| `Ctrl` + `A` | Toggle overlay |
-| `Ctrl` + `,` | Open Settings |
-| `⌘` + `Shift` + `H` | Show Help |
-| `Ctrl` + `Shift` + `X` | Quit (with confirmation) |
-
-Implemented with **Carbon HotKeys** (no beep) and a local key monitor for extra reliability while windows are key.
-
-------
-
-## 🧠 How It Works
-
-- One borderless, transparent `NSWindow` **per screen** (`NSScreen.screens`), always-on-top level.
-- Pointer from **Cocoa** (`NSEvent.mouseLocation`), converted **screen → window → view**.
-- Drawing:
-    - **Circle:** `NSBezierPath::bezierPathWithOvalInRect` → `fill` (alpha from transparency) + `stroke`
-    - **L/R:** `CTFontCreatePathForGlyph` → `CGPath` → `NSBezierPath` → `fill` + `stroke`
-- **Hotkeys:** `RegisterEventHotKey` + `InstallEventHandler` (Carbon)
-- **Mouse:** `NSEvent::addGlobalMonitorForEventsMatchingMask` (left/right down/up, move)
-- **Persistence:** `NSUserDefaults`
-- **Permissions:** On first run we invoke `AXIsProcessTrustedWithOptions` to prompt Accessibility if needed.
-
-------
-
-## 🧪 Troubleshooting
-
-- **Shortcuts beep or don’t trigger:** Use **Ctrl+A**, **Ctrl+,**, or **Ctrl+Shift+X**. Other apps may intercept overlapping shortcuts—adjust their settings if necessary.
-- **Overlay not following the cursor:** Ensure **Input Monitoring** and/or **Accessibility** are enabled for your binary (or for your IDE if launching from it).
-- **Hex field layout:** It sits to the right of the “Hex” label; tweak the constants if you change window width.
-
-------
-
-## 🗂️ Code Structure
+## Code Structure
 
 ```
 src/
-├── main.rs              # Entry point + overlay view registration
-├── lib.rs               # Pure helpers (clamp, color_to_hex, parse_hex_color, tr_key)
-│
-├── events/              # Event bus system
-│   ├── bus.rs           # EventBus implementation
-│   ├── global.rs        # Global publish/subscribe functions
-│   └── types.rs         # AppEvent enum definitions
-│
-├── handlers/            # Event handlers
-│   └── dispatcher.rs    # Main event dispatcher
-│
-├── ffi/                 # FFI bindings encapsulated
-│   ├── carbon.rs        # Carbon Event Manager (hotkeys)
-│   ├── coretext.rs      # CoreText (glyph rendering)
-│   ├── coregraphics.rs  # CoreGraphics/CoreFoundation
-│   ├── accessibility.rs # Accessibility permissions
-│   ├── cocoa_utils.rs   # NSString, display_id, mouse position helpers
-│   └── types.rs         # Type aliases (ViewId, WindowId, etc.)
-│
-├── model/               # Pure domain logic (testable, no FFI)
-│   ├── constants.rs     # Default values, pref keys, limits
-│   ├── app_state.rs     # OverlayState struct with validation
-│   └── preferences.rs   # NSUserDefaults load/save
-│
-├── input/               # Input handling
-│   ├── hotkeys.rs       # Carbon hotkey install/uninstall
-│   ├── observers.rs     # Wake/space/termination observers
-│   ├── mouse_monitors.rs    # Global mouse event monitors
-│   └── keyboard_monitors.rs # Local Ctrl+A monitor
-│
-├── ui/
-│   ├── overlay/         # Overlay drawing
-│   │   └── drawing.rs   # draw_circle, draw_letter, DrawParams
-│   ├── settings/        # Settings window
-│   │   └── window.rs    # open/close settings, controls
-│   ├── dialogs/         # Dialog windows
-│   │   ├── quit_dialog.rs   # Quit confirmation
-│   │   └── help_overlay.rs  # Help overlay with keyboard shortcuts
-│   └── status_bar.rs    # Menu bar icon and dropdown menu
-│
-└── app/                 # Shared application helpers
-    └── helpers.rs       # apply_to_all_views, sync_visual_prefs
+├── main.rs              # Entry point (platform dispatch)
+├── macos_main.rs        # macOS implementation (~950 lines)
+├── windows_main.rs      # Windows implementation (~770 lines)
+├── lib.rs               # Shared helpers
+├── events/              # Cross-platform event bus
+├── model/               # Cross-platform state & constants
+└── platform/
+    ├── macos/           # macOS-specific code
+    │   ├── ffi/         # Carbon, CoreText, Cocoa bindings
+    │   ├── ui/          # Overlay, settings, dialogs, status bar
+    │   ├── input/       # Hotkeys, mouse monitors
+    │   └── storage/     # NSUserDefaults
+    └── windows/         # Windows-specific code
+        ├── ffi/         # Win32 bindings
+        ├── ui/          # Overlay, settings, dialogs, tray
+        ├── input/       # Hotkeys, mouse hooks
+        └── storage/     # JSON config
 ```
 
-**Tests:** 65 unit tests across `tests/` and inline modules
+**Tests:** 65 unit tests (`cargo test`)
 
-------
+---
 
-## 🛣️ Roadmap
+## Troubleshooting
 
-No planned features at this time. Feel free to open an issue with suggestions!
+### macOS
+- **Shortcuts don't work:** Grant Accessibility and Input Monitoring permissions in System Preferences → Security & Privacy.
+- **Overlay not visible:** Toggle with `Ctrl+A`.
 
-------
+### Windows
+- **SmartScreen blocks exe:** Click "More info" → "Run anyway".
+- **No overlay visible:** Check system tray icon, toggle with `Ctrl+Shift+A`.
+- **Settings not saving:** Ensure write access to `%APPDATA%\Lumbus\`.
 
-## 📄 Licence
+---
+
+## Roadmap
+
+- [x] macOS support (production-ready)
+- [x] Windows support (production-ready)
+- [ ] Linux support (planned)
+
+---
+
+## License
 
 Apache License 2.0. See [LICENSE](LICENSE) file.
 
-------
+---
 
-## 🙌 Acknowledgments
+## Acknowledgments
 
-Built with `objc2`, `objc2-foundation`, `block2`, and a sprinkle of Core* frameworks via FFI.
-Tested on macOS. Works with ANSI and ISO keyboards. ✔️
+- **macOS:** Built with `objc2`, `objc2-foundation`, `block2`, and Core* frameworks.
+- **Windows:** Built with `windows-rs` (official Microsoft Rust bindings), Direct2D, DirectWrite.
+
+Tested on macOS 14+ and Windows 11. Works with ANSI and ISO keyboards.
