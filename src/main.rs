@@ -1,4 +1,5 @@
 #![allow(unexpected_cfgs)] // Silence cfg warnings inside objc/cocoa macros
+#![cfg_attr(target_os = "windows", windows_subsystem = "windows")] // Hide console on Windows
 
 // ============================================================================
 // Platform-specific entry points
