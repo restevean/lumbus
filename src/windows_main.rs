@@ -674,12 +674,10 @@ unsafe fn update_layered_window_d2d(
                                 } else {
                                     'L'
                                 }
+                            } else if state.lang == LANG_ES {
+                                'D'
                             } else {
-                                if state.lang == LANG_ES {
-                                    'D'
-                                } else {
-                                    'R'
-                                }
+                                'R'
                             };
 
                             // Font size = 3 * radius (matching macOS: letter height = 1.5 * diameter)
