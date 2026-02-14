@@ -110,13 +110,13 @@ pub fn open_settings_window(parent_hwnd: HWND) {
         };
         let _ = RegisterClassW(&wc);
 
-        // Create Segoe UI font (modern Windows font)
-        let font_name: Vec<u16> = "Segoe UI"
+        // Create Segoe UI Semilight font (elegant, modern Windows font)
+        let font_name: Vec<u16> = "Segoe UI Semilight"
             .encode_utf16()
             .chain(std::iter::once(0))
             .collect();
         let font = CreateFontW(
-            -15, // height (negative = character height)
+            -14, // height (slightly smaller for elegance)
             0,
             0,
             0,
