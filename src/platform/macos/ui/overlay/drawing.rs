@@ -5,8 +5,6 @@
 //! logic is isolated and easier to understand/maintain.
 
 use crate::platform::macos::ffi::bridge::{get_class, id, msg_send, NSPoint, NSRect, NSSize};
-
-use crate::clamp;
 use crate::platform::macos::ffi::{
     CFRelease, CGPathRef, CGPathRelease, CTFontCreatePathForGlyph, CTFontCreateWithName,
     CTFontGetGlyphsForCharacters, CTFontRef,
@@ -40,7 +38,7 @@ impl DrawParams {
     /// Calculate the fill alpha based on stroke alpha and transparency setting.
     #[inline]
     pub fn fill_alpha(&self) -> f64 {
-        self.stroke_a * (1.0 - clamp(self.fill_transparency, 0.0, 100.0) / 100.0)
+        self.stroke_a * (1.0 - self.fill_transparency.clamp(0.0, 100.0) / 100.0)
     }
 }
 

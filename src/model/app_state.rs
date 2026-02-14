@@ -4,7 +4,6 @@
 //! serialized to/from NSUserDefaults.
 
 use super::constants::*;
-use crate::clamp;
 
 /// Complete overlay state, serializable to/from NSUserDefaults.
 #[derive(Debug, Clone, PartialEq)]
@@ -51,17 +50,15 @@ impl Default for OverlayState {
 impl OverlayState {
     /// Validates and clamps all values to valid ranges.
     pub fn validate(&mut self) {
-        self.radius = clamp(self.radius, MIN_RADIUS, MAX_RADIUS);
-        self.border_width = clamp(self.border_width, MIN_BORDER, MAX_BORDER);
-        self.fill_transparency_pct = clamp(
-            self.fill_transparency_pct,
-            MIN_TRANSPARENCY,
-            MAX_TRANSPARENCY,
-        );
-        self.stroke_r = clamp(self.stroke_r, 0.0, 1.0);
-        self.stroke_g = clamp(self.stroke_g, 0.0, 1.0);
-        self.stroke_b = clamp(self.stroke_b, 0.0, 1.0);
-        self.stroke_a = clamp(self.stroke_a, 0.0, 1.0);
+        self.radius = self.radius.clamp(MIN_RADIUS, MAX_RADIUS);
+        self.border_width = self.border_width.clamp(MIN_BORDER, MAX_BORDER);
+        self.fill_transparency_pct = self
+            .fill_transparency_pct
+            .clamp(MIN_TRANSPARENCY, MAX_TRANSPARENCY);
+        self.stroke_r = self.stroke_r.clamp(0.0, 1.0);
+        self.stroke_g = self.stroke_g.clamp(0.0, 1.0);
+        self.stroke_b = self.stroke_b.clamp(0.0, 1.0);
+        self.stroke_a = self.stroke_a.clamp(0.0, 1.0);
     }
 
     /// Returns the stroke color as a tuple (r, g, b, a).

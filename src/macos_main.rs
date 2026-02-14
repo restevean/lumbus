@@ -5,7 +5,6 @@
 
 use std::ffi::{c_char, CStr};
 
-use lumbus::clamp;
 use lumbus::color_to_hex;
 use lumbus::events::{publish, AppEvent};
 use lumbus::model::constants::*;
@@ -131,7 +130,7 @@ unsafe fn load_preferences_into_view(view: id) {
     (*view).store_ivar::<f64>("_strokeG", g);
     (*view).store_ivar::<f64>("_strokeB", b);
     (*view).store_ivar::<f64>("_strokeA", a);
-    (*view).store_ivar::<f64>("_fillTransparencyPct", clamp(fill_t, 0.0, 100.0));
+    (*view).store_ivar::<f64>("_fillTransparencyPct", fill_t.clamp(0.0, 100.0));
     (*view).store_ivar::<i32>("_lang", if lang == 1 { 1 } else { 0 });
 }
 
@@ -366,7 +365,7 @@ unsafe fn register_custom_view_class_and_create_view(window: id, width: f64, hei
                 let mut v: f64 = msg_send![sender, doubleValue];
                 // snap to 5 to match desired increments (no visual ticks)
                 v = (v / 5.0).round() * 5.0;
-                v = clamp(v, 5.0, 200.0);
+                v = v.clamp(5.0, 200.0);
 
                 // update non-interactive label immediately
                 let field: id = *this.load_ivar("_fieldRadius");
@@ -391,7 +390,7 @@ unsafe fn register_custom_view_class_and_create_view(window: id, width: f64, hei
         unsafe extern "C-unwind" fn set_border_width(this: &mut AnyObject, _cmd: Sel, sender: id) {
             unsafe {
                 let mut v: f64 = msg_send![sender, doubleValue];
-                v = clamp(v.round(), 1.0, 20.0); // integer steps
+                v = v.round().clamp(1.0, 20.0); // integer steps
 
                 let field: id = *this.load_ivar("_fieldBorder");
                 if field != nil {
@@ -419,7 +418,7 @@ unsafe fn register_custom_view_class_and_create_view(window: id, width: f64, hei
             unsafe {
                 let mut v: f64 = msg_send![sender, doubleValue];
                 v = (v / 5.0).round() * 5.0; // 5% steps
-                v = clamp(v, 0.0, 100.0);
+                v = v.clamp(0.0, 100.0);
 
                 let field: id = *this.load_ivar("_fieldFillT");
                 if field != nil {

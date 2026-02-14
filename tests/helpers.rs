@@ -1,19 +1,11 @@
-use lumbus::{clamp, color_to_hex, parse_hex_color, tr_key};
+use lumbus::{color_to_hex, parse_hex_color, tr_key};
 
 fn approx_eq(a: f64, b: f64) -> bool {
     (a - b).abs() < 1e-6
 }
 
-#[test]
-fn clamp_keeps_inner_value() {
-    assert_eq!(clamp(10.0, 0.0, 20.0), 10.0);
-}
-
-#[test]
-fn clamp_limits_low_and_high() {
-    assert_eq!(clamp(-1.0, 0.0, 1.0), 0.0);
-    assert_eq!(clamp(2.0, 0.0, 1.0), 1.0);
-}
+// Note: clamp tests removed - we now use std's f64::clamp() method
+// which is already tested by the standard library
 
 #[test]
 fn color_to_hex_without_alpha_when_opaque() {

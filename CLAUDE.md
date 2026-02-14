@@ -157,7 +157,7 @@ tests/
 - Model validation tested in `tests/model_tests.rs`
 - Event bus tested in `src/events/bus.rs` (unit tests)
 - No integration/UI tests (platform UI testing is non-trivial)
-- Total: 65 tests
+- Total: 63 tests
 
 ## Platform Requirements
 
