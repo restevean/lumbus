@@ -9,7 +9,7 @@ use std::cell::RefCell;
 use windows::core::{w, PCWSTR};
 use windows::Win32::Foundation::{COLORREF, HWND, LPARAM, LRESULT, WPARAM};
 use windows::Win32::Graphics::Gdi::{
-    CreateFontW, CreateSolidBrush, GetSysColorBrush, InvalidateRect, ScreenToClient, SetBkMode,
+    CreateFontW, CreateSolidBrush, GetSysColorBrush, InvalidateRect, SetBkMode,
     CLIP_DEFAULT_PRECIS, DEFAULT_CHARSET, DEFAULT_QUALITY, FW_NORMAL, HBRUSH, HDC, HFONT,
     OUT_DEFAULT_PRECIS, TRANSPARENT,
 };
@@ -17,13 +17,12 @@ use windows::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows::Win32::UI::Controls::Dialogs::{ChooseColorW, CC_FULLOPEN, CC_RGBINIT, CHOOSECOLORW};
 use windows::Win32::UI::Input::KeyboardAndMouse::EnableWindow;
 use windows::Win32::UI::WindowsAndMessaging::{
-    CreateWindowExW, DefWindowProcW, DestroyWindow, DispatchMessageW, GetCursorPos, GetDlgCtrlID,
-    GetDlgItem, GetMessageW, GetSystemMetrics, GetWindowLongPtrW, LoadCursorW, PostMessageW,
-    RegisterClassW, SendMessageW, SetWindowLongPtrW, SetWindowTextW, ShowWindow, TranslateMessage,
-    CS_HREDRAW, CS_VREDRAW, GWLP_USERDATA, HMENU, IDC_ARROW, MSG, SM_CXSCREEN, SM_CYSCREEN,
-    SW_SHOW, WINDOW_EX_STYLE, WINDOW_STYLE, WM_CLOSE, WM_COMMAND, WM_CREATE, WM_DESTROY,
-    WM_HSCROLL, WM_NCHITTEST, WM_SETFONT, WNDCLASSW, WS_BORDER, WS_CHILD, WS_POPUP, WS_TABSTOP,
-    WS_VISIBLE,
+    CreateWindowExW, DefWindowProcW, DestroyWindow, DispatchMessageW, GetDlgCtrlID, GetDlgItem,
+    GetMessageW, GetSystemMetrics, GetWindowLongPtrW, LoadCursorW, PostMessageW, RegisterClassW,
+    SendMessageW, SetWindowLongPtrW, SetWindowTextW, ShowWindow, TranslateMessage, CS_HREDRAW,
+    CS_VREDRAW, GWLP_USERDATA, HMENU, IDC_ARROW, MSG, SM_CXSCREEN, SM_CYSCREEN, SW_SHOW,
+    WINDOW_EX_STYLE, WINDOW_STYLE, WM_CLOSE, WM_COMMAND, WM_CREATE, WM_DESTROY, WM_HSCROLL,
+    WM_SETFONT, WNDCLASSW, WS_CAPTION, WS_CHILD, WS_OVERLAPPED, WS_SYSMENU, WS_TABSTOP, WS_VISIBLE,
 };
 
 // Control IDs
@@ -51,11 +50,7 @@ const CBN_SELCHANGE: u32 = 1;
 
 // Window dimensions
 const WINDOW_WIDTH: i32 = 420;
-const WINDOW_HEIGHT: i32 = 370; // Increased to accommodate custom caption
-
-// Custom caption constants
-const CAPTION_HEIGHT: i32 = 36;
-const ID_CAPTION_CLOSE: i32 = 200;
+const WINDOW_HEIGHT: i32 = 340;
 
 // Layout constants
 const MARGIN: i32 = 24;
@@ -115,13 +110,13 @@ pub fn open_settings_window(parent_hwnd: HWND) {
         };
         let _ = RegisterClassW(&wc);
 
-        // Create Segoe UI Semilight font (elegant, modern Windows font)
-        let font_name: Vec<u16> = "Segoe UI Semilight"
+        // Create Segoe UI font (modern Windows font)
+        let font_name: Vec<u16> = "Segoe UI"
             .encode_utf16()
             .chain(std::iter::once(0))
             .collect();
         let font = CreateFontW(
-            -14, // height (slightly smaller for elegance)
+            -15, // height (negative = character height)
             0,
             0,
             0,
@@ -144,12 +139,12 @@ pub fn open_settings_window(parent_hwnd: HWND) {
         let x = (screen_width - WINDOW_WIDTH) / 2;
         let y = (screen_height - WINDOW_HEIGHT) / 2;
 
-        // Create window with custom caption (WS_POPUP for no system caption)
+        // Create window
         let hwnd = CreateWindowExW(
             WINDOW_EX_STYLE::default(),
             class_name,
             w!("Settings"),
-            WS_POPUP | WS_BORDER,
+            WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU,
             x,
             y,
             WINDOW_WIDTH,
@@ -257,24 +252,6 @@ unsafe extern "system" fn settings_wnd_proc(
             LRESULT(brush.0 as isize)
         }
 
-        WM_NCHITTEST => {
-            // Allow dragging the window from the custom caption area
-            let mut pt = windows::Win32::Foundation::POINT::default();
-            let _ = GetCursorPos(&mut pt);
-            let _ = ScreenToClient(hwnd, &mut pt);
-
-            // If click is in caption area (top CAPTION_HEIGHT pixels) and not on close button
-            if pt.y < CAPTION_HEIGHT {
-                // Check if over close button (right side)
-                let close_btn_left = WINDOW_WIDTH - CAPTION_HEIGHT;
-                if pt.x >= close_btn_left {
-                    return LRESULT(1); // HTCLIENT - let button handle it
-                }
-                return LRESULT(2); // HTCAPTION - enable drag
-            }
-            DefWindowProcW(hwnd, msg, wparam, lparam)
-        }
-
         WM_CLOSE => {
             close_settings_window();
             LRESULT(0)
@@ -295,17 +272,16 @@ unsafe fn create_controls(hwnd: HWND) {
     let state = config::load_state();
     let is_spanish = state.lang == LANG_ES;
 
-    // Create custom caption
+    // Update window title based on language
     let title = if is_spanish {
         "Configuración"
     } else {
         "Settings"
     };
-    create_caption_title(hwnd, hinstance.into(), title);
-    create_caption_close_button(hwnd, hinstance.into());
+    let title_wide: Vec<u16> = title.encode_utf16().chain(std::iter::once(0)).collect();
+    let _ = SetWindowTextW(hwnd, PCWSTR(title_wide.as_ptr()));
 
-    // Controls start below the caption
-    let mut y = CAPTION_HEIGHT + MARGIN;
+    let mut y = MARGIN;
 
     // Radius row
     let radius_label = if is_spanish {
@@ -490,54 +466,6 @@ unsafe fn apply_font(control: HWND) {
     });
 }
 
-unsafe fn create_caption_title(
-    hwnd: HWND,
-    hinstance: windows::Win32::Foundation::HINSTANCE,
-    title: &str,
-) {
-    let title_wide: Vec<u16> = title.encode_utf16().chain(std::iter::once(0)).collect();
-    if let Ok(label) = CreateWindowExW(
-        WINDOW_EX_STYLE::default(),
-        w!("STATIC"),
-        PCWSTR(title_wide.as_ptr()),
-        WS_CHILD | WS_VISIBLE,
-        MARGIN,
-        (CAPTION_HEIGHT - 20) / 2, // Vertically centered
-        200,
-        20,
-        Some(hwnd),
-        None,
-        Some(hinstance),
-        None,
-    ) {
-        apply_font(label);
-    }
-}
-
-unsafe fn create_caption_close_button(
-    hwnd: HWND,
-    hinstance: windows::Win32::Foundation::HINSTANCE,
-) {
-    // Create a flat close button with X text
-    // BS_FLAT = 0x8000, BS_PUSHBUTTON = 0x0000
-    if let Ok(button) = CreateWindowExW(
-        WINDOW_EX_STYLE::default(),
-        w!("BUTTON"),
-        w!("✕"),
-        WS_CHILD | WS_VISIBLE | WINDOW_STYLE(0x8000), // BS_FLAT
-        WINDOW_WIDTH - CAPTION_HEIGHT,
-        0,
-        CAPTION_HEIGHT,
-        CAPTION_HEIGHT,
-        Some(hwnd),
-        Some(HMENU(ID_CAPTION_CLOSE as *mut _)),
-        Some(hinstance),
-        None,
-    ) {
-        apply_font(button);
-    }
-}
-
 unsafe fn create_label(
     hwnd: HWND,
     hinstance: windows::Win32::Foundation::HINSTANCE,
@@ -719,7 +647,7 @@ unsafe fn set_value_text(hwnd: HWND, value: i32) {
 
 unsafe fn handle_command(hwnd: HWND, control_id: i32, notification: u32, lparam: LPARAM) {
     match control_id {
-        ID_CAPTION_CLOSE | ID_CLOSE_BUTTON => {
+        ID_CLOSE_BUTTON => {
             close_settings_window();
         }
         ID_COLOR_BUTTON => {
