@@ -9,8 +9,9 @@ use std::cell::RefCell;
 use windows::core::{w, PCWSTR};
 use windows::Win32::Foundation::{COLORREF, HWND, LPARAM, LRESULT, WPARAM};
 use windows::Win32::Graphics::Gdi::{
-    CreateFontW, CreateSolidBrush, InvalidateRect, CLIP_DEFAULT_PRECIS, DEFAULT_CHARSET,
-    DEFAULT_QUALITY, FW_NORMAL, HBRUSH, HFONT, OUT_DEFAULT_PRECIS,
+    CreateFontW, CreateSolidBrush, GetSysColorBrush, InvalidateRect, SetBkMode,
+    CLIP_DEFAULT_PRECIS, DEFAULT_CHARSET, DEFAULT_QUALITY, FW_NORMAL, HBRUSH, HDC, HFONT,
+    OUT_DEFAULT_PRECIS, TRANSPARENT,
 };
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows::Win32::UI::Controls::Dialogs::{ChooseColorW, CC_FULLOPEN, CC_RGBINIT, CHOOSECOLORW};
@@ -232,15 +233,23 @@ unsafe extern "system" fn settings_wnd_proc(
 
         // WM_CTLCOLORSTATIC = 0x0138
         0x0138 => {
+            let hdc = HDC(wparam.0 as *mut _);
             let control_hwnd = HWND(lparam.0 as *mut _);
             let control_id = GetDlgCtrlID(control_hwnd);
+
             if control_id == ID_COLOR_PREVIEW {
-                // Get color from GWLP_USERDATA
+                // Color preview uses custom color from GWLP_USERDATA
                 let color = COLORREF(GetWindowLongPtrW(control_hwnd, GWLP_USERDATA) as u32);
                 let brush = CreateSolidBrush(color);
                 return LRESULT(brush.0 as isize);
             }
-            DefWindowProcW(hwnd, msg, wparam, lparam)
+
+            // For all other STATIC controls (labels), use system button face color
+            // This ensures consistent background with the window and other controls
+            SetBkMode(hdc, TRANSPARENT);
+            // COLOR_BTNFACE = 15
+            let brush = GetSysColorBrush(windows::Win32::Graphics::Gdi::SYS_COLOR_INDEX(15));
+            LRESULT(brush.0 as isize)
         }
 
         WM_CLOSE => {
