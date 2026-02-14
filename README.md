@@ -155,7 +155,7 @@ src/
         └── storage/     # JSON config
 ```
 
-**Tests:** 65 unit tests (`cargo test`)
+**Tests:** 63 unit tests (`cargo test`)
 
 ---
 
