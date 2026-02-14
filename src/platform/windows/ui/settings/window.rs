@@ -9,8 +9,8 @@ use std::cell::RefCell;
 use windows::core::{w, PCWSTR};
 use windows::Win32::Foundation::{COLORREF, HWND, LPARAM, LRESULT, WPARAM};
 use windows::Win32::Graphics::Gdi::{
-    CreateFontW, CreateSolidBrush, GetStockObject, InvalidateRect, CLIP_DEFAULT_PRECIS,
-    DEFAULT_CHARSET, DEFAULT_QUALITY, FW_NORMAL, HBRUSH, HFONT, OUT_DEFAULT_PRECIS,
+    CreateFontW, CreateSolidBrush, InvalidateRect, CLIP_DEFAULT_PRECIS, DEFAULT_CHARSET,
+    DEFAULT_QUALITY, FW_NORMAL, HBRUSH, HFONT, OUT_DEFAULT_PRECIS,
 };
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows::Win32::UI::Controls::Dialogs::{ChooseColorW, CC_FULLOPEN, CC_RGBINIT, CHOOSECOLORW};
@@ -101,7 +101,9 @@ pub fn open_settings_window(parent_hwnd: HWND) {
             lpfnWndProc: Some(settings_wnd_proc),
             hInstance: hinstance.into(),
             hCursor: LoadCursorW(None, IDC_ARROW).unwrap_or_default(),
-            hbrBackground: HBRUSH(GetStockObject(windows::Win32::Graphics::Gdi::WHITE_BRUSH).0),
+            // Use system button face color for consistent look with controls
+            // COLOR_BTNFACE = 15, adding 1 converts it to a system color brush handle
+            hbrBackground: HBRUSH((15 + 1) as *mut _),
             lpszClassName: class_name,
             ..Default::default()
         };
