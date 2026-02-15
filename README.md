@@ -1,6 +1,6 @@
 # Lumbus
 
-Highlight the mouse pointer across **all** displays with a configurable circle. Optionally show a bold **L** (left click) or **R** (right click) to visualise clicks—great for **presentations**, **screen recordings**, and **remote support**. The overlay stays on top without stealing focus.
+Highlight the mouse pointer across **all** displays with a configurable circle. Shows a bold **L** (left click) or **R** (right click) to visualise clicks—great for **presentations**, **screen recordings**, and **remote support**. The overlay stays on top without stealing focus.
 
 **Cross-platform:** macOS and Windows.
 
