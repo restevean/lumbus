@@ -159,6 +159,11 @@ tests/
 - No integration/UI tests (platform UI testing is non-trivial)
 - Total: 63 tests
 
+### Manual Testing
+
+- **macOS**: Test directly on development machine
+- **Windows**: Test on Windows 11 ARM virtual machine (clone repo, `cargo run --release`)
+
 ## Platform Requirements
 
 ### macOS
