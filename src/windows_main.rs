@@ -80,10 +80,12 @@ fn run_app() -> windows::core::Result<()> {
         RegisterClassW(&wc);
 
         // Get virtual screen dimensions (all monitors)
+        // Note: We use full dimensions but offset by 1 pixel to prevent Windows
+        // from detecting this as a "fullscreen app" and activating Focus Assist
         let vx = GetSystemMetrics(SM_XVIRTUALSCREEN);
         let vy = GetSystemMetrics(SM_YVIRTUALSCREEN);
-        let vw = GetSystemMetrics(SM_CXVIRTUALSCREEN);
-        let vh = GetSystemMetrics(SM_CYVIRTUALSCREEN);
+        let vw = GetSystemMetrics(SM_CXVIRTUALSCREEN) - 1;
+        let vh = GetSystemMetrics(SM_CYVIRTUALSCREEN) - 1;
 
         // Create layered, transparent, topmost window
         let ex_style =
