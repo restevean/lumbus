@@ -50,8 +50,8 @@ The codebase follows a **platform-abstraction pattern** with conditional compila
 ```
 src/
 ├── main.rs                     # Entry point with cfg gates (~30 lines)
-├── macos_main.rs               # macOS application logic (~950 lines)
-├── windows_main.rs             # Windows application logic (~770 lines)
+├── macos_main.rs               # macOS app orchestrator (~185 lines)
+├── windows_main.rs             # Windows app orchestrator (~285 lines)
 ├── lib.rs                      # Shared helpers + re-exports
 ├── events/                     # Cross-platform event bus
 │   ├── bus.rs                  # EventBus with publish/subscribe
@@ -65,20 +65,15 @@ src/
     │   ├── app/                # Shared app helpers (apply_to_all_views)
     │   ├── ffi/                # FFI bindings (Carbon, CoreText, Cocoa)
     │   ├── handlers/           # Event dispatcher
-    │   ├── input/              # Hotkeys, mouse monitors, observers
+    │   ├── input/              # Hotkeys (Carbon), mouse monitors
     │   ├── storage/            # NSUserDefaults persistence
-    │   └── ui/                 # Overlay drawing, settings, dialogs, status bar
+    │   └── ui/                 # Overlay (view.rs), settings, dialogs, status bar
     └── windows/                # Windows implementation
-        ├── app/                # App helpers
+        ├── app/                # State management (state.rs)
         ├── ffi/                # Win32 type definitions
-        ├── handlers/           # (minimal, logic in windows_main.rs)
-        ├── input/              # (minimal, hotkeys in windows_main.rs)
+        ├── input/              # Hotkeys, mouse hooks (hotkeys.rs)
         ├── storage/            # JSON config persistence
-        └── ui/                 # Settings window, dialogs, tray icon
-
-tests/
-├── helpers.rs                  # Tests for pure helpers from lib.rs
-└── model_tests.rs              # Tests for OverlayState validation
+        └── ui/                 # Overlay (renderer.rs), settings, dialogs, tray
 ```
 
 ### Core Components
@@ -87,17 +82,13 @@ tests/
 - Minimal entry point with platform cfg gates
 - Initialises event bus, then calls `macos_main::run()` or `windows_main::run()`
 
-**`src/macos_main.rs`** (~950 lines)
-- CustomView class registration (NSView subclass)
-- Overlay window creation (one per display)
-- Hotkey handler callback
-- All macOS-specific application logic
+**`src/macos_main.rs`** (~185 lines)
+- App orchestrator: window creation, timer setup, hotkey installation
+- CustomView logic extracted to `platform/macos/ui/overlay/view.rs`
 
-**`src/windows_main.rs`** (~770 lines)
-- Direct2D/DirectWrite initialization
-- Layered window for transparent overlay
-- Global hotkeys and mouse hooks
-- Cursor tracking timer
+**`src/windows_main.rs`** (~285 lines)
+- App orchestrator: COM init, window creation, message loop
+- State/rendering extracted to `platform/windows/app/` and `ui/overlay/`
 
 **`src/lib.rs`**
 - Pure helper functions: `clamp`, `color_to_hex`, `parse_hex_color`, `tr_key`
@@ -157,7 +148,7 @@ tests/
 - Model validation tested in `tests/model_tests.rs`
 - Event bus tested in `src/events/bus.rs` (unit tests)
 - No integration/UI tests (platform UI testing is non-trivial)
-- Total: 63 tests
+- Total: 65 tests
 
 ### Manual Testing
 

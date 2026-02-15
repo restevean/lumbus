@@ -11,7 +11,9 @@
 //!
 //! # Example
 //!
-//! ```ignore
+//! ```no_run
+//! use lumbus::events::{self, AppEvent};
+//!
 //! // In main.rs at startup:
 //! events::init_event_bus();
 //!
@@ -19,8 +21,8 @@
 //! events::publish(AppEvent::ToggleOverlay);
 //!
 //! // Or get a publisher for repeated use:
-//! let pub = events::publisher();
-//! pub.publish(AppEvent::OpenSettings);
+//! let publisher = events::publisher();
+//! publisher.publish(AppEvent::OpenSettings);
 //! ```
 
 use std::sync::mpsc::{self, Receiver, Sender};

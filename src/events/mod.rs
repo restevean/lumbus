@@ -31,7 +31,7 @@
 //!
 //! # Usage
 //!
-//! ```ignore
+//! ```no_run
 //! use lumbus::events::{self, AppEvent};
 //!
 //! // Initialize at app startup (once only)

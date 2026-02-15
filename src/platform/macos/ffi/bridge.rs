@@ -233,13 +233,13 @@ pub unsafe fn set_bool_ivar(obj: id, name: &str, val: bool) {
 /// Run a closure within an autorelease pool.
 ///
 /// Replaces the pattern:
-/// ```ignore
+/// ```text
 /// let _pool = NSAutoreleasePool::new(nil);
 /// // ... code ...
 /// ```
 ///
 /// With:
-/// ```ignore
+/// ```text
 /// autoreleasepool(|| {
 ///     // ... code ...
 /// });

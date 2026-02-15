@@ -54,8 +54,8 @@ pub fn run() {
                 windows.push(win);
                 views.push(view);
             }
-            // Keep windows vector alive for the duration of the app
-            std::mem::forget(windows);
+            // Intentionally leak windows to keep them alive for app lifetime
+            let _ = Box::leak(windows.into_boxed_slice());
 
             // Host view
             let host_view = *views.first().unwrap();
