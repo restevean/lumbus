@@ -6,10 +6,14 @@
 //! - Input handling (global hotkeys, mouse hooks)
 //! - Storage (JSON config file persistence)
 
+pub mod app;
 pub mod ffi;
+pub mod input;
 pub mod storage;
 pub mod ui;
 
 // Re-export commonly used items
+pub use app::*;
+pub use input::*;
 pub use storage::*;
 pub use ui::*;
