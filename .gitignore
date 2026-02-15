@@ -3,6 +3,7 @@
 .vscode/
 github-inspired-theme-rea/
 .DS_Store
+EL_PLAN.md
 
 # App bundle artifacts
 *.app
