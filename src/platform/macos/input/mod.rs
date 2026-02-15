@@ -11,7 +11,7 @@ pub mod keyboard_monitors;
 pub mod mouse_monitors;
 pub mod observers;
 
-pub use hotkeys::{install_hotkeys, reinstall_hotkeys};
+pub use hotkeys::{hotkey_event_handler, install_hotkeys, reinstall_hotkeys};
 pub use keyboard_monitors::install_local_ctrl_a_monitor;
 pub use mouse_monitors::install_mouse_monitors;
 pub use observers::{

@@ -2,17 +2,16 @@
 //!
 //! This module handles registration, unregistration, and reinstallation
 //! of global hotkeys using the Carbon Event Manager API.
-//!
-//! Note: The hotkey event handler remains in main.rs because it needs
-//! to call UI functions (open_settings_window, confirm_and_maybe_quit).
 
+use crate::events::{publish, AppEvent};
 use crate::platform::macos::ffi::bridge::{id, ObjectExt};
-
 use crate::platform::macos::ffi::{
-    EventHandlerRef, EventHotKeyID, EventHotKeyRef, EventTypeSpec, GetApplicationEventTarget,
-    InstallEventHandler, RegisterEventHotKey, RemoveEventHandler, UnregisterEventHotKey, CMD_KEY,
-    CONTROL_KEY, HKID_HELP, HKID_QUIT, HKID_SETTINGS_COMMA, HKID_TOGGLE, KC_A, KC_COMMA, KC_H,
-    KC_X, K_EVENT_CLASS_KEYBOARD, K_EVENT_HOTKEY_PRESSED, NO_ERR, SHIFT_KEY, SIG_MHLT,
+    EventHandlerCallRef, EventHandlerRef, EventHotKeyID, EventHotKeyRef, EventRef, EventTypeSpec,
+    GetApplicationEventTarget, GetEventClass, GetEventKind, GetEventParameter, InstallEventHandler,
+    RegisterEventHotKey, RemoveEventHandler, UnregisterEventHotKey, CMD_KEY, CONTROL_KEY,
+    HKID_HELP, HKID_QUIT, HKID_SETTINGS_COMMA, HKID_TOGGLE, KC_A, KC_COMMA, KC_H, KC_X,
+    K_EVENT_CLASS_KEYBOARD, K_EVENT_HOTKEY_PRESSED, K_EVENT_PARAM_DIRECT_OBJECT, NO_ERR, SHIFT_KEY,
+    SIG_MHLT, TYPE_EVENT_HOTKEY_ID,
 };
 
 /// Type alias for the hotkey event handler function signature.
@@ -129,4 +128,56 @@ pub unsafe fn uninstall_hotkeys(view: id) {
 pub unsafe fn reinstall_hotkeys(view: id, handler: HotkeyHandler) {
     uninstall_hotkeys(view);
     install_hotkeys(view, handler);
+}
+
+/// Carbon event handler for hotkey events.
+///
+/// This function is called by the Carbon Event Manager when a registered
+/// hotkey is pressed. It publishes the appropriate event to the event bus.
+///
+/// # Safety
+/// Called by Carbon runtime. Must not panic.
+pub extern "C" fn hotkey_event_handler(
+    _call_ref: EventHandlerCallRef,
+    event: EventRef,
+    _user_data: *mut std::ffi::c_void,
+) -> i32 {
+    unsafe {
+        if GetEventClass(event) == K_EVENT_CLASS_KEYBOARD
+            && GetEventKind(event) == K_EVENT_HOTKEY_PRESSED
+        {
+            let mut hot_id = EventHotKeyID {
+                signature: 0,
+                id: 0,
+            };
+            let status = GetEventParameter(
+                event,
+                K_EVENT_PARAM_DIRECT_OBJECT,
+                TYPE_EVENT_HOTKEY_ID,
+                std::ptr::null_mut(),
+                std::mem::size_of::<EventHotKeyID>() as u32,
+                std::ptr::null_mut(),
+                &mut hot_id as *mut _ as *mut std::ffi::c_void,
+            );
+            if status == NO_ERR && hot_id.signature == SIG_MHLT {
+                // Publish events to the bus - they'll be processed in the main loop
+                match hot_id.id {
+                    HKID_TOGGLE => {
+                        publish(AppEvent::ToggleOverlay);
+                    }
+                    HKID_SETTINGS_COMMA => {
+                        publish(AppEvent::OpenSettings);
+                    }
+                    HKID_HELP => {
+                        publish(AppEvent::ShowHelp);
+                    }
+                    HKID_QUIT => {
+                        publish(AppEvent::RequestQuit);
+                    }
+                    _ => {}
+                }
+            }
+        }
+        NO_ERR
+    }
 }
