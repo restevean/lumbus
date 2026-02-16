@@ -1,0 +1,108 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build-macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+      
+      - name: Build release
+        run: cargo build --release
+      
+      - name: Create .app bundle
+        run: ./scripts/build-app.sh
+      
+      - name: Create DMG
+        run: ./scripts/build-dmg.sh
+      
+      - name: Upload DMG
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-dmg
+          path: dist/Lumbus-*.dmg
+
+  build-windows-x64:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+      
+      - name: Build release
+        run: cargo build --release
+      
+      - name: Rename executable
+        run: |
+          $version = (Select-String -Path Cargo.toml -Pattern '^version = "(.+)"' | ForEach-Object { $_.Matches.Groups[1].Value })
+          Copy-Item target/release/lumbus.exe "lumbus-$version-windows-x64.exe"
+      
+      - name: Upload executable
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-x64
+          path: lumbus-*-windows-x64.exe
+
+  build-windows-arm64:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+      
+      - name: Add ARM64 target
+        run: rustup target add aarch64-pc-windows-msvc
+      
+      - name: Build release for ARM64
+        run: cargo build --release --target aarch64-pc-windows-msvc
+      
+      - name: Rename executable
+        run: |
+          $version = (Select-String -Path Cargo.toml -Pattern '^version = "(.+)"' | ForEach-Object { $_.Matches.Groups[1].Value })
+          Copy-Item target/aarch64-pc-windows-msvc/release/lumbus.exe "lumbus-$version-windows-arm64.exe"
+      
+      - name: Upload executable
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-arm64
+          path: lumbus-*-windows-arm64.exe
+
+  create-release:
+    needs: [build-macos, build-windows-x64, build-windows-arm64]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+      
+      - name: Display artifacts
+        run: ls -R artifacts
+      
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          name: Lumbus ${{ github.ref_name }}
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+          files: |
+            artifacts/macos-dmg/*
+            artifacts/windows-x64/*
+            artifacts/windows-arm64/*
