@@ -176,7 +176,6 @@ src/
 
 - [x] macOS support (production-ready)
 - [x] Windows support (production-ready)
-- [ ] Linux support (planned)
 
 ---
 
