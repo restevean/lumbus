@@ -137,20 +137,21 @@ cargo build --release
 ```
 src/
 ├── main.rs              # Entry point (platform dispatch)
-├── macos_main.rs        # macOS implementation (~950 lines)
-├── windows_main.rs      # Windows implementation (~770 lines)
+├── macos_main.rs        # macOS orchestrator (~185 lines)
+├── windows_main.rs      # Windows orchestrator (~285 lines)
 ├── lib.rs               # Shared helpers
 ├── events/              # Cross-platform event bus
 ├── model/               # Cross-platform state & constants
 └── platform/
     ├── macos/           # macOS-specific code
     │   ├── ffi/         # Carbon, CoreText, Cocoa bindings
-    │   ├── ui/          # Overlay, settings, dialogs, status bar
+    │   ├── ui/          # Overlay (view.rs), settings, dialogs, status bar
     │   ├── input/       # Hotkeys, mouse monitors
     │   └── storage/     # NSUserDefaults
     └── windows/         # Windows-specific code
+        ├── app/         # State management
         ├── ffi/         # Win32 bindings
-        ├── ui/          # Overlay, settings, dialogs, tray
+        ├── ui/          # Overlay (renderer.rs), settings, dialogs, tray
         ├── input/       # Hotkeys, mouse hooks
         └── storage/     # JSON config
 ```
