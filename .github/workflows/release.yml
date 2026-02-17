@@ -48,7 +48,7 @@ jobs:
       
       - name: Rename executable
         run: |
-          $version = (Select-String -Path Cargo.toml -Pattern '^version = "(.+)"' | ForEach-Object { $_.Matches.Groups[1].Value })
+          $version = (Select-String -Path Cargo.toml -Pattern '^version = "(.+)"' | Select-Object -First 1 | ForEach-Object { $_.Matches.Groups[1].Value })
           Copy-Item target/release/lumbus.exe "lumbus-$version-windows-x64.exe"
       
       - name: Upload executable
@@ -73,7 +73,7 @@ jobs:
       
       - name: Rename executable
         run: |
-          $version = (Select-String -Path Cargo.toml -Pattern '^version = "(.+)"' | ForEach-Object { $_.Matches.Groups[1].Value })
+          $version = (Select-String -Path Cargo.toml -Pattern '^version = "(.+)"' | Select-Object -First 1 | ForEach-Object { $_.Matches.Groups[1].Value })
           Copy-Item target/aarch64-pc-windows-msvc/release/lumbus.exe "lumbus-$version-windows-arm64.exe"
       
       - name: Upload executable
