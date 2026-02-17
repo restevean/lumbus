@@ -24,7 +24,10 @@ use windows::Win32::Graphics::Gdi::{
     CreateCompatibleDC, CreateDIBSection, DeleteDC, DeleteObject, GetDC, ReleaseDC, SelectObject,
     BITMAPINFO, BITMAPINFOHEADER, BI_RGB, DIB_RGB_COLORS,
 };
-use windows::Win32::UI::WindowsAndMessaging::{GetCursorPos, UpdateLayeredWindow, ULW_ALPHA};
+use windows::Win32::UI::WindowsAndMessaging::{
+    GetCursorPos, SetWindowPos, UpdateLayeredWindow, HWND_TOPMOST, SWP_NOACTIVATE, SWP_NOMOVE,
+    SWP_NOSIZE, ULW_ALPHA,
+};
 use windows_numerics::{Matrix3x2, Vector2};
 
 use crate::model::constants::*;
@@ -404,6 +407,17 @@ unsafe fn update_layered_window_d2d(
         COLORREF(0),
         Some(&blend),
         ULW_ALPHA,
+    );
+
+    // Keep window above taskbar (re-assert topmost position each frame)
+    let _ = SetWindowPos(
+        hwnd,
+        Some(HWND_TOPMOST),
+        0,
+        0,
+        0,
+        0,
+        SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE,
     );
 
     // Cleanup
