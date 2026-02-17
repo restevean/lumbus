@@ -297,7 +297,24 @@ unsafe fn update_layered_window_d2d(
                                 if let Some(letter_geom) =
                                     create_letter_geometry(factory, ff, letter, font_size, x, y)
                                 {
-                                    // Draw outlined letter (stroke only, no fill)
+                                    // Fill the letter with transparency (matching circle behavior)
+                                    let fill_alpha =
+                                        1.0 - (state.fill_transparency_pct as f32 / 100.0);
+                                    if fill_alpha > 0.0 {
+                                        let fill_color = D2D1_COLOR_F {
+                                            r: state.stroke_r,
+                                            g: state.stroke_g,
+                                            b: state.stroke_b,
+                                            a: fill_alpha,
+                                        };
+                                        if let Ok(fill_brush) =
+                                            rt.CreateSolidColorBrush(&fill_color, None)
+                                        {
+                                            rt.FillGeometry(&letter_geom, &fill_brush, None);
+                                        }
+                                    }
+
+                                    // Draw the stroke/border on top
                                     rt.DrawGeometry(
                                         &letter_geom,
                                         &brush,
