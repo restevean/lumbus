@@ -24,8 +24,7 @@ pub fn show_about_dialog(hwnd: HWND) {
         • Click indicators (L/R)\n\
         • Customizable colors and size\n\n\
         {}\n\n\
-        © 2024 restevean\n\
-        Apache-2.0 License",
+        © 2026 Rafael Esteve. Apache License 2.0.",
         VERSION, REPO_URL
     );
 
