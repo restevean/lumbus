@@ -17,16 +17,13 @@ jobs:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
       
+      - name: Add Intel target for Universal Binary
+        run: rustup target add x86_64-apple-darwin
+      
       - name: Install DMG tools
         run: brew install create-dmg fileicon
       
-      - name: Build release
-        run: cargo build --release
-      
-      - name: Create .app bundle
-        run: ./scripts/build-app.sh
-      
-      - name: Create DMG
+      - name: Create DMG (builds Universal Binary automatically)
         run: ./scripts/build-dmg.sh
       
       - name: Upload DMG
