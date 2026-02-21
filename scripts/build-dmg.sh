@@ -25,9 +25,10 @@ fi
 
 # Paths
 PROJECT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-BUILD_DIR="$PROJECT_ROOT/target/release"
+SCRIPT_DIR="$PROJECT_ROOT/scripts"
+UNIVERSAL_BUILD_DIR="$PROJECT_ROOT/target/universal-apple-darwin/release"
 APP_NAME="Lumbus"
-APP_BUNDLE="$BUILD_DIR/$APP_NAME.app"
+APP_BUNDLE="$UNIVERSAL_BUILD_DIR/$APP_NAME.app"
 DMG_NAME="Lumbus-$(grep '^version' "$PROJECT_ROOT/Cargo.toml" | head -1 | cut -d'"' -f2)"
 DMG_OUTPUT="$PROJECT_ROOT/dist/$DMG_NAME.dmg"
 
@@ -71,9 +72,9 @@ echo -e "${GREEN}   Generated: $DMG_FILE_ICON_ICNS${NC}"
 generate_icns "$VOLUME_ICON_PNG" "$VOLUME_ICON_ICNS"
 echo -e "${GREEN}   Generated: $VOLUME_ICON_ICNS${NC}"
 
-# Step 2: Build release
-echo -e "${YELLOW}[2/6] Compiling release build...${NC}"
-cargo build --release
+# Step 2: Build Universal Binary (arm64 + x86_64)
+echo -e "${YELLOW}[2/6] Building Universal Binary...${NC}"
+"$SCRIPT_DIR/build-universal.sh"
 
 # Step 3: Create .app bundle
 echo -e "${YELLOW}[3/6] Creating app bundle...${NC}"
@@ -81,8 +82,8 @@ rm -rf "$APP_BUNDLE"
 mkdir -p "$APP_BUNDLE/Contents/MacOS"
 mkdir -p "$APP_BUNDLE/Contents/Resources"
 
-# Copy binary
-cp "$BUILD_DIR/lumbus" "$APP_BUNDLE/Contents/MacOS/$APP_NAME"
+# Copy universal binary
+cp "$UNIVERSAL_BUILD_DIR/lumbus" "$APP_BUNDLE/Contents/MacOS/$APP_NAME"
 
 # Copy Info.plist
 cp "$INFO_PLIST" "$APP_BUNDLE/Contents/Info.plist"

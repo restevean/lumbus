@@ -16,6 +16,7 @@ RESOURCES_DIR="$CONTENTS_DIR/Resources"
 
 # Parse arguments
 BUILD_TYPE="release"
+BUILD_UNIVERSAL=false
 SIGN_APP=false
 SIGN_IDENTITY=""
 
@@ -30,6 +31,15 @@ while [[ $# -gt 0 ]]; do
             RESOURCES_DIR="$CONTENTS_DIR/Resources"
             shift
             ;;
+        --universal)
+            BUILD_UNIVERSAL=true
+            BUILD_DIR="$PROJECT_ROOT/target/universal-apple-darwin/release"
+            APP_DIR="$PROJECT_ROOT/target/universal-apple-darwin/release/$BUNDLE_NAME"
+            CONTENTS_DIR="$APP_DIR/Contents"
+            MACOS_DIR="$CONTENTS_DIR/MacOS"
+            RESOURCES_DIR="$CONTENTS_DIR/Resources"
+            shift
+            ;;
         --sign)
             SIGN_APP=true
             SIGN_IDENTITY="$2"
@@ -37,7 +47,7 @@ while [[ $# -gt 0 ]]; do
             ;;
         *)
             echo "Unknown option: $1"
-            echo "Usage: $0 [--debug] [--sign \"Developer ID Application: NAME (TEAM)\"]"
+            echo "Usage: $0 [--debug] [--universal] [--sign \"Developer ID Application: NAME (TEAM)\"]"
             exit 1
             ;;
     esac
@@ -45,10 +55,13 @@ done
 
 echo "=== Building $APP_NAME.app ==="
 echo "Build type: $BUILD_TYPE"
+echo "Universal: $BUILD_UNIVERSAL"
 
 # Step 1: Build the Rust binary
 echo ">>> Building Rust binary..."
-if [ "$BUILD_TYPE" = "release" ]; then
+if [ "$BUILD_UNIVERSAL" = true ]; then
+    "$PROJECT_ROOT/scripts/build-universal.sh"
+elif [ "$BUILD_TYPE" = "release" ]; then
     cargo build --release --manifest-path="$PROJECT_ROOT/Cargo.toml"
 else
     cargo build --manifest-path="$PROJECT_ROOT/Cargo.toml"
