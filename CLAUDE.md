@@ -39,6 +39,63 @@ cargo test test_name
 
 # Build macOS DMG installer
 ./scripts/build-dmg.sh
+
+# Build Universal Binary (arm64 + x86_64) for macOS
+./scripts/build-universal.sh
+```
+
+## CI/CD and GitHub Actions
+
+### Release Workflow (`.github/workflows/release.yml`)
+
+The release workflow **triggers automatically** when a tag matching `v*` is pushed. It builds artifacts for all platforms and creates a GitHub Release.
+
+**IMPORTANT:** Always review this workflow when modifying build scripts or adding new targets.
+
+#### What it builds
+
+| Job | Runner | Output |
+|-----|--------|--------|
+| `build-macos` | `macos-latest` | `Lumbus-X.Y.Z.dmg` (Universal Binary: arm64 + x86_64) |
+| `build-windows-x64` | `windows-latest` | `lumbus-X.Y.Z-windows-x64.exe` |
+| `build-windows-arm64` | `windows-latest` | `lumbus-X.Y.Z-windows-arm64.exe` |
+
+#### Required Rust targets in CI
+
+The workflow installs these targets as needed:
+- **macOS:** `x86_64-apple-darwin` (for Universal Binary, since runner is arm64)
+- **Windows ARM64:** `aarch64-pc-windows-msvc`
+
+#### Workflow dependencies
+
+```
+build-macos ──────┐
+build-windows-x64 ├──► create-release (uploads all artifacts)
+build-windows-arm64 ──┘
+```
+
+If ANY build job fails, the release is NOT created.
+
+#### Checklist when modifying build process
+
+- [ ] Update `scripts/build-*.sh` as needed
+- [ ] Update `.github/workflows/release.yml` to match
+- [ ] Ensure required Rust targets are installed in workflow
+- [ ] Test locally before pushing tag
+
+### Creating a Release
+
+```bash
+# 1. Update version in Cargo.toml and resources/Info.plist
+# 2. Commit changes
+git add -A && git commit -m "chore: bump version to X.Y.Z"
+
+# 3. Create and push tag (triggers workflow)
+git tag vX.Y.Z && git push origin main --tags
+
+# 4. Monitor workflow
+gh run list --limit 1
+gh run watch  # interactive monitoring
 ```
 
 ## Architecture Overview
