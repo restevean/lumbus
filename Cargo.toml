@@ -52,6 +52,8 @@ windows = { version = "0.62", features = [
     "Win32_UI_Shell",
     # Registry (for theme detection)
     "Win32_System_Registry",
+    # DPI awareness
+    "Win32_UI_HiDpi",
 ]}
 
 # For JSON config persistence on Windows
