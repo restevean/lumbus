@@ -15,7 +15,6 @@ use windows::Win32::Graphics::Gdi::{
 };
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows::Win32::UI::Controls::Dialogs::{ChooseColorW, CC_FULLOPEN, CC_RGBINIT, CHOOSECOLORW};
-use windows::Win32::UI::HiDpi::GetDpiForSystem;
 use windows::Win32::UI::Input::KeyboardAndMouse::EnableWindow;
 use windows::Win32::UI::WindowsAndMessaging::{
     CreateWindowExW, DefWindowProcW, DestroyWindow, DispatchMessageW, GetDlgCtrlID, GetDlgItem,
@@ -66,12 +65,6 @@ thread_local! {
     static PARENT_HWND: RefCell<Option<HWND>> = const { RefCell::new(None) };
     static ON_SETTINGS_CHANGED: RefCell<Option<Box<dyn Fn()>>> = const { RefCell::new(None) };
     static UI_FONT: RefCell<Option<HFONT>> = const { RefCell::new(None) };
-    static DPI_SCALE: RefCell<f32> = const { RefCell::new(1.0) };
-}
-
-/// Scale a value by the current DPI factor.
-fn scale(value: i32) -> i32 {
-    DPI_SCALE.with(|s| (value as f32 * *s.borrow()) as i32)
 }
 
 /// Set callback for when settings change.
@@ -100,11 +93,6 @@ pub fn open_settings_window(parent_hwnd: HWND) {
     PARENT_HWND.with(|h| *h.borrow_mut() = Some(parent_hwnd));
 
     unsafe {
-        // Calculate and store DPI scale factor
-        let dpi = GetDpiForSystem();
-        let dpi_scale = dpi as f32 / 96.0;
-        DPI_SCALE.with(|s| *s.borrow_mut() = dpi_scale);
-
         // Register window class
         let class_name = w!("LumbusSettings");
         let hinstance = GetModuleHandleW(None).unwrap_or_default();
@@ -123,13 +111,12 @@ pub fn open_settings_window(parent_hwnd: HWND) {
         let _ = RegisterClassW(&wc);
 
         // Create Segoe UI Semilight font (elegant, modern Windows font)
-        // Scale font height by DPI
         let font_name: Vec<u16> = "Segoe UI Semilight"
             .encode_utf16()
             .chain(std::iter::once(0))
             .collect();
         let font = CreateFontW(
-            -scale(14), // height scaled by DPI
+            -14, // height (slightly smaller for elegance)
             0,
             0,
             0,
@@ -146,15 +133,11 @@ pub fn open_settings_window(parent_hwnd: HWND) {
         );
         UI_FONT.with(|f| *f.borrow_mut() = Some(font));
 
-        // Scale window dimensions
-        let window_width = scale(WINDOW_WIDTH);
-        let window_height = scale(WINDOW_HEIGHT);
-
         // Center window on screen
         let screen_width = GetSystemMetrics(SM_CXSCREEN);
         let screen_height = GetSystemMetrics(SM_CYSCREEN);
-        let x = (screen_width - window_width) / 2;
-        let y = (screen_height - window_height) / 2;
+        let x = (screen_width - WINDOW_WIDTH) / 2;
+        let y = (screen_height - WINDOW_HEIGHT) / 2;
 
         // Create window
         let hwnd = CreateWindowExW(
@@ -164,8 +147,8 @@ pub fn open_settings_window(parent_hwnd: HWND) {
             WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU,
             x,
             y,
-            window_width,
-            window_height,
+            WINDOW_WIDTH,
+            WINDOW_HEIGHT,
             Some(parent_hwnd),
             None,
             Some(hinstance.into()),
@@ -289,12 +272,6 @@ unsafe fn create_controls(hwnd: HWND) {
     let state = config::load_state();
     let is_spanish = state.lang == LANG_ES;
 
-    // Pre-calculate scaled layout values
-    let margin = scale(MARGIN);
-    let row_height = scale(ROW_HEIGHT);
-    let label_width = scale(LABEL_WIDTH);
-    let value_width = scale(VALUE_WIDTH);
-
     // Update window title based on language
     let title = if is_spanish {
         "Configuración"
@@ -304,7 +281,7 @@ unsafe fn create_controls(hwnd: HWND) {
     let title_wide: Vec<u16> = title.encode_utf16().chain(std::iter::once(0)).collect();
     let _ = SetWindowTextW(hwnd, PCWSTR(title_wide.as_ptr()));
 
-    let mut y = margin;
+    let mut y = MARGIN;
 
     // Radius row
     let radius_label = if is_spanish {
@@ -312,11 +289,11 @@ unsafe fn create_controls(hwnd: HWND) {
     } else {
         "Radius (px)"
     };
-    create_label(hwnd, hinstance.into(), margin, y, radius_label);
+    create_label(hwnd, hinstance.into(), MARGIN, y, radius_label);
     let radius_value = create_value_label(
         hwnd,
         hinstance.into(),
-        margin + label_width,
+        MARGIN + LABEL_WIDTH,
         y,
         ID_RADIUS_VALUE,
     );
@@ -324,7 +301,7 @@ unsafe fn create_controls(hwnd: HWND) {
     let radius_slider = create_slider(
         hwnd,
         hinstance.into(),
-        margin + label_width + value_width + scale(10),
+        MARGIN + LABEL_WIDTH + VALUE_WIDTH + 10,
         y,
         ID_RADIUS_SLIDER,
     );
@@ -336,7 +313,7 @@ unsafe fn create_controls(hwnd: HWND) {
     );
     SetWindowLongPtrW(radius_slider, GWLP_USERDATA, radius_value.0 as isize);
 
-    y += row_height;
+    y += ROW_HEIGHT;
 
     // Border row
     let border_label = if is_spanish {
@@ -344,11 +321,11 @@ unsafe fn create_controls(hwnd: HWND) {
     } else {
         "Border (px)"
     };
-    create_label(hwnd, hinstance.into(), margin, y, border_label);
+    create_label(hwnd, hinstance.into(), MARGIN, y, border_label);
     let border_value = create_value_label(
         hwnd,
         hinstance.into(),
-        margin + label_width,
+        MARGIN + LABEL_WIDTH,
         y,
         ID_BORDER_VALUE,
     );
@@ -356,7 +333,7 @@ unsafe fn create_controls(hwnd: HWND) {
     let border_slider = create_slider(
         hwnd,
         hinstance.into(),
-        margin + label_width + value_width + scale(10),
+        MARGIN + LABEL_WIDTH + VALUE_WIDTH + 10,
         y,
         ID_BORDER_SLIDER,
     );
@@ -368,13 +345,12 @@ unsafe fn create_controls(hwnd: HWND) {
     );
     SetWindowLongPtrW(border_slider, GWLP_USERDATA, border_value.0 as isize);
 
-    y += row_height;
+    y += ROW_HEIGHT;
 
     // Color row
-    create_label(hwnd, hinstance.into(), margin, y, "Color");
+    create_label(hwnd, hinstance.into(), MARGIN, y, "Color");
 
     // Color preview square
-    let color_preview_size = scale(COLOR_PREVIEW_SIZE);
     let r = (state.stroke_r * 255.0) as u32;
     let g = (state.stroke_g * 255.0) as u32;
     let b = (state.stroke_b * 255.0) as u32;
@@ -382,7 +358,7 @@ unsafe fn create_controls(hwnd: HWND) {
     create_color_preview(
         hwnd,
         hinstance.into(),
-        margin + label_width,
+        MARGIN + LABEL_WIDTH,
         y,
         current_color,
     );
@@ -392,14 +368,14 @@ unsafe fn create_controls(hwnd: HWND) {
     create_button(
         hwnd,
         hinstance.into(),
-        margin + label_width + color_preview_size + scale(10),
+        MARGIN + LABEL_WIDTH + COLOR_PREVIEW_SIZE + 10,
         y,
         choose_label,
         ID_COLOR_BUTTON,
-        scale(90),
+        90,
     );
 
-    y += row_height;
+    y += ROW_HEIGHT;
 
     // Transparency row
     let transp_label = if is_spanish {
@@ -407,11 +383,11 @@ unsafe fn create_controls(hwnd: HWND) {
     } else {
         "Fill Transparency (%)"
     };
-    create_label(hwnd, hinstance.into(), margin, y, transp_label);
+    create_label(hwnd, hinstance.into(), MARGIN, y, transp_label);
     let transp_value = create_value_label(
         hwnd,
         hinstance.into(),
-        margin + label_width,
+        MARGIN + LABEL_WIDTH,
         y,
         ID_TRANSP_VALUE,
     );
@@ -419,7 +395,7 @@ unsafe fn create_controls(hwnd: HWND) {
     let transp_slider = create_slider(
         hwnd,
         hinstance.into(),
-        margin + label_width + value_width + scale(10),
+        MARGIN + LABEL_WIDTH + VALUE_WIDTH + 10,
         y,
         ID_TRANSP_SLIDER,
     );
@@ -431,15 +407,15 @@ unsafe fn create_controls(hwnd: HWND) {
     );
     SetWindowLongPtrW(transp_slider, GWLP_USERDATA, transp_value.0 as isize);
 
-    y += row_height;
+    y += ROW_HEIGHT;
 
     // Language row
     let lang_label = if is_spanish { "Idioma" } else { "Language" };
-    create_label(hwnd, hinstance.into(), margin, y, lang_label);
+    create_label(hwnd, hinstance.into(), MARGIN, y, lang_label);
     let lang_combo = create_combobox(
         hwnd,
         hinstance.into(),
-        margin + label_width,
+        MARGIN + LABEL_WIDTH,
         y,
         ID_LANG_COMBO,
     );
@@ -462,18 +438,18 @@ unsafe fn create_controls(hwnd: HWND) {
     let current_lang = if state.lang == LANG_ES { 1 } else { 0 };
     SendMessageW(lang_combo, CB_SETCURSEL, Some(WPARAM(current_lang)), None);
 
-    y += row_height + scale(10);
+    y += ROW_HEIGHT + 10;
 
     // Close button
     let close_label = if is_spanish { "Cerrar" } else { "Close" };
     create_button(
         hwnd,
         hinstance.into(),
-        scale(WINDOW_WIDTH) - scale(100) - margin,
+        WINDOW_WIDTH - 100 - MARGIN,
         y,
         close_label,
         ID_CLOSE_BUTTON,
-        scale(80),
+        80,
     );
 }
 
@@ -504,9 +480,9 @@ unsafe fn create_label(
         PCWSTR(text_wide.as_ptr()),
         WS_CHILD | WS_VISIBLE,
         x,
-        y + scale(6),
-        scale(LABEL_WIDTH),
-        scale(22),
+        y + 6,
+        LABEL_WIDTH,
+        22,
         Some(hwnd),
         None,
         Some(hinstance),
@@ -529,9 +505,9 @@ unsafe fn create_value_label(
         w!("0"),
         WS_CHILD | WS_VISIBLE | WINDOW_STYLE(0x0001), // SS_CENTER
         x,
-        y + scale(6),
-        scale(VALUE_WIDTH),
-        scale(22),
+        y + 6,
+        VALUE_WIDTH,
+        22,
         Some(hwnd),
         Some(HMENU(id as *mut _)),
         Some(hinstance),
@@ -556,8 +532,8 @@ unsafe fn create_slider(
         WS_CHILD | WS_VISIBLE | WS_TABSTOP,
         x,
         y,
-        scale(SLIDER_WIDTH),
-        scale(28),
+        SLIDER_WIDTH,
+        28,
         Some(hwnd),
         Some(HMENU(id as *mut _)),
         Some(hinstance),
@@ -582,9 +558,9 @@ unsafe fn create_button(
         PCWSTR(text_wide.as_ptr()),
         WS_CHILD | WS_VISIBLE | WS_TABSTOP,
         x,
-        y + scale(2),
+        y + 2,
         width,
-        scale(28),
+        28,
         Some(hwnd),
         Some(HMENU(id as *mut _)),
         Some(hinstance),
@@ -608,9 +584,9 @@ unsafe fn create_combobox(
         None,
         WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(0x0003),
         x,
-        y + scale(2),
-        scale(130),
-        scale(120), // Height includes dropdown area
+        y + 2,
+        130,
+        120, // Height includes dropdown area
         Some(hwnd),
         Some(HMENU(id as *mut _)),
         Some(hinstance),
@@ -636,9 +612,9 @@ unsafe fn create_color_preview(
         None,
         WS_CHILD | WS_VISIBLE | WINDOW_STYLE(0x1000), // SS_SUNKEN
         x,
-        y + scale(4),
-        scale(COLOR_PREVIEW_SIZE),
-        scale(COLOR_PREVIEW_SIZE),
+        y + 4,
+        COLOR_PREVIEW_SIZE,
+        COLOR_PREVIEW_SIZE,
         Some(hwnd),
         Some(HMENU(ID_COLOR_PREVIEW as *mut _)),
         Some(hinstance),

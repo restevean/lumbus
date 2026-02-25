@@ -11,9 +11,6 @@ use windows::Win32::Graphics::Direct2D::{D2D1CreateFactory, D2D1_FACTORY_TYPE_SI
 use windows::Win32::Graphics::DirectWrite::{DWriteCreateFactory, DWRITE_FACTORY_TYPE_SHARED};
 use windows::Win32::System::Com::{CoInitializeEx, CoUninitialize, COINIT_APARTMENTTHREADED};
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
-use windows::Win32::UI::HiDpi::{
-    GetDpiForSystem, SetProcessDpiAwarenessContext, DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2,
-};
 use windows::Win32::UI::Input::KeyboardAndMouse::{
     RegisterHotKey, UnregisterHotKey, MOD_CONTROL, MOD_SHIFT,
 };
@@ -52,10 +49,6 @@ pub fn run() {
 
 fn run_app() -> windows::core::Result<()> {
     unsafe {
-        // Enable DPI awareness so GetSystemMetrics returns physical pixels
-        // This fixes overlay clipping on high-DPI or scaled displays
-        let _ = SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
-
         // Initialize COM
         CoInitializeEx(None, COINIT_APARTMENTTHREADED).ok()?;
 
@@ -113,10 +106,6 @@ fn run_app() -> windows::core::Result<()> {
             None,
         )?;
 
-        // Calculate DPI scale factor (96 DPI = 100% = 1.0)
-        let dpi = GetDpiForSystem();
-        let dpi_scale = dpi as f32 / 96.0;
-
         // Store state
         STATE.with(|s| {
             let mut state = s.borrow_mut();
@@ -125,7 +114,6 @@ fn run_app() -> windows::core::Result<()> {
             state.height = vh;
             state.offset_x = vx;
             state.offset_y = vy;
-            state.dpi_scale = dpi_scale;
         });
 
         // Load settings from config file
