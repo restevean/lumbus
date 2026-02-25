@@ -25,6 +25,8 @@ pub struct WindowsRuntimeState {
     pub height: i32,
     pub offset_x: i32,
     pub offset_y: i32,
+    /// DPI scale factor (1.0 = 100%, 1.25 = 125%, etc.)
+    pub dpi_scale: f32,
 
     // Settings fields (persisted via config.json)
     // Note: colors are f32 for Direct2D compatibility
@@ -50,6 +52,7 @@ impl Default for WindowsRuntimeState {
             height: 0,
             offset_x: 0,
             offset_y: 0,
+            dpi_scale: 1.0,
             radius: DEFAULT_DIAMETER / 2.0,
             border_width: DEFAULT_BORDER_WIDTH,
             stroke_r: DEFAULT_COLOR.0 as f32,

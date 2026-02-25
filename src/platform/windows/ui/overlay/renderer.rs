@@ -264,6 +264,8 @@ unsafe fn update_layered_window_d2d(
                 let x = (cursor.x - state.offset_x) as f32;
                 let y = (cursor.y - state.offset_y) as f32;
 
+                // Use configured radius/border directly (no DPI scaling needed -
+                // DPI awareness ensures correct screen coverage, user controls actual size)
                 let radius = state.radius as f32;
                 let border = state.border_width as f32;
 
