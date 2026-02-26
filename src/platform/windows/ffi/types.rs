@@ -24,16 +24,3 @@ pub use windows::Win32::UI::WindowsAndMessaging::{
     WM_HOTKEY, WM_PAINT, WM_TIMER, WNDCLASSW, WS_EX_LAYERED, WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW,
     WS_EX_TOPMOST, WS_EX_TRANSPARENT, WS_POPUP, WS_VISIBLE,
 };
-
-// Application-specific hotkey IDs
-pub const HOTKEY_TOGGLE: i32 = 1;
-pub const HOTKEY_SETTINGS: i32 = 2;
-pub const HOTKEY_HELP: i32 = 3;
-pub const HOTKEY_QUIT: i32 = 4;
-
-// Timer ID for cursor tracking
-pub const TIMER_CURSOR: usize = 1;
-pub const TIMER_INTERVAL_MS: u32 = 16; // ~60 FPS
-
-// Transparency color key (magenta, commonly used for transparency)
-pub const TRANSPARENT_COLOR: u32 = 0x00FF00FF; // RGB(255, 0, 255)
