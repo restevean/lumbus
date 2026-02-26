@@ -1,6 +1,6 @@
 [package]
 name = "lumbus"
-version = "0.5.0"
+version = "0.5.1"
 authors = ["restevean <restevean@protonmail.com>"]
 edition = "2021"
 license = "Apache-2.0"
