@@ -9,7 +9,24 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
+  verify-version:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify tag matches Cargo.toml version
+        run: |
+          CARGO_VERSION=$(grep '^version' Cargo.toml | head -1 | sed 's/.*"\(.*\)".*/\1/')
+          TAG_VERSION="${GITHUB_REF_NAME#v}"
+          if [ "$CARGO_VERSION" != "$TAG_VERSION" ]; then
+            echo "::error::Tag version ($TAG_VERSION) does not match Cargo.toml version ($CARGO_VERSION)"
+            echo "Update Cargo.toml and Info.plist before tagging."
+            exit 1
+          fi
+          echo "Version check passed: $CARGO_VERSION"
+
   build-macos:
+    needs: [verify-version]
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
@@ -33,6 +50,7 @@ jobs:
           path: dist/Lumbus-*.dmg
 
   build-windows-x64:
+    needs: [verify-version]
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -55,6 +73,7 @@ jobs:
           path: lumbus-*-windows-x64.exe
 
   build-windows-arm64:
+    needs: [verify-version]
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4

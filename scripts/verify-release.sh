@@ -42,6 +42,26 @@ else
     echo -e "${GREEN}   OK: Version $CARGO_VERSION${NC}"
 fi
 
+# 1b. Tag-vs-Cargo.toml version check (if pushing a tag)
+# Detect if we're pushing a tag by checking git refs being pushed
+PUSHING_TAG=""
+if [ -n "${GIT_PUSH_REFS:-}" ]; then
+    PUSHING_TAG="$GIT_PUSH_REFS"
+elif git describe --exact-match HEAD 2>/dev/null | grep -q '^v'; then
+    PUSHING_TAG=$(git describe --exact-match HEAD 2>/dev/null)
+fi
+
+if [ -n "$PUSHING_TAG" ]; then
+    TAG_VERSION="${PUSHING_TAG#v}"
+    if [ "$CARGO_VERSION" != "$TAG_VERSION" ]; then
+        echo -e "${RED}   ERROR: Tag version ($TAG_VERSION) does not match Cargo.toml ($CARGO_VERSION)${NC}"
+        echo -e "   Update Cargo.toml and Info.plist before tagging."
+        ERRORS=$((ERRORS + 1))
+    else
+        echo -e "${GREEN}   OK: Tag matches Cargo.toml ($TAG_VERSION)${NC}"
+    fi
+fi
+
 # 2. Hotkey Documentation (Settings should be Ctrl+, not Cmd+,)
 echo -e "${YELLOW}[2/5] Checking hotkey documentation...${NC}"
 
