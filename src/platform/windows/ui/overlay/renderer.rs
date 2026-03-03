@@ -153,7 +153,42 @@ unsafe fn create_letter_geometry(
 }
 
 /// Update the overlay using Direct2D rendering.
+///
+/// Skips the expensive redraw if the cursor hasn't moved and
+/// the display state (visibility, mode, settings) hasn't changed.
 pub fn update_overlay() {
+    use windows::Win32::Foundation::POINT;
+    use windows::Win32::UI::WindowsAndMessaging::GetCursorPos;
+
+    // Read cursor position early to decide if we need to redraw
+    let mut cursor = POINT::default();
+    unsafe {
+        let _ = GetCursorPos(&mut cursor);
+    }
+
+    let needs_redraw = STATE.with(|s| {
+        let mut state = s.borrow_mut();
+        let changed = state.dirty
+            || cursor.x != state.last_cursor_x
+            || cursor.y != state.last_cursor_y
+            || state.display_mode != state.last_display_mode
+            || state.visible != state.last_visible;
+
+        if changed {
+            state.last_cursor_x = cursor.x;
+            state.last_cursor_y = cursor.y;
+            state.last_display_mode = state.display_mode;
+            state.last_visible = state.visible;
+            state.dirty = false;
+        }
+
+        changed
+    });
+
+    if !needs_redraw {
+        return;
+    }
+
     STATE.with(|s| {
         let state = s.borrow();
         D2D_FACTORY.with(|d2d_f| {

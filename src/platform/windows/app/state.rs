@@ -40,6 +40,13 @@ pub struct WindowsRuntimeState {
     // Runtime state (not persisted)
     pub visible: bool,
     pub display_mode: i32,
+
+    // Frame tracking (skip redundant redraws)
+    pub last_cursor_x: i32,
+    pub last_cursor_y: i32,
+    pub last_display_mode: i32,
+    pub last_visible: bool,
+    pub dirty: bool,
 }
 
 impl Default for WindowsRuntimeState {
@@ -60,6 +67,11 @@ impl Default for WindowsRuntimeState {
             lang: LANG_EN,
             visible: true,
             display_mode: DISPLAY_MODE_CIRCLE,
+            last_cursor_x: i32::MIN,
+            last_cursor_y: i32::MIN,
+            last_display_mode: -1,
+            last_visible: false,
+            dirty: true,
         }
     }
 }
@@ -84,5 +96,6 @@ pub fn reload_settings_from_config() {
         state.stroke_a = loaded.stroke_a as f32;
         state.fill_transparency_pct = loaded.fill_transparency_pct;
         state.lang = loaded.lang;
+        state.dirty = true;
     });
 }
