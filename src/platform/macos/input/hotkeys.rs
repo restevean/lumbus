@@ -136,7 +136,9 @@ pub unsafe fn reinstall_hotkeys(view: id, handler: HotkeyHandler) {
 /// hotkey is pressed. It publishes the appropriate event to the event bus.
 ///
 /// # Safety
-/// Called by Carbon runtime. Must not panic.
+/// Called by Carbon runtime with valid pointers. Must not panic.
+/// The raw pointer dereference is safe because Carbon guarantees valid EventRef.
+#[allow(clippy::not_unsafe_ptr_arg_deref)]
 pub extern "C" fn hotkey_event_handler(
     _call_ref: EventHandlerCallRef,
     event: EventRef,

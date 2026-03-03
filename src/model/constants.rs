@@ -6,16 +6,17 @@
 // === Visual Defaults ===
 
 /// Default circle diameter in pixels.
-pub const DEFAULT_DIAMETER: f64 = 38.5;
+pub const DEFAULT_DIAMETER: f64 = 30.0;
 
 /// Default border width in pixels.
 pub const DEFAULT_BORDER_WIDTH: f64 = 3.0;
 
-/// Default stroke color (R, G, B, A) - white, fully opaque.
-pub const DEFAULT_COLOR: (f64, f64, f64, f64) = (1.0, 1.0, 1.0, 1.0);
+/// Default stroke color (R, G, B, A) - orange #E37B00, fully opaque.
+pub const DEFAULT_COLOR: (f64, f64, f64, f64) = (0.890, 0.482, 0.0, 1.0);
 
-/// Default fill transparency percentage (100 = fully transparent).
-pub const DEFAULT_FILL_TRANSPARENCY_PCT: f64 = 100.0;
+/// Default fill transparency percentage (100 = fully transparent, 0 = fully opaque).
+/// 10% means 90% opaque.
+pub const DEFAULT_FILL_TRANSPARENCY_PCT: f64 = 10.0;
 
 // === NSUserDefaults Keys ===
 

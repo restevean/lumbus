@@ -6,6 +6,10 @@
 //! - About (Acerca de...)
 //! - Quit (Salir)
 
+use std::sync::atomic::{AtomicPtr, Ordering};
+
+use objc2::runtime::AnyObject;
+
 use crate::platform::macos::ffi::bridge::{
     get_class, id, msg_send, nil, nsstring_id, sel, NSSize, YES,
 };
@@ -13,8 +17,8 @@ use crate::platform::macos::ffi::bridge::{
 use crate::platform::macos::app::lang_is_es;
 use crate::tr_key;
 
-/// Global reference to the status item (must be kept alive)
-static mut STATUS_ITEM: id = std::ptr::null_mut();
+/// Global reference to the status item (must be kept alive).
+static STATUS_ITEM: AtomicPtr<AnyObject> = AtomicPtr::new(std::ptr::null_mut());
 
 /// Install the status bar item with menu.
 ///
@@ -28,7 +32,7 @@ pub unsafe fn install_status_bar(view: id) {
 
     // Keep a strong reference so it doesn't get deallocated
     let _: id = msg_send![status_item, retain];
-    STATUS_ITEM = status_item;
+    STATUS_ITEM.store(status_item, Ordering::Release);
 
     // Set the icon from StatusBarIcon.png in Resources
     let button: id = msg_send![status_item, button];
@@ -139,10 +143,11 @@ unsafe fn create_status_menu(view: id) -> id {
 /// - `view` must be a valid, non-null pointer to a CustomViewMulti.
 /// - Must be called from main thread with valid autorelease pool.
 pub unsafe fn update_status_bar_language(view: id) {
-    if STATUS_ITEM == nil {
+    let item = STATUS_ITEM.load(Ordering::Acquire);
+    if item.is_null() {
         return;
     }
 
     let menu = create_status_menu(view);
-    let _: () = msg_send![STATUS_ITEM, setMenu: menu];
+    let _: () = msg_send![item, setMenu: menu];
 }

@@ -6,4 +6,4 @@ pub mod drawing;
 pub mod view;
 
 pub use drawing::{draw_circle, draw_letter, ClickLetter, DrawParams};
-pub use view::{get_bool_ivar, register_and_create_view, set_bool_ivar};
+pub use view::register_and_create_view;

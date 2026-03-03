@@ -158,6 +158,7 @@ fn run_app() -> windows::core::Result<()> {
 
         let _ = UnregisterHotKey(Some(hwnd), HOTKEY_TOGGLE);
         let _ = UnregisterHotKey(Some(hwnd), HOTKEY_SETTINGS);
+        let _ = UnregisterHotKey(Some(hwnd), HOTKEY_HELP);
         let _ = UnregisterHotKey(Some(hwnd), HOTKEY_QUIT);
 
         // Remove system tray icon

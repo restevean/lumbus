@@ -11,7 +11,7 @@ use std::ffi::{c_char, CStr};
 use crate::events::{publish, AppEvent};
 use crate::model::constants::*;
 use crate::platform::macos::app::apply_to_all_views;
-use crate::platform::macos::ffi::bridge::{get_class, id, msg_send, nil, nsstring_id, ObjectExt, NO, YES};
+use crate::platform::macos::ffi::bridge::{get_bool_ivar, get_class, id, msg_send, nil, nsstring_id, set_bool_ivar, ObjectExt, NO, YES};
 use crate::platform::macos::ffi::{
     display_id_for_screen, get_mouse_position_cocoa, CFAbsoluteTimeGetCurrent,
 };
@@ -27,27 +27,6 @@ use crate::{color_to_hex, parse_hex_color, tr_key};
 use objc2::runtime::{AnyClass, AnyObject, ClassBuilder, Sel};
 use objc2::sel;
 use objc2_foundation::{NSPoint, NSRect, NSSize};
-
-// ============================================================================
-// Helper functions for boolean ivars (stored as u8)
-// ============================================================================
-
-/// Load a boolean ivar stored as u8.
-///
-/// # Safety
-/// The object must have an ivar with the given name of type u8.
-pub unsafe fn get_bool_ivar(obj: id, name: &str) -> bool {
-    let val = *(*obj).load_ivar::<u8>(name);
-    val != 0
-}
-
-/// Store a boolean ivar as u8.
-///
-/// # Safety
-/// The object must have an ivar with the given name of type u8.
-pub unsafe fn set_bool_ivar(obj: id, name: &str, val: bool) {
-    (*obj).store_ivar::<u8>(name, if val { 1 } else { 0 });
-}
 
 // ============================================================================
 // CustomView registration and creation

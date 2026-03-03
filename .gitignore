@@ -8,4 +8,5 @@ EL_PLAN.md
 # App bundle artifacts
 *.app
 *.dmg
+dist/
 resources/icons/AppIcon.iconset/

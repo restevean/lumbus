@@ -12,11 +12,11 @@ mod macos_main;
 mod windows_main;
 
 fn main() {
-    // Initialize event bus (cross-platform)
-    lumbus::events::init_event_bus();
-
     #[cfg(target_os = "macos")]
-    macos_main::run();
+    {
+        lumbus::events::init_event_bus();
+        macos_main::run();
+    }
 
     #[cfg(target_os = "windows")]
     windows_main::run();
