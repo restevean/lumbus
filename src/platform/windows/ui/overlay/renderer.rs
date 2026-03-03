@@ -2,6 +2,10 @@
 //!
 //! GPU-accelerated, high-quality anti-aliased rendering with per-pixel alpha
 //! transparency via UpdateLayeredWindow.
+//!
+//! Expensive resources (memory DC, bitmap, render target, stroke style) are
+//! cached in thread-local storage and reused across frames. Only brushes
+//! are created per-frame since colors can change via settings.
 
 use std::cell::RefCell;
 
@@ -22,7 +26,7 @@ use windows::Win32::Graphics::DirectWrite::{
 use windows::Win32::Graphics::Dxgi::Common::DXGI_FORMAT_B8G8R8A8_UNORM;
 use windows::Win32::Graphics::Gdi::{
     CreateCompatibleDC, CreateDIBSection, DeleteDC, DeleteObject, GetDC, ReleaseDC, SelectObject,
-    BITMAPINFO, BITMAPINFOHEADER, BI_RGB, DIB_RGB_COLORS,
+    BITMAPINFO, BITMAPINFOHEADER, BI_RGB, DIB_RGB_COLORS, HBITMAP, HDC,
 };
 use windows::Win32::UI::WindowsAndMessaging::{
     GetCursorPos, SetWindowPos, UpdateLayeredWindow, HWND_TOPMOST, SWP_NOACTIVATE, SWP_NOMOVE,
@@ -33,10 +37,125 @@ use windows_numerics::{Matrix3x2, Vector2};
 use crate::model::constants::*;
 use crate::platform::windows::app::state::{WindowsRuntimeState, STATE};
 
+/// Cached rendering resources to avoid per-frame allocations.
+struct RenderCache {
+    screen_dc: HDC,
+    mem_dc: HDC,
+    bitmap: HBITMAP,
+    dc_render_target: ID2D1DCRenderTarget,
+    stroke_style: ID2D1StrokeStyle,
+    width: i32,
+    height: i32,
+}
+
+impl Drop for RenderCache {
+    fn drop(&mut self) {
+        unsafe {
+            let _ = DeleteObject(self.bitmap.into());
+            let _ = DeleteDC(self.mem_dc);
+            ReleaseDC(None, self.screen_dc);
+        }
+    }
+}
+
 thread_local! {
     pub static D2D_FACTORY: RefCell<Option<ID2D1Factory>> = const { RefCell::new(None) };
     pub static DWRITE_FACTORY: RefCell<Option<IDWriteFactory>> = const { RefCell::new(None) };
     pub static FONT_FACE: RefCell<Option<IDWriteFontFace>> = const { RefCell::new(None) };
+    static RENDER_CACHE: RefCell<Option<RenderCache>> = const { RefCell::new(None) };
+}
+
+/// Create or retrieve cached rendering resources.
+///
+/// Recreates resources only if screen dimensions changed.
+unsafe fn get_or_create_cache(factory: &ID2D1Factory, width: i32, height: i32) -> Option<()> {
+    RENDER_CACHE.with(|cache| {
+        let mut cache = cache.borrow_mut();
+
+        // Reuse if dimensions match
+        if let Some(ref c) = *cache {
+            if c.width == width && c.height == height {
+                return Some(());
+            }
+        }
+
+        // Drop old cache (triggers cleanup via Drop)
+        *cache = None;
+
+        // Create new resources
+        let screen_dc = GetDC(None);
+        let mem_dc = CreateCompatibleDC(Some(screen_dc));
+
+        let bmi = BITMAPINFO {
+            bmiHeader: BITMAPINFOHEADER {
+                biSize: std::mem::size_of::<BITMAPINFOHEADER>() as u32,
+                biWidth: width,
+                biHeight: -height, // Top-down
+                biPlanes: 1,
+                biBitCount: 32,
+                biCompression: BI_RGB.0,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        let mut bits: *mut std::ffi::c_void = std::ptr::null_mut();
+        let bitmap = CreateDIBSection(Some(mem_dc), &bmi, DIB_RGB_COLORS, &mut bits, None, 0);
+
+        if bitmap.is_err() || bits.is_null() {
+            ReleaseDC(None, screen_dc);
+            let _ = DeleteDC(mem_dc);
+            return None;
+        }
+        let bitmap = bitmap.unwrap();
+        let _ = SelectObject(mem_dc, bitmap.into());
+
+        // Create DC render target
+        let rt_props = D2D1_RENDER_TARGET_PROPERTIES {
+            r#type: D2D1_RENDER_TARGET_TYPE_DEFAULT,
+            pixelFormat: D2D1_PIXEL_FORMAT {
+                format: DXGI_FORMAT_B8G8R8A8_UNORM,
+                alphaMode: D2D1_ALPHA_MODE_PREMULTIPLIED,
+            },
+            dpiX: 96.0,
+            dpiY: 96.0,
+            usage: D2D1_RENDER_TARGET_USAGE_NONE,
+            minLevel: Default::default(),
+        };
+
+        let dc_render_target = factory.CreateDCRenderTarget(&rt_props).ok()?;
+
+        // Create stroke style (never changes)
+        let stroke_props = D2D1_STROKE_STYLE_PROPERTIES {
+            startCap: D2D1_CAP_STYLE_ROUND,
+            endCap: D2D1_CAP_STYLE_ROUND,
+            dashCap: D2D1_CAP_STYLE_ROUND,
+            lineJoin: D2D1_LINE_JOIN_ROUND,
+            miterLimit: 1.0,
+            dashStyle: D2D1_DASH_STYLE_SOLID,
+            dashOffset: 0.0,
+        };
+        let stroke_style = factory.CreateStrokeStyle(&stroke_props, None).ok()?;
+
+        *cache = Some(RenderCache {
+            screen_dc,
+            mem_dc,
+            bitmap,
+            dc_render_target,
+            stroke_style,
+            width,
+            height,
+        });
+
+        Some(())
+    })
+}
+
+/// Release cached rendering resources (call on app exit).
+pub fn release_render_cache() {
+    RENDER_CACHE.with(|cache| {
+        *cache.borrow_mut() = None;
+    });
 }
 
 /// Create a font face for the Arial Bold font.
@@ -205,6 +324,9 @@ pub fn update_overlay() {
 }
 
 /// Draw using Direct2D and apply with UpdateLayeredWindow.
+///
+/// Uses cached rendering resources (DC, bitmap, render target, stroke style)
+/// to avoid expensive per-frame allocations.
 unsafe fn update_layered_window_d2d(
     state: &WindowsRuntimeState,
     factory: &ID2D1Factory,
@@ -214,64 +336,15 @@ unsafe fn update_layered_window_d2d(
     let width = state.width;
     let height = state.height;
 
-    // Create a compatible DC and ARGB bitmap
-    let screen_dc = GetDC(None);
-    let mem_dc = CreateCompatibleDC(Some(screen_dc));
-
-    let bmi = BITMAPINFO {
-        bmiHeader: BITMAPINFOHEADER {
-            biSize: std::mem::size_of::<BITMAPINFOHEADER>() as u32,
-            biWidth: width,
-            biHeight: -height, // Top-down
-            biPlanes: 1,
-            biBitCount: 32,
-            biCompression: BI_RGB.0,
-            ..Default::default()
-        },
-        ..Default::default()
-    };
-
-    let mut bits: *mut std::ffi::c_void = std::ptr::null_mut();
-    let bitmap = CreateDIBSection(Some(mem_dc), &bmi, DIB_RGB_COLORS, &mut bits, None, 0);
-
-    if bitmap.is_err() || bits.is_null() {
-        ReleaseDC(None, screen_dc);
-        let _ = DeleteDC(mem_dc);
+    // Ensure cached resources exist (only allocates on first call or resize)
+    if get_or_create_cache(factory, width, height).is_none() {
         return;
     }
 
-    let bitmap = bitmap.unwrap();
-    let old_bitmap = SelectObject(mem_dc, bitmap.into());
+    RENDER_CACHE.with(|cache| {
+        let cache = cache.borrow();
+        let cache = cache.as_ref().unwrap();
 
-    // Create DC render target
-    let rt_props = D2D1_RENDER_TARGET_PROPERTIES {
-        r#type: D2D1_RENDER_TARGET_TYPE_DEFAULT,
-        pixelFormat: D2D1_PIXEL_FORMAT {
-            format: DXGI_FORMAT_B8G8R8A8_UNORM,
-            alphaMode: D2D1_ALPHA_MODE_PREMULTIPLIED,
-        },
-        dpiX: 96.0,
-        dpiY: 96.0,
-        usage: D2D1_RENDER_TARGET_USAGE_NONE,
-        minLevel: Default::default(),
-    };
-
-    // Create stroke style with round caps
-    let stroke_props = D2D1_STROKE_STYLE_PROPERTIES {
-        startCap: D2D1_CAP_STYLE_ROUND,
-        endCap: D2D1_CAP_STYLE_ROUND,
-        dashCap: D2D1_CAP_STYLE_ROUND,
-        lineJoin: D2D1_LINE_JOIN_ROUND,
-        miterLimit: 1.0,
-        dashStyle: D2D1_DASH_STYLE_SOLID,
-        dashOffset: 0.0,
-    };
-    let stroke_style: Option<ID2D1StrokeStyle> =
-        factory.CreateStrokeStyle(&stroke_props, None).ok();
-
-    let render_target: Result<ID2D1DCRenderTarget, _> = factory.CreateDCRenderTarget(&rt_props);
-
-    if let Ok(dc_rt) = render_target {
         let rect = windows::Win32::Foundation::RECT {
             left: 0,
             top: 0,
@@ -279,187 +352,167 @@ unsafe fn update_layered_window_d2d(
             bottom: height,
         };
 
-        if dc_rt.BindDC(mem_dc, &rect).is_ok() {
-            let rt: ID2D1RenderTarget = dc_rt.into();
+        if cache.dc_render_target.BindDC(cache.mem_dc, &rect).is_err() {
+            return;
+        }
 
-            rt.BeginDraw();
+        let rt: ID2D1RenderTarget = cache.dc_render_target.clone().into();
 
-            // Clear to transparent
-            rt.Clear(Some(&D2D1_COLOR_F {
-                r: 0.0,
-                g: 0.0,
-                b: 0.0,
-                a: 0.0,
-            }));
+        rt.BeginDraw();
 
-            if state.visible {
-                let mut cursor = POINT::default();
-                let _ = GetCursorPos(&mut cursor);
+        // Clear to transparent
+        rt.Clear(Some(&D2D1_COLOR_F {
+            r: 0.0,
+            g: 0.0,
+            b: 0.0,
+            a: 0.0,
+        }));
 
-                let x = (cursor.x - state.offset_x) as f32;
-                let y = (cursor.y - state.offset_y) as f32;
+        if state.visible {
+            let mut cursor = POINT::default();
+            let _ = GetCursorPos(&mut cursor);
 
-                // Use configured radius/border directly (no DPI scaling needed -
-                // DPI awareness ensures correct screen coverage, user controls actual size)
-                let radius = state.radius as f32;
-                let border = state.border_width as f32;
+            let x = (cursor.x - state.offset_x) as f32;
+            let y = (cursor.y - state.offset_y) as f32;
 
-                rt.SetAntialiasMode(D2D1_ANTIALIAS_MODE_PER_PRIMITIVE);
+            let radius = state.radius as f32;
+            let border = state.border_width as f32;
 
-                let color = D2D1_COLOR_F {
-                    r: state.stroke_r,
-                    g: state.stroke_g,
-                    b: state.stroke_b,
-                    a: 1.0,
-                };
+            rt.SetAntialiasMode(D2D1_ANTIALIAS_MODE_PER_PRIMITIVE);
 
-                if let Ok(brush) = rt.CreateSolidColorBrush(&color, None) {
-                    match state.display_mode {
-                        DISPLAY_MODE_LEFT | DISPLAY_MODE_RIGHT => {
-                            // Use I/D for Spanish, L/R for English
-                            let letter = if state.display_mode == DISPLAY_MODE_LEFT {
-                                if state.lang == LANG_ES {
-                                    'I'
-                                } else {
-                                    'L'
-                                }
-                            } else if state.lang == LANG_ES {
-                                'D'
+            let color = D2D1_COLOR_F {
+                r: state.stroke_r,
+                g: state.stroke_g,
+                b: state.stroke_b,
+                a: 1.0,
+            };
+
+            if let Ok(brush) = rt.CreateSolidColorBrush(&color, None) {
+                match state.display_mode {
+                    DISPLAY_MODE_LEFT | DISPLAY_MODE_RIGHT => {
+                        let letter = if state.display_mode == DISPLAY_MODE_LEFT {
+                            if state.lang == LANG_ES {
+                                'I'
                             } else {
-                                'R'
-                            };
+                                'L'
+                            }
+                        } else if state.lang == LANG_ES {
+                            'D'
+                        } else {
+                            'R'
+                        };
 
-                            // Font size = 3 * radius (matching macOS: letter height = 1.5 * diameter)
-                            let font_size = 3.0 * radius;
+                        let font_size = 3.0 * radius;
 
-                            // Try to create outlined letter geometry
-                            let drew_outline = if let Some(ff) = font_face {
-                                if let Some(letter_geom) =
-                                    create_letter_geometry(factory, ff, letter, font_size, x, y)
-                                {
-                                    // Fill the letter with transparency (matching circle behavior)
-                                    let fill_alpha =
-                                        1.0 - (state.fill_transparency_pct as f32 / 100.0);
-                                    if fill_alpha > 0.0 {
-                                        let fill_color = D2D1_COLOR_F {
-                                            r: state.stroke_r,
-                                            g: state.stroke_g,
-                                            b: state.stroke_b,
-                                            a: fill_alpha,
-                                        };
-                                        if let Ok(fill_brush) =
-                                            rt.CreateSolidColorBrush(&fill_color, None)
-                                        {
-                                            rt.FillGeometry(&letter_geom, &fill_brush, None);
-                                        }
+                        let drew_outline = if let Some(ff) = font_face {
+                            if let Some(letter_geom) =
+                                create_letter_geometry(factory, ff, letter, font_size, x, y)
+                            {
+                                let fill_alpha = 1.0 - (state.fill_transparency_pct as f32 / 100.0);
+                                if fill_alpha > 0.0 {
+                                    let fill_color = D2D1_COLOR_F {
+                                        r: state.stroke_r,
+                                        g: state.stroke_g,
+                                        b: state.stroke_b,
+                                        a: fill_alpha,
+                                    };
+                                    if let Ok(fill_brush) =
+                                        rt.CreateSolidColorBrush(&fill_color, None)
+                                    {
+                                        rt.FillGeometry(&letter_geom, &fill_brush, None);
                                     }
-
-                                    // Draw the stroke/border on top
-                                    rt.DrawGeometry(
-                                        &letter_geom,
-                                        &brush,
-                                        border,
-                                        stroke_style.as_ref(),
-                                    );
-                                    true
-                                } else {
-                                    false
                                 }
+
+                                rt.DrawGeometry(
+                                    &letter_geom,
+                                    &brush,
+                                    border,
+                                    Some(&cache.stroke_style),
+                                );
+                                true
                             } else {
                                 false
-                            };
-
-                            // Fallback: draw a simple indicator if outline failed
-                            if !drew_outline {
-                                // Draw a small filled circle as fallback
-                                let ellipse = D2D1_ELLIPSE {
-                                    point: Vector2::new(x, y),
-                                    radiusX: radius * 0.5,
-                                    radiusY: radius * 0.5,
-                                };
-                                rt.FillEllipse(&ellipse, &brush);
                             }
-                        }
-                        _ => {
-                            // Draw circle (default)
+                        } else {
+                            false
+                        };
+
+                        if !drew_outline {
                             let ellipse = D2D1_ELLIPSE {
                                 point: Vector2::new(x, y),
-                                radiusX: radius,
-                                radiusY: radius,
+                                radiusX: radius * 0.5,
+                                radiusY: radius * 0.5,
                             };
-
-                            // Fill the inner circle with transparency
-                            // 0% transparency = fully opaque (alpha 1.0)
-                            // 100% transparency = fully transparent (alpha 0.0)
-                            let fill_alpha = 1.0 - (state.fill_transparency_pct as f32 / 100.0);
-                            if fill_alpha > 0.0 {
-                                let fill_color = D2D1_COLOR_F {
-                                    r: state.stroke_r,
-                                    g: state.stroke_g,
-                                    b: state.stroke_b,
-                                    a: fill_alpha,
-                                };
-                                if let Ok(fill_brush) = rt.CreateSolidColorBrush(&fill_color, None)
-                                {
-                                    rt.FillEllipse(&ellipse, &fill_brush);
-                                }
-                            }
-
-                            // Draw the stroke/border on top
-                            rt.DrawEllipse(&ellipse, &brush, border, stroke_style.as_ref());
+                            rt.FillEllipse(&ellipse, &brush);
                         }
+                    }
+                    _ => {
+                        let ellipse = D2D1_ELLIPSE {
+                            point: Vector2::new(x, y),
+                            radiusX: radius,
+                            radiusY: radius,
+                        };
+
+                        let fill_alpha = 1.0 - (state.fill_transparency_pct as f32 / 100.0);
+                        if fill_alpha > 0.0 {
+                            let fill_color = D2D1_COLOR_F {
+                                r: state.stroke_r,
+                                g: state.stroke_g,
+                                b: state.stroke_b,
+                                a: fill_alpha,
+                            };
+                            if let Ok(fill_brush) = rt.CreateSolidColorBrush(&fill_color, None) {
+                                rt.FillEllipse(&ellipse, &fill_brush);
+                            }
+                        }
+
+                        rt.DrawEllipse(&ellipse, &brush, border, Some(&cache.stroke_style));
                     }
                 }
             }
-
-            let _ = rt.EndDraw(None, None);
         }
-    }
 
-    // Apply to window
-    let pt_src = POINT { x: 0, y: 0 };
-    let size = SIZE {
-        cx: width,
-        cy: height,
-    };
-    let pt_dst = POINT {
-        x: state.offset_x,
-        y: state.offset_y,
-    };
+        let _ = rt.EndDraw(None, None);
 
-    let blend = windows::Win32::Graphics::Gdi::BLENDFUNCTION {
-        BlendOp: 0,
-        BlendFlags: 0,
-        SourceConstantAlpha: 255,
-        AlphaFormat: 1,
-    };
+        // Apply to window
+        let pt_src = POINT { x: 0, y: 0 };
+        let size = SIZE {
+            cx: width,
+            cy: height,
+        };
+        let pt_dst = POINT {
+            x: state.offset_x,
+            y: state.offset_y,
+        };
 
-    let _ = UpdateLayeredWindow(
-        hwnd,
-        Some(screen_dc),
-        Some(&pt_dst),
-        Some(&size),
-        Some(mem_dc),
-        Some(&pt_src),
-        COLORREF(0),
-        Some(&blend),
-        ULW_ALPHA,
-    );
+        let blend = windows::Win32::Graphics::Gdi::BLENDFUNCTION {
+            BlendOp: 0,
+            BlendFlags: 0,
+            SourceConstantAlpha: 255,
+            AlphaFormat: 1,
+        };
 
-    // Keep window above taskbar (re-assert topmost position each frame)
-    let _ = SetWindowPos(
-        hwnd,
-        Some(HWND_TOPMOST),
-        0,
-        0,
-        0,
-        0,
-        SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE,
-    );
+        let _ = UpdateLayeredWindow(
+            hwnd,
+            Some(cache.screen_dc),
+            Some(&pt_dst),
+            Some(&size),
+            Some(cache.mem_dc),
+            Some(&pt_src),
+            COLORREF(0),
+            Some(&blend),
+            ULW_ALPHA,
+        );
 
-    // Cleanup
-    SelectObject(mem_dc, old_bitmap);
-    let _ = DeleteObject(bitmap.into());
-    let _ = DeleteDC(mem_dc);
-    ReleaseDC(None, screen_dc);
+        // Keep window above taskbar
+        let _ = SetWindowPos(
+            hwnd,
+            Some(HWND_TOPMOST),
+            0,
+            0,
+            0,
+            0,
+            SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE,
+        );
+    });
 }

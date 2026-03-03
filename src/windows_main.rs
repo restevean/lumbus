@@ -32,7 +32,8 @@ use lumbus::platform::windows::input::{
 use lumbus::platform::windows::storage::config;
 use lumbus::platform::windows::ui::dialogs::{show_about_dialog, show_help_overlay};
 use lumbus::platform::windows::ui::overlay::{
-    create_arial_bold_font_face, update_overlay, D2D_FACTORY, DWRITE_FACTORY, FONT_FACE,
+    create_arial_bold_font_face, release_render_cache, update_overlay, D2D_FACTORY, DWRITE_FACTORY,
+    FONT_FACE,
 };
 use lumbus::platform::windows::ui::settings::window as settings_window;
 use lumbus::platform::windows::ui::tray::{
@@ -164,6 +165,7 @@ fn run_app() -> windows::core::Result<()> {
         // Remove system tray icon
         tray::remove_tray_icon();
 
+        release_render_cache();
         FONT_FACE.with(|f| *f.borrow_mut() = None);
         DWRITE_FACTORY.with(|f| *f.borrow_mut() = None);
         D2D_FACTORY.with(|f| *f.borrow_mut() = None);
