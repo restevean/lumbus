@@ -143,6 +143,12 @@ unsafe fn register_ivars(builder: &mut ClassBuilder) {
     // Menu installed flag
     builder.add_ivar::<u8>(c"_menuInstalled"); // bool as u8
 
+    // Frame tracking (skip redundant redraws when cursor is idle)
+    builder.add_ivar::<f64>(c"_lastCursorX");
+    builder.add_ivar::<f64>(c"_lastCursorY");
+    builder.add_ivar::<i32>(c"_lastDisplayMode");
+    builder.add_ivar::<u8>(c"_lastOverlayEnabled"); // bool as u8, init to 2 (neither T/F)
+
     // Refresh timer
     builder.add_ivar::<id>(c"_updateTimer");
 
@@ -318,6 +324,12 @@ unsafe fn initialize_view_ivars(view: id) {
     (*view).store_ivar::<f64>("_lastToggleTs", 0.0);
     set_bool_ivar(view, "_menuInstalled", false);
 
+    // Frame tracking (values that force a redraw on first tick)
+    (*view).store_ivar::<f64>("_lastCursorX", f64::MIN);
+    (*view).store_ivar::<f64>("_lastCursorY", f64::MIN);
+    (*view).store_ivar::<i32>("_lastDisplayMode", -1);
+    (*view).store_ivar::<u8>("_lastOverlayEnabled", 2); // neither true(1) nor false(0)
+
     // Refresh timer
     (*view).store_ivar::<id>("_updateTimer", nil);
 
@@ -345,14 +357,36 @@ unsafe fn process_pending_events(view: id) {
 }
 
 unsafe extern "C-unwind" fn update_cursor_multi(this: &mut AnyObject, _cmd: Sel) {
-    // Process any pending events from the event bus
+    // Process any pending events from the event bus (cheap — always run)
     process_pending_events(this as *mut _ as id);
 
+    // Read current state for idle-skip comparison
     let (x, y) = get_mouse_position_cocoa();
+    let enabled = get_bool_ivar(this as *mut _ as id, "_overlayEnabled");
+    let display_mode = *this.load_ivar::<i32>("_displayMode");
+
+    // Skip expensive screen iteration + redraw if nothing changed
+    let host = this as *mut _ as id;
+    let last_x = *(*host).load_ivar::<f64>("_lastCursorX");
+    let last_y = *(*host).load_ivar::<f64>("_lastCursorY");
+    let last_mode = *(*host).load_ivar::<i32>("_lastDisplayMode");
+    let last_enabled = *(*host).load_ivar::<u8>("_lastOverlayEnabled");
+    let enabled_u8 = if enabled { 1u8 } else { 0u8 };
+
+    if x == last_x && y == last_y && display_mode == last_mode && enabled_u8 == last_enabled {
+        return;
+    }
+
+    // State changed — update tracking ivars
+    (*host).store_ivar::<f64>("_lastCursorX", x);
+    (*host).store_ivar::<f64>("_lastCursorY", y);
+    (*host).store_ivar::<i32>("_lastDisplayMode", display_mode);
+    (*host).store_ivar::<u8>("_lastOverlayEnabled", enabled_u8);
+
+    // Find which screen the cursor is on
     let screens: id = msg_send![get_class("NSScreen"), screens];
     let count: usize = msg_send![screens, count];
 
-    // Work out the screen under the cursor using a stable DisplayID
     let mut target_id: u32 = 0;
     for i in 0..count {
         let s: id = msg_send![screens, objectAtIndex: i];
@@ -366,8 +400,6 @@ unsafe extern "C-unwind" fn update_cursor_multi(this: &mut AnyObject, _cmd: Sel)
             break;
         }
     }
-
-    let enabled = get_bool_ivar(this as *mut _ as id, "_overlayEnabled");
 
     apply_to_all_views(|v| {
         *(*v).load_ivar_mut::<f64>("_cursorXScreen") = x;
