@@ -69,12 +69,12 @@ The workflow installs these targets as needed:
 #### Workflow dependencies
 
 ```
-build-macos ──────┐
-build-windows-x64 ├──► create-release (uploads all artifacts)
-build-windows-arm64 ──┘
+                      ┌── build-macos ──────┐
+verify-version ──────►├── build-windows-x64 ├──► create-release (uploads all artifacts)
+                      └── build-windows-arm64┘
 ```
 
-If ANY build job fails, the release is NOT created.
+If `verify-version` or ANY build job fails, the release is NOT created.
 
 #### Checklist when modifying build process
 
@@ -108,7 +108,7 @@ The codebase follows a **platform-abstraction pattern** with conditional compila
 src/
 ├── main.rs                     # Entry point with cfg gates (~30 lines)
 ├── macos_main.rs               # macOS app orchestrator (~185 lines)
-├── windows_main.rs             # Windows app orchestrator (~285 lines)
+├── windows_main.rs             # Windows app orchestrator (~290 lines)
 ├── lib.rs                      # Shared helpers + re-exports
 ├── events/                     # Cross-platform event bus
 │   ├── bus.rs                  # EventBus with publish/subscribe
@@ -143,7 +143,7 @@ src/
 - App orchestrator: window creation, timer setup, hotkey installation
 - CustomView logic extracted to `platform/macos/ui/overlay/view.rs`
 
-**`src/windows_main.rs`** (~285 lines)
+**`src/windows_main.rs`** (~290 lines)
 - App orchestrator: COM init, window creation, message loop
 - State/rendering extracted to `platform/windows/app/` and `ui/overlay/`
 

@@ -27,6 +27,17 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 cd "$PROJECT_ROOT"
 
+# 0. Uncommitted Cargo.lock
+echo -e "${YELLOW}[0/5] Checking Cargo.lock is committed...${NC}"
+
+if git diff --name-only | grep -q '^Cargo.lock$'; then
+    echo -e "${RED}   ERROR: Cargo.lock has uncommitted changes${NC}"
+    echo -e "   Run: git add Cargo.lock && git commit --amend --no-edit"
+    ERRORS=$((ERRORS + 1))
+else
+    echo -e "${GREEN}   OK: Cargo.lock is clean${NC}"
+fi
+
 # 1. Version Consistency
 echo -e "${YELLOW}[1/5] Checking version consistency...${NC}"
 
