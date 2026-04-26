@@ -32,7 +32,7 @@ Highlight the mouse pointer across **all** displays with a configurable circle. 
 | Action | macOS | Windows |
 |--------|-------|---------|
 | Toggle overlay | `Ctrl+A` | `Ctrl+Shift+A` |
-| Open Settings | `Ctrl+,` | `Ctrl+Shift+S` |
+| Open Settings | `Cmd+Shift+,` | `Ctrl+Shift+S` |
 | Show Help | `Cmd+Shift+H` | `Ctrl+Shift+H` |
 | Quit | `Ctrl+Shift+X` | `Ctrl+Shift+Q` |
 
@@ -92,7 +92,7 @@ cargo build --release
 
 1. **Launch** the app. A circle appears following your cursor.
 2. **Toggle** visibility with the hotkey (`Ctrl+A` on macOS, `Ctrl+Shift+A` on Windows).
-3. **Configure** via Settings hotkey (`Ctrl+,`) or tray/status bar menu.
+3. **Configure** via Settings hotkey (`Cmd+Shift+,`) or tray/status bar menu.
 4. **Click** to see L/R indicators (or I/D in Spanish).
 
 ### Settings Panel
@@ -156,7 +156,7 @@ src/
         └── storage/     # JSON config
 ```
 
-**Tests:** 65 unit tests (`cargo test`)
+**Tests:** 59 unit tests (`cargo test`)
 
 ---
 

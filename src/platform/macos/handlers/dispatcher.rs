@@ -24,7 +24,7 @@ use crate::platform::macos::ui::show_help_overlay;
 ///
 /// This is necessary because macOS run loop continues processing timers
 /// while a modal dialog is open via `runModalForWindow:`. Without this guard,
-/// pressing Ctrl+, multiple times quickly would open multiple settings windows.
+/// pressing Cmd+Shift+, multiple times quickly would open multiple settings windows.
 ///
 /// The guard is acquired at the START of dispatch_events and released
 /// when the modal closes, preventing race conditions where two timer

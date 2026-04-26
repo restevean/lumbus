@@ -3,7 +3,7 @@
 #
 # Checks:
 # 1. Version consistency between Cargo.toml and Info.plist
-# 2. Hotkey documentation consistency (Ctrl+, not Cmd+,)
+# 2. Hotkey documentation consistency (Cmd+Shift+, for Settings)
 # 3. Dependencies mentioned in docs match actual crates
 # 4. Test count in README matches actual tests
 #
@@ -73,17 +73,18 @@ if [ -n "$PUSHING_TAG" ]; then
     fi
 fi
 
-# 2. Hotkey Documentation (Settings should be Ctrl+, not Cmd+,)
+# 2. Hotkey Documentation (Settings should be Cmd+Shift+,)
 echo -e "${YELLOW}[2/5] Checking hotkey documentation...${NC}"
 
-# Check for old Cmd+, references (should be Ctrl+,)
-OLD_HOTKEY_REFS=$(grep -rn "⌘.*," --include="*.md" --include="*.rs" . 2>/dev/null | grep -i "settings\|Open\|Abrir" | grep -v "target/" || true)
+# Check for old Ctrl+, references for Settings on macOS (should be Cmd+Shift+,)
+# Search for the literal "Ctrl + ," hotkey string (macOS Settings was Ctrl+Comma before v0.5.3)
+OLD_HOTKEY_REFS=$(grep -rn "Ctrl + ," --include="*.md" --include="*.rs" . 2>/dev/null | grep -v "target/" || true)
 if [ -n "$OLD_HOTKEY_REFS" ]; then
-    echo -e "${RED}   ERROR: Found old Cmd+, references for Settings:${NC}"
+    echo -e "${RED}   ERROR: Found old Ctrl+, references for macOS Settings:${NC}"
     echo "$OLD_HOTKEY_REFS" | while read line; do echo "   $line"; done
     ERRORS=$((ERRORS + 1))
 else
-    echo -e "${GREEN}   OK: Settings hotkey is Ctrl+, everywhere${NC}"
+    echo -e "${GREEN}   OK: Settings hotkey is Cmd+Shift+, everywhere${NC}"
 fi
 
 # 3. Dependencies in README

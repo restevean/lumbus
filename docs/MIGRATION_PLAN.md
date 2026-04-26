@@ -366,5 +366,5 @@ Cleanup: Eliminar bridge, tests          [1-2 horas]
 
 1. **Circulo desaparecia**: Ventanas/vistas eran autoreleased. Fix: `retain` + `mem::forget`
 2. **Tipos de retorno incorrectos**: `runModalForWindow:` → `i64`, `CGColor` → `CGColorRef`
-3. **Hotkey Cmd+, conflictuaba**: Cambiado a `Ctrl+,`
+3. **Hotkey Cmd+, conflictuaba**: Cambiado a `Cmd+Shift+,` (antes `Ctrl+,`)
 4. **Multiples ventanas modales**: Guard atomico en dispatcher + drain de eventos duplicados

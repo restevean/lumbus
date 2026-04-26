@@ -25,7 +25,7 @@ pub type HotkeyHandler = extern "C" fn(
 ///
 /// Registers:
 /// - Ctrl+A: Toggle overlay
-/// - Cmd+,: Open Settings
+/// - Cmd+Shift+,: Open Settings
 /// - Cmd+Shift+H: Show Help
 /// - Ctrl+Shift+X: Quit confirmation
 ///
@@ -80,8 +80,8 @@ pub unsafe fn install_hotkeys(view: id, handler: HotkeyHandler) {
 
     // Ctrl + A (toggle)
     register_hotkey!(KC_A, CONTROL_KEY, HKID_TOGGLE, "_hkToggle");
-    // Ctrl + , → Settings (Cmd+, conflicts with macOS system shortcut)
-    register_hotkey!(KC_COMMA, CONTROL_KEY, HKID_SETTINGS_COMMA, "_hkComma");
+    // Cmd + Shift + , → Settings
+    register_hotkey!(KC_COMMA, CMD_KEY | SHIFT_KEY, HKID_SETTINGS_COMMA, "_hkComma");
     // Cmd + Shift + H → Help
     register_hotkey!(KC_H, CMD_KEY | SHIFT_KEY, HKID_HELP, "_hkHelp");
     // Ctrl + Shift + X → Quit confirmation

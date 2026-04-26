@@ -14,7 +14,7 @@ pub enum AppEvent {
     /// Toggle overlay visibility (Ctrl+A)
     ToggleOverlay,
 
-    /// Open settings window (Cmd+, or Cmd+;)
+    /// Open settings window (Cmd+Shift+,)
     OpenSettings,
 
     /// Request application quit with confirmation dialog (Ctrl+Shift+X)

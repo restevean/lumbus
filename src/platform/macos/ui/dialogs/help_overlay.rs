@@ -34,7 +34,7 @@ const HOTKEYS: &[HotkeyEntry] = &[
         description_key: "Toggle overlay",
     },
     HotkeyEntry {
-        keys: "Ctrl + ,",
+        keys: "\u{2318} + Shift + ,",
         description_key: "Open settings",
     },
     HotkeyEntry {
